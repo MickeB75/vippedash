@@ -14,6 +14,13 @@
 - Oberoende deluppgifter kan köras parallellt, men två subagenter får inte ändra samma fil samtidigt.
 - Subagenten redovisar vad den har ändrat (filer och en kort sammanfattning) och committar inte själv.
 
+## Verktyg
+
+- De vanligaste jobben har egna kommandon med checklistor i `.claude/skills/`: `/ny-bana`, `/fixa-bana`, `/ny-skin`, `/ny-karaktar` och `/mobil`. Följ dem när uppgiften passar.
+- Subagenter kontrollerar sitt eget arbete utan webbläsare: `python tools/verify.py [bana] [--windows]` (går banan att klara, hur snäva är hoppen), `python tools/shot.py "<sida>"` (PNG som kan läsas med Read), `tools/map.html` (banans karta), `tools/skins.html?t=0` (alla skins, byte-identisk bild för samma kod) och debug-URL:er som `index.html?debug&level=forest&cp=5&freeze`. Detaljerna står i README.
+- Ge subagenten de verktygskommandon som behövs i uppdraget och be den visa bilder eller utdata som bevis i rapporten.
+- Previewn startas med `preview_start` (konfigurationerna i `.claude/launch.json`), aldrig med Bash. Om port 8765 är upptagen av användarens egen server, använd `vippedash-alt` (8766) i stället för att stänga den.
+
 ## Godkännande
 
 - Opus läser igenom ändringarna (till exempel med `git diff`) innan de godkänns.

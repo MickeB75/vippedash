@@ -262,6 +262,16 @@ html, body {
 .btn.hidden { display: none; }
 .help { margin: 0; font-family: system-ui, sans-serif; font-size: calc(var(--u) * 15px); color: #aab6d8; }
 .help b { color: #fff; }
+.version {
+  position: absolute;
+  right: calc(var(--u) * 16px);
+  bottom: calc(var(--u) * 10px);
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  font-size: max(10px, calc(var(--u) * 12px)); /* readable on a phone too: it's how you tell which build it runs */
+  color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
 h2 { margin: 0 0 calc(var(--u) * 6px); font-weight: normal; font-size: calc(var(--u) * 52px); }
 .wintitle { color: #ffd634; -webkit-text-stroke: calc(var(--u) * 2px) #6b3a00; }
 .sub { margin: 0; max-width: calc(var(--u) * 560px); font-family: system-ui, sans-serif; font-size: calc(var(--u) * 18px); color: #dfe8ff; }

@@ -14,7 +14,8 @@
 <body>
 <h2>VippeDash level verifier</h2>
 <p>Runs the search bot from every checkpoint to the next one using the real game physics.
-Add <code>?level=forest</code> to check one level only (default: all levels), and <code>windows</code>
+Add <code>?level=forest</code> (or a comma-separated list, e.g. <code>?level=forest,metro</code>) to check only
+those levels (default: all levels), and <code>windows</code>
 (e.g. <code>?level=forest&amp;windows</code>) to also measure how much timing slack every jump has (slower).</p>
 <div id="out">Running…</div>
 <script src="../js/util.js"></script>
@@ -26,10 +27,24 @@ Add <code>?level=forest</code> to check one level only (default: all levels), an
     const q = new URLSearchParams(location.search);
     const windows = q.has('windows');
     const only = q.get('level');
-    const levels = VD.LEVELS.filter((L) => !only || L.id === only);
+    const onlyIds = only ? only.split(',').map((s) => s.trim()).filter(Boolean) : null;
+    const levels = VD.LEVELS.filter((L) => !onlyIds || onlyIds.includes(L.id));
     const t0 = performance.now();
     let html = '';
     window.REPORT = {};
+    // machine-readable copy for tools/verify.py, built alongside the HTML table below
+    const jsonReport = { windows, levels: [] };
+    function rowJson(r) {
+      const o = { cp: r.cp, from: r.from, to: r.to, ok: r.ok, maxX: r.maxX, nodes: r.nodes };
+      if (r.ship) {
+        o.ship = true;
+        o.fatOk = r.fatOk;
+      } else if (r.windows) {
+        o.windows = r.windows;
+        o.minWindow = r.minWindow;
+      }
+      return o;
+    }
     for (const L of levels) {
       const lvl = VD.buildLevel(L.id);
       const rep = VD.Solver.verifyAll(lvl, { windows });
@@ -52,8 +67,22 @@ Add <code>?level=forest</code> to check one level only (default: all levels), an
       html += '<p>Full run start → finish: <b class="' + (full.ok ? 'ok' : 'bad') + '">' + (full.ok ? 'beatable' : 'NOT beatable (' + full.reason + ', furthest ' + full.maxX.toFixed(1) + ')') + '</b> (' + full.nodes + ' nodes)</p>';
       if (windows) html += '<pre>' + JSON.stringify(rep.map((r) => ({ cp: r.cp, windows: r.windows })), null, 1) + '</pre>';
       window.REPORT[L.id] = { rep, full };
+      jsonReport.levels.push({
+        id: L.id,
+        num: L.num,
+        name: L.name,
+        checkpoints: lvl.checkpoints.length,
+        seconds: +(lvl.finishX / VD.PHYS.SPEED).toFixed(1),
+        rows: rep.map(rowJson),
+        full: { ok: full.ok, reason: full.reason || null, maxX: +full.maxX.toFixed(1), nodes: full.nodes },
+      });
     }
     html += '<p>Total ' + Math.round(performance.now() - t0) + ' ms</p>';
+    // escape '<' so a stray '</script' inside any data (e.g. a reason string) can't end this element early
+    // when the browser's HTML parser re-parses the innerHTML string below; the < escape round-trips
+    // through JSON.parse()/json.loads() back to '<' with no extra unescaping needed on the reading side.
+    const jsonText = JSON.stringify(jsonReport).replace(/</g, '\\u003c');
+    html += '<script type="application/json" id="report">' + jsonText + '<' + '/script>';
     document.getElementById('out').innerHTML = html;
   }, 50);
 </script>

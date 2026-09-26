@@ -10,6 +10,7 @@ const FILES = [
   'css/style.css',
   'fonts/LilitaOne-Regular.ttf',
   'js/util.js',
+  'js/version.js',
   'js/physics.js',
   'js/level.js',
   'js/solver.js',

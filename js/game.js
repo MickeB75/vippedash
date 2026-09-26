@@ -39,6 +39,7 @@
     bindInput();
     bindUI();
     refreshMenu();
+    if (G.debug) applyDebugStart();
     G.last = performance.now();
     requestAnimationFrame(loop);
   };
@@ -99,6 +100,7 @@
 
   function bindInput() {
     addEventListener('keydown', (e) => {
+      if (G.freeze) G.freeze = false; // any key unfreezes a ?freeze debug start
       if (JUMP.has(e.code)) e.preventDefault();
       if (e.repeat) return;
       if (e.code === 'Escape' || e.code === 'KeyP') {
@@ -149,6 +151,7 @@
     const cv = $('game');
     cv.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      if (G.freeze) G.freeze = false; // any click/tap unfreezes a ?freeze debug start
       const r = cv.getBoundingClientRect();
       const lx = ((e.clientX - r.left) / r.width) * R.W, ly = ((e.clientY - r.top) / r.height) * R.H;
       if (lx > R.W - 70 && ly < 66 && G.state === 'play') return G.pause();
@@ -163,12 +166,13 @@
     };
     addEventListener('pointerup', up);
     addEventListener('pointercancel', up);
+    // losing focus pauses the run, except a ?freeze debug start: nothing moves, and the pause menu would hide it
     addEventListener('blur', () => {
       releaseAll();
-      if (G.state === 'play') G.pause();
+      if (G.state === 'play' && !G.freeze) G.pause();
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && G.state === 'play') G.pause();
+      if (document.hidden && G.state === 'play' && !G.freeze) G.pause();
     });
   }
 
@@ -196,6 +200,100 @@
     const res = VD.Solver.solve(G.lvl, Ph.clone(fromState), G.lvl.finishX + 1, { k: 4, maxNodes: 3000000 });
     G.botPath = res.ok ? res.path : null;
     G.botTick = 0;
+  }
+
+  // ------------------------------------------------------------------ debug URL params (debug mode only)
+  // index.html?debug&level=forest&cp=5   or the same after the hash: index.html#debug&level=forest&cp=5
+  // level, cp, x, skin, bot, god, freeze, mute, shop — lets a URL drop straight into a spot for screenshots.
+  function debugParams() {
+    const out = {};
+    const merge = (str) => {
+      if (!str) return;
+      for (const [k, v] of new URLSearchParams(str)) if (!(k in out)) out[k] = v;
+    };
+    merge(location.search);
+    merge(location.hash.replace(/^#/, ''));
+    return out;
+  }
+  // spawn at the last checkpoint at or before x, solve a path past x, then replay it with the real
+  // physics and stop as soon as x is reached, so the player's mode/gravity/layer are all consistent.
+  function fastForwardTo(x) {
+    const lvl = G.lvl;
+    const from = Ph.clone(G.s);
+    const res = VD.Solver.solve(lvl, Ph.clone(from), x, { k: 4, maxNodes: 3000000 });
+    if (!res.ok) {
+      console.warn('VippeDash debug: no solver path to x=' + x + ' (' + res.reason + '); staying at the checkpoint');
+      return;
+    }
+    const s = Ph.clone(from);
+    let reached = false;
+    for (let d = 0; d < res.path.length && !reached; d++) {
+      for (let k = 0; k < res.K; k++) {
+        Ph.step(s, res.path[d], lvl, null);
+        if (s.dead) {
+          console.warn('VippeDash debug: replay crashed before reaching x=' + x + '; staying at the checkpoint');
+          return;
+        }
+        if (s.x >= x) {
+          reached = true;
+          break;
+        }
+      }
+    }
+    G.s = s;
+    G.cpIndex = lvl.checkpointAt(s.x); // so a crash after the x-start respawns at the normal last checkpoint
+    G.vis = { rot: 0, wheel: 0, oT: 0 };
+    G.camV = G.camVT = lvl.depthOf(s.layer);
+    G.camX = s.x - R.PX;
+    AU.startMusic(s.x / P.SPEED);
+  }
+  function applyDebugStart() {
+    const q = debugParams();
+    let startCp = null;
+    if ('level' in q) {
+      if (VD.LEVELS.some((L) => L.id === q.level)) {
+        if (q.level !== G.levelDef.id) selectLevel(q.level);
+      } else {
+        console.warn('VippeDash debug: unknown level "' + q.level + '"');
+      }
+    }
+    if ('cp' in q) {
+      const n = +q.cp;
+      if (Number.isInteger(n) && n >= 0 && n < G.lvl.checkpoints.length) startCp = n;
+      else console.warn('VippeDash debug: cp out of range: ' + q.cp);
+    }
+    if ('level' in q || 'cp' in q || 'x' in q) {
+      if ('x' in q) {
+        const x = +q.x;
+        if (Number.isFinite(x)) {
+          G.start(G.lvl.checkpointAt(x));
+          fastForwardTo(x);
+        } else {
+          console.warn('VippeDash debug: bad x value "' + q.x + '"');
+          G.start(startCp || 0);
+        }
+      } else {
+        G.start(startCp || 0);
+      }
+    }
+    if ('skin' in q) {
+      // session-only: bypasses ownership and isn't saved, so coins/owned skins are untouched
+      if (Art.SKINS[q.skin]) G.skin = q.skin;
+      else console.warn('VippeDash debug: unknown skin "' + q.skin + '"');
+    }
+    if ('bot' in q) {
+      G.bot = true;
+      if (G.s) computeBot(G.s);
+    }
+    if ('god' in q) G.god = true;
+    if ('mute' in q) {
+      AU.setMuted(true); // session only: never persisted to the saved mute setting
+      updateMuteIcon();
+    }
+    if ('freeze' in q) G.freeze = true; // must come last: freezes the state the params above just set up
+    refreshMenu();
+    // shop: open the shop on the tab of the skin being worn (with skin=, that skin's character); menu only
+    if ('shop' in q && G.state === 'menu') openShop();
   }
 
   // ------------------------------------------------------------------ UI
@@ -381,14 +479,15 @@
   }
 
   // ------------------------------------------------------------------ states
-  G.start = function () {
+  // cpIndex: which checkpoint to start at (default 0). Used by debug URL params (?cp=, ?x=) to start elsewhere.
+  G.start = function (cpIndex) {
     AU.init();
     G.shopOpen = false;
     show('menu', false);
     show('shop', false);
     show('pause', false);
     show('win', false);
-    G.cpIndex = 0;
+    G.cpIndex = cpIndex || 0;
     G.attempts = 0;
     G.deaths = 0;
     G.runTime = 0;
@@ -667,7 +766,7 @@
     G.clock += dt;
     G.fps = G.fps ? G.fps * 0.95 + (1 / Math.max(dt, 0.001)) * 0.05 : 60;
 
-    if (G.state === 'play') {
+    if (G.state === 'play' && !G.freeze) {
       G.acc += dt;
       G.runTime += dt;
       let n = 0;

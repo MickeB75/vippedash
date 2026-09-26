@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VippeDash level map</title>
+<style>
+  html, body { margin: 0; background: #12141a; }
+  body { font: 13px/1.5 system-ui, sans-serif; color: #dfe3ea; padding: 16px; }
+  h2 { margin: 0 0 6px; font-size: 18px; }
+  p.info { max-width: 960px; color: #9aa1ad; }
+  p.info code { color: #cfe0ff; }
+  #status { color: #f2c94c; margin-bottom: 10px; }
+  canvas { display: block; background: #12141a; }
+</style>
+</head>
+<body>
+<h2>VippeDash level map</h2>
+<p class="info">
+  Draws a schematic top-down/side map of a level's layout (not the game's art), so a level's rhythm and
+  hitboxes can be checked at a glance. Query params: <code>level=&lt;id&gt;</code> (default: the first
+  level), <code>from=&lt;x&gt;</code> / <code>to=&lt;x&gt;</code> (block range to draw, default the whole
+  level), <code>cols=&lt;n&gt;</code> (blocks per row, default 100), <code>scale=&lt;n&gt;</code>
+  (pixels per block, default 12), <code>bot</code> (run the search bot from every checkpoint and draw its
+  path, red where a segment fails) and <code>windows</code> (implies <code>bot</code>; also colour each
+  press by its timing slack: green &gt;= 90&nbsp;ms, yellow 50-89, red &lt; 50).
+</p>
+<div id="status">Building map…</div>
+<div id="wrap"></div>
+<script src="../js/util.js"></script>
+<script src="../js/physics.js"></script>
+<script src="../js/level.js"></script>
+<script src="../js/solver.js"></script>
+<script>
+(function () {
+  try {
+    run();
+  } catch (e) {
+    document.getElementById('status').textContent = 'Error: ' + e.message;
+    document.body.dataset.shotSize = '900x200';
+    window.MAP_DONE = true;
+    throw e;
+  }
+
+  function run() {
+    const Ph = VD.Physics;
+
+    // ======================================================================
+    // PALETTE
+    // ======================================================================
+    const COL = {
+      bg: '#12141a',
+      gridMinor: 'rgba(255,255,255,0.05)',
+      gridMajor: 'rgba(255,255,255,0.12)',
+      ground: '#e7eaf0',
+      ceil: '#6fa8dc',
+      text: '#c7ccd6',
+      textDim: '#7d8492',
+      areaBand: ['#3a5f7d', '#5a4a7d', '#7d4a5a', '#4a7d5f', '#7d6a3a', '#3a6a7d', '#6a3a7d', '#5a7d3a'],
+      hazardFill: 'rgba(255,90,90,0.55)',
+      hazardStroke: '#ff5a5a',
+      hitbox: '#ff33aa',
+      water: 'rgba(70,150,230,0.6)',
+      waterStroke: '#3f8ddb',
+      rail: 'rgba(255,190,40,0.7)',
+      railStroke: '#e0a41e',
+      pad: '#ffd23f',
+      orbFill: 'rgba(255,224,102,0.35)',
+      orbStroke: '#ffe066',
+      portal: { cube: '#8fd6a0', ship: '#5aa8ff', ball: '#c58cf0' },
+      checkpoint: '#33d6c0',
+      finish: '#ffffff',
+      hole: '#ff9d3a',
+      botPath: '#22e5ff',
+      botFail: '#ff3b3b',
+      pressNeutral: '#e8ecf2',
+      pressOk: '#3ddc73',
+      pressWarn: '#ffcf3d',
+      pressBad: '#ff4d4d',
+    };
+
+    // deterministic string -> hue, so each solid `style` gets its own (muted) tint
+    function styleHue(style) {
+      let h = 0;
+      const s = style || 'stone';
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      return h % 360;
+    }
+    function styleFill(style) { return 'hsl(' + styleHue(style) + ',20%,40%)'; }
+    function styleStroke(style) { return 'hsl(' + styleHue(style) + ',24%,64%)'; }
+
+    // ======================================================================
+    // PARAMS
+    // ======================================================================
+    const q = new URLSearchParams(location.search);
+    const levelId = q.get('level') || VD.LEVELS[0].id;
+    const lvl = VD.buildLevel(levelId);
+    const def = VD.levelDef(levelId);
+    const fromX = q.has('from') ? +q.get('from') : 0;
+    const toX = q.has('to') ? +q.get('to') : lvl.finishX + 20;
+    const cols = q.has('cols') ? Math.max(10, +q.get('cols')) : 100;
+    const scale = q.has('scale') ? Math.max(2, +q.get('scale')) : 12;
+    const showWindows = q.has('windows');
+    const showBot = showWindows || q.has('bot');
+
+    // ======================================================================
+    // BOT — run the search bot over every checkpoint segment that overlaps the view
+    // ======================================================================
+    function samplePoint(s) {
+      const ph = Ph.boxH(s);
+      return { x: s.x, y: s.y + ph / 2, mode: s.mode, layer: s.layer };
+    }
+
+    function runBot() {
+      const cps = lvl.checkpoints;
+      const segs = [];
+      for (let i = 0; i < cps.length; i++) {
+        const target = i + 1 < cps.length ? cps[i + 1].x + 2 : lvl.finishX + 1;
+        if (target < fromX || cps[i].x > toX) continue; // outside the drawn range
+        const start = Ph.spawn(cps[i]);
+        const res = VD.Solver.solve(lvl, start, target, { k: 4 });
+        const hasShip = start.mode === 'ship' || lvl.objs.some((o) => o.t === 'portal' && o.mode === 'ship' && o.x >= cps[i].x && o.x < target);
+        const seg = { cp: i, from: cps[i].x, to: target, ok: res.ok, maxX: res.maxX, hasShip, points: [], presses: [], breaks: [] };
+        let lastLayer = start.layer;
+        // advance one physics step, sample the point and, if a hole just dropped the player onto
+        // the next layer, record a compact "break" marker instead of letting the polyline connect
+        // the pre-drop and post-drop points (that jump is a raw-y artefact of the drop, not a real
+        // 15-block leap upward — see physics.js's `holeAt`/`s.y += hole.shift`)
+        const tick = (s, held) => {
+          const prevY = seg.points.length ? seg.points[seg.points.length - 1].y : null;
+          Ph.step(s, held, lvl, null);
+          const p = samplePoint(s);
+          if (p.layer !== lastLayer) seg.breaks.push({ x: p.x, y: prevY == null ? p.y : prevY, layer: p.layer });
+          lastLayer = p.layer;
+          seg.points.push(p);
+          return p;
+        };
+        if (res.ok) {
+          const s = Ph.clone(start);
+          const K = res.K;
+          seg.points.push(samplePoint(s));
+          for (let d = 0; d < res.path.length; d++) {
+            if (res.path[d] && (d === 0 || !res.path[d - 1])) seg.presses.push({ x: s.x, y: s.y + Ph.boxH(s) / 2 });
+            for (let k = 0; k < K; k++) {
+              tick(s, res.path[d]);
+              if (s.dead) break;
+            }
+            if (s.dead) break;
+          }
+          if (showWindows && !hasShip) {
+            const w = VD.Solver.analyze(lvl, start, target, res, { maxShift: 8 });
+            for (let j = 0; j < seg.presses.length && j < w.length; j++) seg.presses[j].ms = w[j].ms;
+          }
+        } else {
+          // best-effort partial path for a failing segment: solve up to just short of the furthest x
+          // reached, replay it, then keep stepping (release) to show how it dies for the report
+          let res2 = null;
+          const nearTarget = Math.max(start.x + 0.2, res.maxX - 0.15);
+          try {
+            res2 = VD.Solver.solve(lvl, start, nearTarget, { k: 4, maxNodes: 300000 });
+          } catch (e) { res2 = null; }
+          const s = Ph.clone(start);
+          seg.points.push(samplePoint(s));
+          if (res2 && res2.ok) {
+            const K = res2.K;
+            for (let d = 0; d < res2.path.length && !s.dead; d++) {
+              if (res2.path[d] && (d === 0 || !res2.path[d - 1])) seg.presses.push({ x: s.x, y: s.y + Ph.boxH(s) / 2 });
+              for (let k = 0; k < K && !s.dead; k++) tick(s, res2.path[d]);
+            }
+          }
+          seg.failFrom = seg.points.length - 1;
+          let tries = 0;
+          while (!s.dead && s.x < res.maxX + 3 && tries < 3000) {
+            tick(s, false);
+            tries++;
+          }
+          seg.fails = true;
+          seg.failX = res.maxX;
+        }
+        segs.push(seg);
+      }
+      return segs;
+    }
+
+    const botSegs = showBot ? runBot() : [];
+
+    // ======================================================================
+    // VERTICAL EXTENT — how tall the drawing needs to be, from the objects actually in view
+    // ======================================================================
+    function topOf(o) {
+      if (o.t === 'solid') return o.y + o.h;
+      if (o.t === 'haz') return Math.max(o.y + (o.h || 0), o.hy1);
+      if (o.t === 'pad') return o.y + o.h;
+      if (o.t === 'orb') return o.cy + 0.6;
+      if (o.t === 'portal') return o.y + o.h;
+      return (o.y || 0) + 1;
+    }
+    function botOf(o) {
+      if (o.t === 'haz') return Math.min(o.y, o.hy0);
+      return o.y || 0;
+    }
+
+    // ======================================================================
+    // LAYOUT
+    // ======================================================================
+    const LEFT = 56, RIGHT = 24;
+    const RULER_H = 16, AREA_H = 13, ROW_GAP = 30;
+    const rowHeaderH = RULER_H + AREA_H + 4;
+    const rows = Math.max(1, Math.ceil((toX - fromX) / cols));
+
+    function rowX0(r) { return fromX + r * cols; }
+    function rowX1(r) { return Math.min(rowX0(r) + cols, toX); }
+
+    // each row's vertical extent comes from ONLY that row's own content, so a tall excursion
+    // in one row (e.g. the long fall inside a hole) doesn't force every other row to reserve
+    // that much height too — rows stay only as tall as they need to be
+    const rowYTop = [], rowYBot = [];
+    for (let r = 0; r < rows; r++) {
+      const x0 = rowX0(r), x1 = rowX1(r);
+      let top = 4, bot = -1;
+      for (const o of lvl.objs) {
+        const w = o.w || 1;
+        if (o.x + w < x0 || o.x > x1) continue;
+        top = Math.max(top, topOf(o));
+        bot = Math.min(bot, botOf(o));
+      }
+      for (const c of lvl.corridors) if (c.x1 > x0 && c.x0 < x1) top = Math.max(top, c.ceil);
+      for (const cp of lvl.checkpoints) if (cp.x >= x0 && cp.x < x1) top = Math.max(top, (cp.y || 0) + 3, cp.ceil || 0);
+      for (const seg of botSegs) for (const p of seg.points) if (p.x >= x0 && p.x < x1) { top = Math.max(top, p.y + 1); bot = Math.min(bot, p.y - 0.5); }
+      rowYTop.push(top + 1.5);
+      rowYBot.push(bot - 0.5);
+    }
+    function trackH(r) { return (rowYTop[r] - rowYBot[r]) * scale; }
+
+    // legend items (drawn once, at the top)
+    const legendItems = [
+      { shape: 'rect', color: styleFill('stone'), stroke: styleStroke('stone'), label: 'solid (per-style tint)' },
+      { shape: 'spike', color: COL.hazardFill, label: 'spike / half / thorny' },
+      { shape: 'circle', color: COL.hazardFill, label: 'bird' },
+      { shape: 'hitbox', label: 'hazard hitbox' },
+      { shape: 'strip', color: COL.water, label: 'water' },
+      { shape: 'strip', color: COL.rail, label: 'live rail' },
+      { shape: 'bar', color: COL.pad, label: 'pad' },
+      { shape: 'orb', color: COL.orbStroke, label: 'orb' },
+      { shape: 'portal', color: COL.portal.cube, label: 'portal: cube' },
+      { shape: 'portal', color: COL.portal.ship, label: 'ship' },
+      { shape: 'portal', color: COL.portal.ball, label: 'ball' },
+      { shape: 'flag', color: COL.checkpoint, label: 'checkpoint' },
+      { shape: 'finishline', label: 'finish' },
+      { shape: 'hole', label: 'hole / layer drop' },
+    ];
+    if (showBot) {
+      legendItems.push({ shape: 'path', color: COL.botPath, label: 'bot path' });
+      legendItems.push({ shape: 'path', color: COL.botFail, label: 'bot path (fails)' });
+      if (showWindows) {
+        legendItems.push({ shape: 'dot', color: COL.pressOk, label: 'press >= 90ms slack' });
+        legendItems.push({ shape: 'dot', color: COL.pressWarn, label: 'press 50-89ms' });
+        legendItems.push({ shape: 'dot', color: COL.pressBad, label: 'press < 50ms' });
+      } else {
+        legendItems.push({ shape: 'dot', color: COL.pressNeutral, label: 'press starts' });
+      }
+    }
+
+    const contentW = cols * scale;
+    const canvasW = LEFT + contentW + RIGHT;
+    const TITLE_H = 40;
+    // wrap the legend to the canvas width
+    const legendItemW = 190, legendRowH = 20;
+    const perRow = Math.max(1, Math.floor((canvasW - LEFT) / legendItemW));
+    const legendRows = Math.ceil(legendItems.length / perRow);
+    const LEGEND_H = legendRows * legendRowH + 10;
+    const contentTop = TITLE_H + LEGEND_H;
+
+    // cumulative pixel offset of each row's top (rows can have different heights, see rowYTop/rowYBot)
+    const rowOffsetY = [];
+    let accY = contentTop;
+    for (let r = 0; r < rows; r++) {
+      rowOffsetY.push(accY);
+      accY += rowHeaderH + trackH(r) + ROW_GAP;
+    }
+    const canvasH = accY - ROW_GAP + 20;
+
+    // ======================================================================
+    // CANVAS
+    // ======================================================================
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(400, Math.round(canvasW));
+    canvas.height = Math.max(200, Math.round(canvasH));
+    document.getElementById('wrap').appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = COL.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // ---- title ----
+    ctx.fillStyle = '#f0f2f6';
+    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('Level ' + def.num + ': ' + def.name + '  (' + def.id + ')', LEFT, 20);
+    ctx.fillStyle = COL.textDim;
+    ctx.font = '12px system-ui, sans-serif';
+    const lenS = (lvl.finishX / VD.PHYS.SPEED).toFixed(1);
+    let info = lvl.finishX + ' blocks, ' + lenS + ' s, ' + lvl.checkpoints.length + ' checkpoints';
+    if (fromX !== 0 || toX !== lvl.finishX + 20) info += '  —  showing x ' + fromX + '–' + toX;
+    if (showBot) {
+      const okN = botSegs.filter((s) => s.ok).length;
+      info += '  —  bot: ' + okN + '/' + botSegs.length + ' segment(s) beatable';
+      if (okN < botSegs.length) info += '  —  SEE FAILURES BELOW';
+    }
+    ctx.fillText(info, LEFT, 36);
+
+    // ---- legend ----
+    function legendIcon(shape, x, y, color, stroke) {
+      const s = 12;
+      ctx.save();
+      if (shape === 'rect') {
+        ctx.fillStyle = color; ctx.fillRect(x, y - s, s * 1.4, s);
+        ctx.strokeStyle = stroke || color; ctx.strokeRect(x, y - s, s * 1.4, s);
+      } else if (shape === 'spike') {
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.moveTo(x + s * 0.5, y - s); ctx.lineTo(x, y); ctx.lineTo(x + s, y); ctx.closePath(); ctx.fill();
+      } else if (shape === 'circle') {
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(x + s * 0.5, y - s * 0.5, s * 0.45, 0, 7); ctx.fill();
+      } else if (shape === 'hitbox') {
+        ctx.strokeStyle = COL.hitbox; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.5;
+        ctx.strokeRect(x + 1, y - s + 1, s * 1.2, s - 2);
+        ctx.setLineDash([]);
+      } else if (shape === 'strip') {
+        ctx.fillStyle = color; ctx.fillRect(x, y - s * 0.35, s * 1.4, s * 0.35);
+      } else if (shape === 'bar') {
+        ctx.fillStyle = color; ctx.fillRect(x, y - s * 0.3, s * 1.2, s * 0.3);
+      } else if (shape === 'orb') {
+        ctx.strokeStyle = color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x + s * 0.5, y - s * 0.5, s * 0.45, 0, 7); ctx.stroke();
+      } else if (shape === 'portal') {
+        ctx.fillStyle = color; ctx.fillRect(x + s * 0.35, y - s, s * 0.4, s);
+      } else if (shape === 'flag') {
+        ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - s); ctx.stroke();
+        ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s, y - s * 0.75); ctx.lineTo(x, y - s * 0.5); ctx.closePath(); ctx.fill();
+      } else if (shape === 'finishline') {
+        for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#111' : '#fff'; ctx.fillRect(x + i * 3, y - s, 3, s); }
+      } else if (shape === 'hole') {
+        ctx.strokeStyle = COL.hole; ctx.setLineDash([2, 2]);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - s); ctx.moveTo(x + s, y); ctx.lineTo(x + s, y - s); ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (shape === 'path') {
+        ctx.strokeStyle = color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, y - 2); ctx.lineTo(x + s * 0.7, y - s + 2); ctx.lineTo(x + s * 1.4, y - 3); ctx.stroke();
+      } else if (shape === 'dot') {
+        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x + s * 0.5, y - s * 0.5, 4, 0, 7); ctx.fill();
+      }
+      ctx.restore();
+    }
+    let lx = LEFT, ly = TITLE_H + 16, col0 = 0;
+    for (const item of legendItems) {
+      if (col0 >= perRow) { col0 = 0; lx = LEFT; ly += legendRowH; }
+      legendIcon(item.shape, lx, ly, item.color, item.stroke);
+      ctx.fillStyle = COL.text;
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.fillText(item.label, lx + 20, ly - 3);
+      lx += legendItemW; col0++;
+    }
+
+    // ======================================================================
+    // PER-ROW DRAWING
+    // ======================================================================
+    function rowTopY(r) { return rowOffsetY[r]; }
+    function trackTopY(r) { return rowTopY(r) + rowHeaderH; }
+    function xPix(x, x0) { return LEFT + (x - x0) * scale; }
+    function yPix(y, r) { return trackTopY(r) + (rowYTop[r] - y) * scale; }
+
+    function drawHitboxOutline(o, x0, r) {
+      ctx.save();
+      ctx.strokeStyle = COL.hitbox;
+      ctx.lineWidth = 1.25;
+      ctx.setLineDash([3, 2]);
+      const px0 = xPix(o.hx0, x0), px1 = xPix(o.hx1, x0);
+      const py0 = yPix(o.hy1, r), py1 = yPix(o.hy0, r); // hy1 (top, larger world y) -> smaller pixel y
+      ctx.strokeRect(px0, py0, px1 - px0, py1 - py0);
+      ctx.restore();
+    }
+
+    function triSpike(x0, r, ox0, ox1, baseY, tipY, color) {
+      const xl = xPix(ox0, x0), xr = xPix(ox1, x0);
+      const yb = yPix(baseY, r), yt = yPix(tipY, r);
+      ctx.fillStyle = color;
+      ctx.strokeStyle = COL.hazardStroke;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo((xl + xr) / 2, yt);
+      ctx.lineTo(xl, yb);
+      ctx.lineTo(xr, yb);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    function drawObj(o, x0, x1, r) {
+      if (o.t === 'solid') {
+        const px = xPix(o.x, x0), py = yPix(o.y + o.h, r);
+        const w = o.w * scale, h = o.h * scale;
+        ctx.fillStyle = styleFill(o.style);
+        ctx.strokeStyle = styleStroke(o.style);
+        ctx.lineWidth = 1;
+        ctx.fillRect(px, py, w, h);
+        ctx.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1);
+        const cx = o.x + o.w / 2;
+        if (cx >= x0 && cx < x1 && w > 30 && h > 12) {
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.font = Math.min(11, h * 0.4) + 'px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(o.style, xPix(cx, x0), py + h / 2 + 3);
+          ctx.textAlign = 'left';
+        }
+      } else if (o.t === 'haz') {
+        const kind = o.kind;
+        if (kind === 'water' || kind === 'rail') {
+          const px = xPix(o.x, x0);
+          ctx.fillStyle = kind === 'water' ? COL.water : COL.rail;
+          ctx.strokeStyle = kind === 'water' ? COL.waterStroke : COL.railStroke;
+          const py = yPix(o.h, r), h = o.h * scale;
+          ctx.fillRect(px, py, o.w * scale, h);
+          ctx.strokeRect(px + 0.5, py + 0.5, o.w * scale - 1, Math.max(1, h - 1));
+        } else if (kind === 'spike') {
+          triSpike(x0, r, o.x, o.x + o.w, o.y, o.y + o.h, COL.hazardFill);
+        } else if (kind === 'half') {
+          triSpike(x0, r, o.x, o.x + o.w, o.y, o.y + o.h, COL.hazardFill);
+        } else if (kind === 'spikeDown') {
+          triSpike(x0, r, o.x, o.x + o.w, o.y + o.h, o.y, COL.hazardFill);
+        } else if (kind === 'bird') {
+          const cx = xPix(o.x + o.w / 2, x0), cy = yPix(o.y + o.h / 2, r);
+          ctx.fillStyle = COL.hazardFill;
+          ctx.strokeStyle = COL.hazardStroke;
+          ctx.beginPath(); ctx.arc(cx, cy, o.w * scale * 0.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        } else {
+          // thorny, croc jaws, snapper and anything else: a plain red block
+          const px = xPix(o.x, x0), py = yPix(o.y + o.h, r);
+          ctx.fillStyle = COL.hazardFill;
+          ctx.strokeStyle = COL.hazardStroke;
+          ctx.fillRect(px, py, o.w * scale, o.h * scale);
+          ctx.strokeRect(px + 0.5, py + 0.5, o.w * scale - 1, o.h * scale - 1);
+        }
+        drawHitboxOutline(o, x0, r);
+      } else if (o.t === 'pad') {
+        const px = xPix(o.x, x0), py = yPix(o.y + o.h, r);
+        ctx.fillStyle = COL.pad;
+        ctx.fillRect(px, py, o.w * scale, o.h * scale);
+      } else if (o.t === 'orb') {
+        const cx = xPix(o.cx, x0), cy = yPix(o.cy, r);
+        ctx.strokeStyle = COL.orbStroke;
+        ctx.fillStyle = COL.orbFill;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, 0.45 * scale, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      } else if (o.t === 'portal') {
+        const px = xPix(o.x, x0), py = yPix(o.y + o.h, r);
+        ctx.fillStyle = COL.portal[o.mode] || '#aaa';
+        ctx.fillRect(px, py, o.w * scale, o.h * scale);
+        ctx.save();
+        ctx.fillStyle = '#12141a';
+        ctx.font = 'bold 10px system-ui, sans-serif';
+        ctx.translate(px + o.w * scale / 2, py + o.h * scale / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = 'center';
+        ctx.fillText(o.mode, 0, 3);
+        ctx.restore();
+      }
+    }
+
+    function drawRow(r) {
+      const x0 = rowX0(r), x1 = rowX1(r);
+      const top = rowTopY(r), track = trackTopY(r);
+
+      // row label
+      ctx.fillStyle = COL.textDim;
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('x ' + x0.toFixed(0) + '–' + x1.toFixed(0), LEFT, top + 10);
+
+      // clip everything else in this row to its own band, so objects that straddle a row
+      // wrap (a long train, water strip, rail or corridor) are simply cut at the edge
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(LEFT, top + RULER_H, (x1 - x0) * scale, AREA_H + trackH(r));
+      ctx.clip();
+
+      // ---- area band ----
+      for (const a of lvl.areas) {
+        if (a.x1 <= x0 || a.x0 >= x1) continue;
+        const segX0 = Math.max(a.x0, x0), segX1 = Math.min(a.x1, x1);
+        ctx.fillStyle = COL.areaBand[a.index % COL.areaBand.length];
+        ctx.fillRect(xPix(segX0, x0), top + RULER_H, (segX1 - segX0) * scale, AREA_H);
+        if (a.x0 >= x0 && a.x0 < x1) {
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 10px system-ui, sans-serif';
+          ctx.fillText(a.name, xPix(a.x0, x0) + 3, top + RULER_H + AREA_H - 3);
+        }
+      }
+
+      // ---- x ruler (drawn in the RULER_H strip, above the area band) ----
+      ctx.strokeStyle = COL.gridMajor;
+      ctx.fillStyle = COL.textDim;
+      ctx.font = '9px system-ui, sans-serif';
+      for (let x = Math.ceil(x0 / 5) * 5; x <= x1; x += 5) {
+        const px = xPix(x, x0);
+        const major = x % 10 === 0;
+        ctx.beginPath();
+        ctx.moveTo(px, top + RULER_H - (major ? 8 : 5));
+        ctx.lineTo(px, top + RULER_H);
+        ctx.stroke();
+        if (major) ctx.fillText(String(x), px + 2, top + RULER_H - 8);
+      }
+
+      // ---- vertical gridlines through the track (every 10 blocks) ----
+      ctx.strokeStyle = COL.gridMinor;
+      for (let x = Math.ceil(x0 / 10) * 10; x <= x1; x += 10) {
+        const px = xPix(x, x0);
+        ctx.beginPath(); ctx.moveTo(px, track); ctx.lineTo(px, track + trackH(r)); ctx.stroke();
+      }
+
+      // ---- ceiling lines (corridors: ship/ball sections) ----
+      ctx.strokeStyle = COL.ceil;
+      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = 1.5;
+      for (const c of lvl.corridors) {
+        if (c.x1 <= x0 || c.x0 >= x1) continue;
+        const segX0 = Math.max(c.x0, x0), segX1 = Math.min(c.x1, x1);
+        const py = yPix(c.ceil, r);
+        ctx.beginPath(); ctx.moveTo(xPix(segX0, x0), py); ctx.lineTo(xPix(segX1, x0), py); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      // ---- ground line, broken at holes ----
+      const drops = lvl.drops.filter((d) => d.x1 > x0 && d.x0 < x1).sort((a, b) => a.x0 - b.x0);
+      ctx.strokeStyle = COL.ground;
+      ctx.lineWidth = 2;
+      let gx = x0;
+      for (const d of drops) {
+        const segEnd = Math.max(x0, Math.min(d.x0, x1));
+        if (segEnd > gx) {
+          ctx.beginPath(); ctx.moveTo(xPix(gx, x0), yPix(0, r)); ctx.lineTo(xPix(segEnd, x0), yPix(0, r)); ctx.stroke();
+        }
+        gx = Math.min(d.x1, x1);
+        // mark the drop: dashed orange edges + a label
+        ctx.save();
+        ctx.strokeStyle = COL.hole;
+        ctx.setLineDash([3, 3]);
+        const dx0 = xPix(Math.max(d.x0, x0), x0), dx1 = xPix(Math.min(d.x1, x1), x0);
+        ctx.beginPath(); ctx.moveTo(dx0, track); ctx.lineTo(dx0, track + trackH(r)); ctx.moveTo(dx1, track); ctx.lineTo(dx1, track + trackH(r)); ctx.stroke();
+        ctx.setLineDash([]);
+        if (d.x0 >= x0 && d.x0 < x1) {
+          ctx.fillStyle = COL.hole;
+          ctx.font = 'bold 11px system-ui, sans-serif';
+          ctx.fillText('↓ layer ' + (d.layer + 1), dx0 + 3, track + 12);
+        }
+        ctx.restore();
+      }
+      if (gx < x1) {
+        ctx.beginPath(); ctx.moveTo(xPix(gx, x0), yPix(0, r)); ctx.lineTo(xPix(x1, x0), yPix(0, r)); ctx.stroke();
+      }
+
+      // ---- gameplay objects ----
+      for (const o of lvl.objs) {
+        const w = o.w || 1;
+        if (o.x + w <= x0 || o.x >= x1) continue;
+        drawObj(o, x0, x1, r);
+      }
+
+      // ---- checkpoints ----
+      for (const cp of lvl.checkpoints) {
+        if (cp.x < x0 || cp.x >= x1) continue;
+        const px = xPix(cp.x, x0);
+        const baseY = yPix(cp.y || 0, r);
+        const topY = yPix((cp.y || 0) + 2.2, r);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(px, baseY); ctx.lineTo(px, topY); ctx.stroke();
+        ctx.fillStyle = COL.checkpoint;
+        ctx.beginPath();
+        ctx.moveTo(px, topY);
+        ctx.lineTo(px + 14, topY + 5);
+        ctx.lineTo(px, topY + 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#0a0c10';
+        ctx.font = 'bold 9px system-ui, sans-serif';
+        ctx.fillText(String(cp.index), px + 3, topY + 8);
+        ctx.fillStyle = COL.checkpoint;
+        ctx.font = '10px system-ui, sans-serif';
+        const modeTag = cp.mode !== 'cube' ? ' (' + cp.mode + ')' : '';
+        ctx.fillText('cp' + cp.index + modeTag, px + 2, topY - 3);
+      }
+
+      // ---- finish ----
+      if (lvl.finishX >= x0 && lvl.finishX < x1) {
+        const px = xPix(lvl.finishX, x0);
+        for (let i = 0; i < Math.ceil(trackH(r) / 8); i++) {
+          ctx.fillStyle = i % 2 ? '#111' : '#fff';
+          ctx.fillRect(px, track + i * 8, 6, 8);
+        }
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px system-ui, sans-serif';
+        ctx.fillText('FINISH', px + 9, track + 12);
+      }
+
+      // ---- bot path ----
+      if (showBot) {
+        for (const seg of botSegs) {
+          const pts = seg.points;
+          ctx.lineWidth = 2;
+          for (let i = 1; i < pts.length; i++) {
+            const p0 = pts[i - 1], p1 = pts[i];
+            if (p1.x < x0 || p0.x >= x1) continue;
+            if (p0.layer !== p1.layer) continue; // a hole dropped the player a layer: see seg.breaks below, not a real vertical leap
+            const failing = seg.fails && seg.failFrom != null && i > seg.failFrom;
+            ctx.strokeStyle = failing ? COL.botFail : COL.botPath;
+            ctx.beginPath(); ctx.moveTo(xPix(p0.x, x0), yPix(p0.y, r)); ctx.lineTo(xPix(p1.x, x0), yPix(p1.y, r)); ctx.stroke();
+          }
+          // compact marker where the bot's path drops through a hole to the next layer
+          for (const brk of seg.breaks) {
+            if (brk.x < x0 || brk.x >= x1) continue;
+            const px = xPix(brk.x, x0), py = yPix(brk.y, r);
+            ctx.save();
+            ctx.strokeStyle = COL.hole;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 2]);
+            ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py + 14); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.beginPath(); ctx.moveTo(px - 3, py + 9); ctx.lineTo(px, py + 15); ctx.lineTo(px + 3, py + 9); ctx.stroke();
+            ctx.fillStyle = COL.hole;
+            ctx.font = 'bold 10px system-ui, sans-serif';
+            ctx.fillText('falls to layer ' + brk.layer, px + 6, py + 12);
+            ctx.restore();
+          }
+          for (let i = 0; i < seg.presses.length; i++) {
+            const p = seg.presses[i];
+            if (p.x < x0 || p.x >= x1) continue;
+            let color = COL.pressNeutral;
+            if (showWindows && p.ms != null) color = p.ms >= 90 ? COL.pressOk : p.ms >= 50 ? COL.pressWarn : COL.pressBad;
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(xPix(p.x, x0), yPix(p.y, r), 3.5, 0, Math.PI * 2); ctx.fill();
+            if (showWindows && p.ms != null && p.ms < 90) {
+              ctx.fillStyle = color;
+              ctx.font = '9px system-ui, sans-serif';
+              ctx.fillText(p.ms + 'ms', xPix(p.x, x0) + 5, yPix(p.y, r) - 4);
+            }
+          }
+          if (seg.fails && seg.failX >= x0 && seg.failX < x1) {
+            const px = xPix(seg.failX, x0);
+            ctx.strokeStyle = COL.botFail;
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(px, track); ctx.lineTo(px, track + trackH(r)); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = COL.botFail;
+            ctx.font = 'bold 11px system-ui, sans-serif';
+            ctx.fillText('FAILS here (cp' + seg.cp + ')', px + 4, track + 24);
+          }
+        }
+      }
+
+      ctx.restore(); // end clip
+    }
+
+    for (let r = 0; r < rows; r++) drawRow(r);
+
+    // ======================================================================
+    // DONE — tell shot.py how big the page is
+    // ======================================================================
+    // measure the real page size (HTML text above the canvas + the canvas itself), rather than
+    // guessing the preamble's height, so nothing at the bottom of a tall map gets clipped
+    document.body.dataset.shotSize = document.documentElement.scrollWidth + 'x' + document.documentElement.scrollHeight;
+    document.getElementById('status').textContent =
+      'Level ' + def.name + ' — x ' + fromX + '–' + toX + (showBot ? ', bot path drawn' : '') + (showWindows ? ' with timing windows' : '') + '.';
+    window.MAP_DONE = true;
+  }
+})();
+</script>
+</body>
+</html>

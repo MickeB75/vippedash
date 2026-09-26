@@ -24,6 +24,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8768", "--bind", "127.0.0.1"],
       "port": 8768
+    },
+    {
+      "name": "vippedash-release",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-u", "tools/release.py", "--no-verify", "--port", "8765"],
+      "port": 8765
     }
   ]
 }

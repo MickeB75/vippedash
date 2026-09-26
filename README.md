@@ -34,7 +34,7 @@ There are two ways, and neither needs web hosting or Android Studio. On a phone,
 python tools/build_single.py
 ```
 
-This builds `dist/VippeDash.html`, the whole game in one file of about 450 KB with the code, CSS and font inside, so it plays offline. E-mail it to yourself (or copy it to the phone's `Download` folder over USB).
+This builds `dist/VippeDash.html`, the whole game in one file of about 450 KB with the code, CSS and font inside, so it plays offline. The build is stamped with the version (build date and short commit hash), which the main menu shows faintly in the bottom-right. E-mail it to yourself (or copy it to the phone's `Download` folder over USB).
 
 On the phone, download the attachment and open it with **Chrome**. Don't open it with the built-in "HTML Viewer": JavaScript is turned off there, so the game won't start. You won't get an app icon, and coins and progress may not be saved between times when the game is opened from a file.
 
@@ -45,14 +45,18 @@ Run the build again whenever the game changes. Gmail won't send `.apk` files, bu
 This installs VippeDash as an app with its own icon. It runs in fullscreen landscape, works offline and saves coins and progress. You only need the cable to install or update it.
 
 1. **On the phone:** go to Settings → About phone and tap **Build number** 7 times. Then go to Developer options and turn on **USB debugging**.
-2. **On the PC:** start the server, `python -m http.server 8765 --bind 127.0.0.1`.
+2. **On the PC:** use `python tools/release.py` to check, verify, build and serve in one command. Or use the plain `python -m http.server 8765 --bind 127.0.0.1`.
 3. **Connect the phone** with a USB cable and open `chrome://inspect/#devices` in Chrome on the PC. Allow USB debugging on the phone when it asks. Click **Port forwarding…**, add port `8765` → `localhost:8765`, and tick **Enable port forwarding**.
 4. **In Chrome on the phone**, open <http://localhost:8765> and choose **⋮ → Install app** (or **Add to home screen**). Start the app once while the cable is still connected, so everything gets saved on the phone.
 5. **Unplug the cable.** The app now works on its own, even in airplane mode.
 
+`release.py` stops before building if a file the game loads is missing from `sw.js` or a level can't be beaten. `--no-verify` skips the level check, `--no-serve` only builds, and `--port <n>` serves on another port. Ctrl+C stops the server.
+
 To **update** the app, do steps 2–3 again and open the app while the cable is connected. It fetches the new files by itself. Close the app and open it again to play the new version.
 
-This works because the app is a PWA: `manifest.json` names the app and its icons, and `sw.js` (a service worker) keeps a copy of every file on the phone. **When you add a file that the game loads, add it to `FILES` in `sw.js`**, or the installed app won't have it offline.
+The main menu shows a version stamp in the bottom-right corner, faintly. On the phone you can see which build you have. In the repo, `js/version.js` holds `'dev'`. When you build with `python tools/release.py` or `python tools/build_single.py`, they stamp the version as `v YYYY-MM-DD HH:MM · <short commit>` (plus ` *` if there are uncommitted changes), so the build date and commit are embedded in the built file.
+
+This works because the app is a PWA: `manifest.json` names the app and its icons, and `sw.js` (a service worker) keeps a copy of every file on the phone. **When you add a file that the game loads, add it to `FILES` in `sw.js`**, or the installed app won't have it offline. `python tools/release.py` checks this for you.
 
 The installed app, the e-mailed file and the browser each keep their own coins and progress.
 
@@ -155,13 +159,21 @@ js/art.js         all drawing: Vippe, Affelito and their skins, obstacles, anima
 js/render.js      parallax scene, camera (incl. following you down a hole), HUD
 js/game.js        game loop, input, checkpoints, menus, coins and the shop
 js/mobile.js      phone extras: fullscreen + landscape, portrait pause, back button
+js/version.js     version string shown in the main menu (stamped by build tools)
 fonts/            Lilita One (SIL Open Font License, see fonts/OFL.txt)
 manifest.json     app name, icons and landscape/fullscreen for the installed app
 sw.js             service worker: offline copy of every file for the installed app
 icons/            app icons
-tools/verify.html level verifier
+tools/verify.html level verifier in the browser
+tools/verify.py   level verifier from the command line (headless Chrome)
+tools/map.html    draws a schematic map of a level's layout and rhythm
+tools/skins.html  gallery of every skin in every mode, for checking designs
+tools/shot.py     takes a PNG screenshot of any page with headless Chrome
+tools/headless.py shared helper: runs pages in headless Chrome (finds Chrome or Edge automatically)
 tools/icons.html  draws the app icons
-tools/build_single.py  builds dist/VippeDash.html, the one-file version
+tools/build_single.py builds dist/VippeDash.html, the one-file version (stamps version)
+tools/release.py  one command to ship: check, verify, build and serve a new mobile build
+.claude/skills/   Claude Code skills for common tasks (see "Working with Claude Code" below)
 ```
 
 ### Editing a level
@@ -195,7 +207,31 @@ b.hole(454, 7);              // a hole in the floor: fall through it to the laye
 
 `b.hole()` splits the level into two floors, one above the other. Everything placed after the hole is on the lower floor. When you fall in, the physics moves you up by one screen (15 blocks) and onto the lower floor, so the fall looks continuous and the camera follows you down.
 
-After changing a level, open `tools/verify.html` through the local server. It runs the search bot from every checkpoint to the next one using the real game physics, and reports any segment that can't be beaten. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2 is harder: its triple spikes have about 80 ms, and everything else has more. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms too, but there are more of them and fewer checkpoints.
+After changing a level, verify it with the command line:
+
+```bash
+python tools/verify.py
+```
+
+This runs the search bot from every checkpoint to the next one using the real game physics. Add a level name to check one level only: `python tools/verify.py forest`. Options: `--windows` to measure timing slack (slower; `!` marks a jump with less than 90 ms, `!!` less than 50 ms), `--json` to print the raw report. Exit code 0 when every level is beatable.
+
+Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2 is harder: its triple spikes have about 80 ms, and everything else has more. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms too, but there are more of them and fewer checkpoints.
+
+To see a level's layout and rhythm at a glance, open `tools/map.html?level=<id>` in a browser. It draws a schematic top-down/side map of the level's hitboxes, obstacles and checkpoints. Options: `from=<x>&to=<x>` (show part of the level), `cols=<n>` (blocks per row), `scale=<px>` (pixels per block, default 12), `bot` (draw the bot's path from every checkpoint, red where it fails), `windows` (also colour each jump by its timing slack). Example: `tools/map.html?level=forest&from=380&to=500&windows&scale=20`.
+
+### Adding a skin or a character
+
+Everything that differs between characters lives in `js/art.js` in the `Art.CHARS` data structure. Adding a new character means adding one entry to `Art.CHARS` (plus drawing hook functions if needed for custom hair/ears) and tagging its skins with `char: '<id>'` in `Art.SKINS`. The character's first skin must be free. The shop gets a tab for it automatically. See the comment above `Art.CHARS` in `js/art.js` for the full structure.
+
+To check a new or modified skin with one screenshot, open `tools/skins.html` in a browser. It draws every skin of every character in every mode and size. Options: `char=<id>` (one character only), `skin=<id>,<id>` (select skins), `t=<seconds>` (freeze time so animated skins stand still), `scale=<n>` (multiply sizes), `bg=light` (light background for contrast checking). Without `t`, the page redraws every frame so animated skins can be watched live.
+
+### Screenshots from the command line
+
+```bash
+python tools/shot.py "index.html?debug&level=forest&cp=5&freeze"
+```
+
+This saves a PNG of any page (here `shots/index.png`) with Chrome running without a window, straight from disk, so no server is needed. `-o file.png` picks the file and `--size 1280x720` the window size (`map.html` and `skins.html` set their own size). The page normally runs in fast-forwarded virtual time, which gives the same PNG every time for the same code. The shop redraws every card each frame, which is slow to fast-forward, so use `--realtime 2500` for it. The `shots/` folder is git-ignored. `tools/headless.py` is the shared helper: it finds Chrome or Edge by itself, or set the `CHROME` environment variable.
 
 ### Debug mode
 
@@ -208,6 +244,34 @@ Open `index.html#debug`. This shows hitboxes and FPS and adds these keys:
 | `G` | God mode |
 | `B` | The bot plays for you |
 | `C` | +500 coins (also works in the menu), for testing the shop |
+
+The hash (or query string) also accepts URL parameters to drop straight into a specific moment for screenshots or video:
+
+| Parameter | Effect |
+| --- | --- |
+| `level=<id>` | Start that level directly, skipping the menu. Ids: `home`, `forest`, `metro` |
+| `cp=<n>` | Start at checkpoint *n* (0 = the start) |
+| `x=<blocks>` | Start at any x position. The bot plays from the checkpoint before it up to x, so the mode, gravity and floor are right |
+| `skin=<id>` | Wear any skin for this session only (not saved; coins and owned skins untouched) |
+| `bot` | The bot plays |
+| `god` | God mode |
+| `mute` | Start muted (not saved) |
+| `freeze` | Stop the game at the start position (for screenshots); any key, click or tap continues |
+| `shop` | Open the shop (on the tab of the character you're wearing) |
+
+Examples: `index.html?debug&level=metro&x=500&freeze` or `index.html#debug&level=forest&cp=5`. Parameters can go after `?` or `#`.
+
+## Working with Claude Code
+
+The project includes Claude Code skills in `.claude/skills/` for common development tasks:
+
+- `/ny-bana` — start a new level
+- `/fixa-bana` — fix or change a level
+- `/ny-skin` — add a new skin
+- `/ny-karaktar` — add a new character
+- `/mobil` — prepare a new build for the phone
+
+Each skill carries the checklist for that job. See `CLAUDE.md` in the project for the project rules that guide Claude's work.
 
 ## Notes
 

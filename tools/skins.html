@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VippeDash skin gallery</title>
+<style>
+  @font-face {
+    font-family: 'Lilita One';
+    src: url('../fonts/LilitaOne-Regular.ttf') format('truetype');
+    font-display: swap;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0b0e1a; color: #e8ecf6; font: 14px/1.4 system-ui, sans-serif; }
+  body { padding: 22px; }
+  h1 { font-family: 'Lilita One', 'Arial Black', Impact, sans-serif; font-size: 28px; margin: 0 0 8px; color: #ffd634; }
+  .info { max-width: 980px; color: #aab6d8; margin: 0 0 22px; }
+  .info code { color: #dfe8ff; background: rgba(255, 255, 255, 0.08); padding: 1px 5px; border-radius: 4px; }
+  .char-section { margin-bottom: 26px; }
+  .char-name {
+    font-family: 'Lilita One', 'Arial Black', Impact, sans-serif;
+    font-size: 22px;
+    margin: 16px 0 10px;
+    color: #8fd3ff;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+    padding-bottom: 4px;
+  }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .header-row {
+    position: sticky;
+    top: 0;
+    background: #0b0e1a;
+    z-index: 2;
+    padding: 8px 0;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    color: #aab6d8;
+  }
+  .cell { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; text-align: center; }
+  .info-cell { flex-direction: column; align-items: flex-start; justify-content: center; padding-left: 4px; }
+  .skin-id { font-family: Consolas, monospace; font-size: 12px; color: #8fd3ff; }
+  .skin-name { font-weight: bold; }
+  .skin-price { color: #ffd634; font-size: 12px; }
+  canvas.tile { display: block; border-radius: 6px; }
+  .empty { color: #aab6d8; font-style: italic; margin: 10px 0; }
+  .font-warn { color: #ff8a80; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<h1>VippeDash skin gallery</h1>
+<p class="info">
+  Every skin of every character (<code>Art.CHARS</code> / <code>Art.SKINS</code> in <code>../js/art.js</code>), drawn the way the
+  game draws them, for checking a new or changed skin with one screenshot. Parameters:
+  <code>char=&lt;id&gt;</code> show only that character &middot;
+  <code>skin=&lt;id&gt;[,&lt;id&gt;...]</code> show only those skins &middot;
+  <code>t=&lt;seconds&gt;</code> freeze time (overrides <code>performance.now</code> to always return <code>t*1000</code>) so the
+  page draws once and is pixel-identical between runs, for before/after diffing &middot;
+  <code>scale=&lt;n&gt;</code> multiply all sizes (default 1) &middot;
+  <code>bg=light</code> use a light sky-blue tile instead of mid-grey, to check contrast there too.
+  Without <code>t</code> the page redraws every frame so shimmering patterns and hats (rainbow, galaxy, gold, robot antenna, fire,
+  propeller, ...) can be watched live.
+</p>
+<p class="info">
+  Sizes come from the game: the cube/ball are drawn at <code>BS = 48</code> px in play (<code>js/render.js</code>), the ship at
+  <code>BS * 1.15</code>, shop cards at 56 px and the shop tab icon at 28 px (<code>drawShop()</code> in <code>js/game.js</code>),
+  and the menu hero at 96 px (<code>drawHero()</code>). The expressions the game actually uses are <code>grin</code> (default),
+  <code>o</code> (mid-jump, <code>v.oT &gt; 0</code>), <code>happy</code> (won) and <code>tongue</code> (crashed) &mdash; see
+  <code>R.drawPlayer</code> in <code>js/render.js</code> and the <code>eyes()</code>/<code>mouth()</code> helpers in
+  <code>js/art.js</code>. In play the cube looks with <code>look=1</code>; the shop and menu hero use <code>look=0</code>.
+</p>
+<div id="app"></div>
+
+<script>
+  // Freeze time BEFORE art.js runs anything, so every time-based pattern/hat inside it (rainbow scroll,
+  // gold/diamond shimmer, galaxy twinkle, blinking robot antenna, fire flicker, ...) is deterministic.
+  (function () {
+    var qs = new URLSearchParams(location.search);
+    var raw = qs.get('t');
+    if (raw !== null && raw !== '' && !isNaN(parseFloat(raw))) {
+      var frozenMs = parseFloat(raw) * 1000;
+      performance.now = function () { return frozenMs; };
+    }
+  })();
+</script>
+<script src="../js/util.js"></script>
+<script src="../js/art.js"></script>
+<script>
+  (function () {
+    var Art = window.VD.Art;
+    var qs = new URLSearchParams(location.search);
+    var tRaw = qs.get('t');
+    var frozen = tRaw !== null && tRaw !== '' && !isNaN(parseFloat(tRaw));
+    var scale = parseFloat(qs.get('scale'));
+    if (!scale || scale <= 0) scale = 1;
+    var lightBg = qs.get('bg') === 'light';
+    var charFilter = qs.get('char');
+    var skinParam = qs.get('skin');
+    var skinSet = skinParam
+      ? new Set(skinParam.split(',').map(function (s) { return s.trim(); }).filter(Boolean))
+      : null;
+
+    var TILE_DARK = '#777777';
+    var TILE_LIGHT = '#cfe9ff'; // close to the level-1 noon sky bottom colour (see HOME_THEME in js/level.js)
+    var tileColor = lightBg ? TILE_LIGHT : TILE_DARK;
+
+    // sizes, in px, matching the game (see the intro text above for where each one comes from)
+    var LARGE = 96 * scale; // big expression swatch, same size as the menu hero
+    var INGAME = 48 * scale; // BS in js/render.js
+    var SHOPCARD = 56 * scale; // shop card cube size in drawShop()
+    var SHIPSIZE = INGAME * 1.15; // BS * 1.15 in R.drawPlayer
+
+    Art.setDark(0); // no evening tint in the gallery
+
+    var currentT = frozen ? parseFloat(tRaw) : performance.now() / 1000;
+    var tiles = []; // { ctx, w, h, ox, oy, draw(ctx) } redrawn every frame when not frozen
+
+    // cube/ball hats can reach roughly 1.26x their own size above centre (the robot's blinking antenna
+    // glow) and the astronaut bubble helmet reaches about 0.79x sideways, so tiles get generous padding
+    // to never clip, and stay the same relative size across the gallery for easy pixel comparison.
+    function cubeTileSize(size) { return Math.round(size * 2.7); }
+    function ballTileSize(size) { return Math.round(size * 1.8); }
+    function shipTileSize(size) { return { w: Math.round(size * 2.2), h: Math.round(size * 1.9) }; }
+
+    function paintTile(entry) {
+      var ctx = entry.ctx;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = tileColor;
+      ctx.fillRect(0, 0, entry.w, entry.h);
+      ctx.save();
+      ctx.translate(entry.ox, entry.oy);
+      entry.draw(ctx);
+      ctx.restore();
+    }
+    function addTile(w, h, ox, oy, draw) {
+      var c = document.createElement('canvas');
+      c.className = 'tile';
+      c.width = w;
+      c.height = h;
+      var entry = { ctx: c.getContext('2d'), w: w, h: h, ox: ox, oy: oy, draw: draw };
+      tiles.push(entry);
+      paintTile(entry);
+      return c;
+    }
+    function makeCubeTile(size, expr, skinId, look) {
+      var w = cubeTileSize(size);
+      return addTile(w, w, w / 2, w / 2, function (ctx) { Art.cube(ctx, size, expr, skinId, look); });
+    }
+    function makeBallTile(size, expr, skinId, flipped) {
+      var w = ballTileSize(size);
+      return addTile(w, w, w / 2, w / 2, function (ctx) { Art.ball(ctx, size, expr, skinId, 0, flipped); });
+    }
+    function makeShipTile(size, expr, skinId) {
+      var d = shipTileSize(size);
+      // t drives the rocket-flame flicker (Art.ship reads its own "t" argument, not performance.now)
+      return addTile(d.w, d.h, d.w * 0.58, d.h * 0.6, function (ctx) { Art.ship(ctx, size, expr, skinId, 0, currentT); });
+    }
+
+    // columns, labelled once at the top; header and rows share these so everything lines up
+    var COLS = [
+      { key: 'info', label: 'skin', width: 220, isInfo: true },
+      { key: 'grin', label: 'grin', kind: 'cube', size: LARGE, expr: 'grin', look: 0 },
+      { key: 'o', label: 'o', kind: 'cube', size: LARGE, expr: 'o', look: 0 },
+      { key: 'happy', label: 'happy', kind: 'cube', size: LARGE, expr: 'happy', look: 0 },
+      { key: 'tongue', label: 'tongue', kind: 'cube', size: LARGE, expr: 'tongue', look: 0 },
+      { key: 'ingame', label: 'in-game 48px (look=1)', kind: 'cube', size: INGAME, expr: 'grin', look: 1 },
+      { key: 'shopcard', label: 'shop card 56px', kind: 'cube', size: SHOPCARD, expr: 'grin', look: 0 },
+      { key: 'ship', label: 'ship', kind: 'ship', size: SHIPSIZE, expr: 'grin' },
+      { key: 'ball', label: 'ball', kind: 'ball', size: INGAME, expr: 'grin', flipped: false },
+      { key: 'ballFlip', label: 'ball flipped', kind: 'ball', size: INGAME, expr: 'grin', flipped: true },
+    ];
+    COLS.forEach(function (col) {
+      if (col.isInfo) return;
+      if (col.kind === 'cube') col.width = cubeTileSize(col.size);
+      else if (col.kind === 'ball') col.width = ballTileSize(col.size);
+      else if (col.kind === 'ship') col.width = shipTileSize(col.size).w;
+    });
+
+    function buildHeaderRow() {
+      var row = document.createElement('div');
+      row.className = 'row header-row';
+      COLS.forEach(function (col) {
+        var cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.width = col.width + 'px';
+        cell.textContent = col.label;
+        row.appendChild(cell);
+      });
+      return row;
+    }
+    function buildSkinRow(skinId) {
+      var k = Art.SKINS[skinId];
+      var row = document.createElement('div');
+      row.className = 'row skin-row';
+      COLS.forEach(function (col) {
+        var cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.width = col.width + 'px';
+        if (col.isInfo) {
+          cell.classList.add('info-cell');
+          cell.innerHTML =
+            '<div class="skin-id">' + skinId + '</div>' +
+            '<div class="skin-name">' + k.name + '</div>' +
+            '<div class="skin-price">' + (k.price ? k.price + ' coins' : 'free') + '</div>';
+        } else if (col.kind === 'cube') {
+          cell.appendChild(makeCubeTile(col.size, col.expr, skinId, col.look));
+        } else if (col.kind === 'ship') {
+          cell.appendChild(makeShipTile(col.size, col.expr, skinId));
+        } else if (col.kind === 'ball') {
+          cell.appendChild(makeBallTile(col.size, col.expr, skinId, col.flipped));
+        }
+        row.appendChild(cell);
+      });
+      return row;
+    }
+
+    // The afModo skin's cap badge draws "MoDo" with the Lilita One font (see the 'modo' case in
+    // truckerCap() in js/art.js); headings here use it too. With a frozen t we draw synchronously once,
+    // so whatever font is ready at that instant gets baked into the canvas — if the @font-face hasn't
+    // loaded yet, the fallback font is used instead, which breaks the "same code -> same pixels"
+    // guarantee. So wait for the font (with a timeout so a blocked/slow font can never hang the page)
+    // before the first draw, and only then flag the page as drawn.
+    function whenFontReady(run) {
+      var FONT_PROBE = '20px "Lilita One"';
+      var settled = false;
+      function finish() {
+        if (settled) return;
+        settled = true;
+        var loaded = !!(document.fonts && document.fonts.check && document.fonts.check(FONT_PROBE));
+        if (!loaded) {
+          var warn = document.createElement('p');
+          warn.className = 'font-warn';
+          warn.textContent = 'Warning: "Lilita One" was not ready in time, so headings and the MoDo badge use the fallback font.';
+          document.body.insertBefore(warn, document.getElementById('app'));
+        }
+        run();
+      }
+      if (!(document.fonts && document.fonts.load && document.fonts.ready)) {
+        finish(); // document.fonts unsupported: draw right away with whatever font is available
+        return;
+      }
+      Promise.all([document.fonts.load(FONT_PROBE), document.fonts.ready]).then(finish, finish);
+      setTimeout(finish, 1500); // safety net: never wait forever (e.g. a browser that blocks file:// fonts)
+    }
+
+    function buildGallery() {
+      var app = document.getElementById('app');
+      var charIds = Object.keys(Art.CHARS);
+      if (charFilter) charIds = charIds.filter(function (id) { return id === charFilter; });
+      if (!charIds.length) {
+        var msg = document.createElement('p');
+        msg.className = 'empty';
+        msg.textContent = 'No character matches char=' + charFilter + '.';
+        app.appendChild(msg);
+        return;
+      }
+      app.appendChild(buildHeaderRow());
+      var any = false;
+      charIds.forEach(function (charId) {
+        var skinIds = Object.keys(Art.SKINS).filter(function (id) { return Art.charOf(id) === charId; });
+        if (skinSet) skinIds = skinIds.filter(function (id) { return skinSet.has(id); });
+        if (!skinIds.length) return;
+        any = true;
+        var section = document.createElement('section');
+        section.className = 'char-section';
+        var h2 = document.createElement('h2');
+        h2.className = 'char-name';
+        h2.textContent = Art.CHARS[charId].name + ' (' + charId + ')';
+        section.appendChild(h2);
+        skinIds.forEach(function (skinId) { section.appendChild(buildSkinRow(skinId)); });
+        app.appendChild(section);
+      });
+      if (!any) {
+        var msg2 = document.createElement('p');
+        msg2.className = 'empty';
+        msg2.textContent = 'No skin matches skin=' + skinParam + '.';
+        app.appendChild(msg2);
+      }
+    }
+
+    whenFontReady(function () {
+      buildGallery();
+
+      // tools/shot.py reads this to size the screenshot window
+      document.body.dataset.shotSize = document.documentElement.scrollWidth + 'x' + document.documentElement.scrollHeight;
+      window.SKINS_DONE = true;
+
+      if (!frozen) {
+        (function loop() {
+          currentT = performance.now() / 1000;
+          for (var i = 0; i < tiles.length; i++) paintTile(tiles[i]);
+          requestAnimationFrame(loop);
+        })();
+      }
+    });
+  })();
+</script>
+</body>
+</html>

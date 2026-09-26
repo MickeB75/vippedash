@@ -86,10 +86,52 @@
     afFire: { char: 'alfred', name: 'Fire', main: '#b3200f', dark: '#3a0603', trim: '#ffd23a', frame: '#ff8a1f', pattern: 'fire', hat: 'flames', noHair: true, price: 1500 },
     afDiamond: { char: 'alfred', name: 'Diamond', main: '#7fdcff', dark: '#1a4f7a', trim: '#ffffff', frame: '#bff2ff', pattern: 'diamond', hat: 'cap', cap: { front: '#eafcff', mesh: '#8fe3ff', brim: '#bff2ff', badge: 'gem' }, price: 2000 },
   };
-  // the two playable characters; a skin without `char` belongs to Vippe. `first` is the skin shown on the shop tab.
+  // =====================================================================
+  // CHARACTERS — everything that differs between playable characters lives here.
+  // Art.cube()/eyes()/mouth() read these fields instead of testing for a specific
+  // character id, so adding a new character means adding one entry below (plus its
+  // own hook functions if it needs new hair/ears) and tagging its skins with
+  // `char: '<id>'` in Art.SKINS — nothing else in the drawing code changes.
+  //
+  // A skin without `char` belongs to 'vippe'; an unknown/missing `char` on a skin
+  // also falls back to 'vippe' (same fallback as Art.charOf). The shop tab and its
+  // label are built automatically from Art.CHARS by js/game.js.
+  //
+  // Fields on an entry:
+  //   name       shown on the shop tab (js/game.js)
+  //   hair       hair colour, used by js/game.js for the shop-purchase confetti
+  //   first      id of the skin shown on the tab icon and worn by default for this
+  //              character — it MUST be a free skin (price 0)
+  //   skin       face/neck tone
+  //   face       the face rounded-rect, in units of the cube size s: { x, y, w, h, r }
+  //   iris       iris (pupil) colour
+  //   irisRing   colour the iris outline is stroked with; leave it out (or null) to
+  //              leave the eye socket's own outline colour showing through instead
+  //   brow       eyebrow colour
+  //   arch       how curved the eyebrows are (bigger = more arched)
+  //   grinTilt   radians the 'grin'/'happy' mouth is rotated by (0 = straight)
+  // Optional draw hooks, each `(ctx, s) => void`, for layers drawn at fixed points
+  // in Art.cube's stack (all may be omitted):
+  //   behindFace draws before the face, e.g. ears sticking out past its edges
+  //   fringe     hair drawn after the face/cheeks but before the eyes, e.g. a
+  //              fringe overlapping the forehead
+  //   topHair    hair drawn on top, after the mouth, e.g. curls framing the face
+  // `fringe` and `topHair` are both skipped when the skin sets `noHair: true`;
+  // `behindFace` is not, since ears or a taller forehead don't count as hair.
+  // =====================================================================
   Art.CHARS = {
-    vippe: { name: 'Vippe', hair: '#6b4526', first: 'red' },
-    alfred: { name: 'Affelito', hair: '#8a5a2e', first: 'afTee' },
+    vippe: {
+      name: 'Vippe', hair: '#6b4526', first: 'red',
+      skin: '#f2c6a0', face: { x: -0.36, y: -0.3, w: 0.72, h: 0.68, r: 0.16 },
+      iris: '#6d9fc4', irisRing: null, brow: '#4a2c18', arch: 0.06, grinTilt: 0,
+      topHair: hair,
+    },
+    alfred: {
+      name: 'Affelito', hair: '#8a5a2e', first: 'afTee',
+      skin: '#f4caa6', face: { x: -0.36, y: -0.38, w: 0.72, h: 0.76, r: 0.16 },
+      iris: '#8fa674', irisRing: '#566b42', brow: '#5e3f22', arch: 0.03, grinTilt: -0.13,
+      behindFace: alfEars, fringe: alfHair,
+    },
   };
   Art.charOf = (skinId) => (Art.SKINS[skinId] && Art.SKINS[skinId].char) || 'vippe';
   const CAMO = [
@@ -1209,8 +1251,8 @@
     ctx.arc(0.2 * s, -0.18 * s, 0.04 * s, Math.PI * 1.3, Math.PI * 2.7);
     ctx.stroke();
   }
-  // Vippe has blue-grey eyes; Affelito (af) has hazel-green eyes and straighter, lighter brows
-  function eyes(ctx, s, expr, look, af) {
+  // eye/iris/brow colours and brow arch come from the character (ch, an Art.CHARS entry)
+  function eyes(ctx, s, expr, look, ch) {
     const ry = expr === 'o' || expr === 'tongue' ? 0.15 : 0.13;
     for (const sx of [-1, 1]) {
       const ex = sx * 0.17 * s, ey = -0.04 * s;
@@ -1230,11 +1272,11 @@
       ctx.strokeStyle = '#3a2418';
       ctx.stroke();
       const ix = ex + look * 0.03 * s, iy = ey + 0.015 * s;
-      ctx.fillStyle = af ? '#8fa674' : '#6d9fc4';
+      ctx.fillStyle = ch.iris;
       circle(ctx, ix, iy, 0.068 * s);
       ctx.fill();
       ctx.fillStyle = '#3d6f95';
-      if (af) ctx.strokeStyle = '#566b42';
+      if (ch.irisRing) ctx.strokeStyle = ch.irisRing;
       circle(ctx, ix, iy, 0.068 * s);
       ctx.lineWidth = s * 0.012;
       ctx.stroke();
@@ -1246,10 +1288,10 @@
       ctx.fill();
     }
     // brows
-    ctx.strokeStyle = af ? '#5e3f22' : '#4a2c18';
+    ctx.strokeStyle = ch.brow;
     ctx.lineWidth = s * 0.035;
     ctx.lineCap = 'round';
-    const lift = expr === 'o' || expr === 'tongue' ? -0.04 : 0, arch = af ? 0.03 : 0.06;
+    const lift = expr === 'o' || expr === 'tongue' ? -0.04 : 0, arch = ch.arch;
     for (const sx of [-1, 1]) {
       ctx.beginPath();
       ctx.moveTo(sx * 0.25 * s, (-0.19 + lift) * s);
@@ -1257,14 +1299,15 @@
       ctx.stroke();
     }
   }
-  function mouth(ctx, s, expr, af) {
-    if (af && (expr === 'grin' || expr === 'happy')) {
-      // Affelito's grin is a bit lopsided, like a smirk
+  // tilt = the character's grinTilt (radians); 0 draws the mouth straight
+  function mouth(ctx, s, expr, tilt) {
+    if (tilt && (expr === 'grin' || expr === 'happy')) {
+      // e.g. Affelito's grin is a bit lopsided, like a smirk
       ctx.save();
       ctx.translate(0, 0.24 * s);
-      ctx.rotate(-0.13);
+      ctx.rotate(tilt);
       ctx.translate(0, -0.24 * s);
-      mouth(ctx, s, expr, false);
+      mouth(ctx, s, expr, 0);
       ctx.restore();
     } else if (expr === 'grin' || expr === 'happy') {
       const y0 = 0.14 * s;
@@ -1334,7 +1377,8 @@
 
   // centred at (0,0), s = size in px
   Art.cube = function (ctx, s, expr, skinId, look = 1) {
-    const k = Art.SKINS[skinId] || Art.SKINS.red, h = s / 2, af = k.char === 'alfred';
+    const k = Art.SKINS[skinId] || Art.SKINS.red, h = s / 2;
+    const ch = Art.CHARS[k.char] || Art.CHARS.vippe;
     ctx.lineJoin = 'round';
     rr(ctx, -h, -h, s, s, s * 0.16);
     ctx.fillStyle = k.main;
@@ -1348,11 +1392,13 @@
     ctx.strokeStyle = k.dark;
     ctx.stroke();
     collar(ctx, s, k);
-    // face (Affelito's ears stick out and his forehead goes up under the fringe)
-    if (af) alfEars(ctx, s);
-    if (af) rr(ctx, -0.36 * s, -0.38 * s, 0.72 * s, 0.76 * s, 0.16 * s);
-    else rr(ctx, -0.36 * s, -0.3 * s, 0.72 * s, 0.68 * s, 0.16 * s);
-    ctx.fillStyle = af ? '#f4caa6' : '#f2c6a0';
+    // face (a layer can be drawn behind it first, e.g. Affelito's ears; the rect and
+    // skin tone come from the character, so his taller forehead under the fringe is
+    // just a taller `face` rather than a special case here)
+    if (ch.behindFace) ch.behindFace(ctx, s);
+    const f = ch.face;
+    rr(ctx, f.x * s, f.y * s, f.w * s, f.h * s, f.r * s);
+    ctx.fillStyle = ch.skin;
     ctx.fill();
     ctx.lineWidth = s * 0.03;
     ctx.strokeStyle = '#b87f58';
@@ -1362,8 +1408,8 @@
     ctx.fill();
     circle(ctx, 0.25 * s, 0.1 * s, 0.07 * s);
     ctx.fill();
-    if (af && !k.noHair) alfHair(ctx, s);
-    eyes(ctx, s, expr, look, af);
+    if (ch.fringe && !k.noHair) ch.fringe(ctx, s);
+    eyes(ctx, s, expr, look, ch);
     // nose
     ctx.strokeStyle = '#c98c66';
     ctx.lineWidth = s * 0.028;
@@ -1371,8 +1417,8 @@
     ctx.moveTo(0.02 * s, 0.0);
     ctx.quadraticCurveTo(0.07 * s, 0.08 * s, 0.0, 0.09 * s);
     ctx.stroke();
-    mouth(ctx, s, expr, af);
-    if (!af) hair(ctx, s);
+    mouth(ctx, s, expr, ch.grinTilt);
+    if (ch.topHair && !k.noHair) ch.topHair(ctx, s);
     if (k.hat) hat(ctx, s, k);
   };
   function collar(ctx, s, k) {
