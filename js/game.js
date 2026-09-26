@@ -110,6 +110,10 @@
       if (G.state === 'menu') {
         if (G.shopOpen) {
           if (e.code === 'Escape' || e.code === 'Backspace') closeShop();
+          else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+            const ids = Object.keys(Art.CHARS);
+            setShopTab(ids[(ids.indexOf(G.shopTab) + (e.code === 'ArrowLeft' ? ids.length - 1 : 1)) % ids.length]);
+          }
           return;
         }
         const n = /^Digit(\d)$/.exec(e.code);
@@ -224,12 +228,25 @@
       b.onclick = () => pickLevel(L.id);
       box.appendChild(b);
     }
-    // shop cards
+    // shop: one tab per character, each showing that character's skins
+    const tabs = $('shopTabs');
+    for (const c of Object.keys(Art.CHARS)) {
+      const b = document.createElement('button');
+      b.className = 'tab';
+      b.dataset.char = c;
+      b.innerHTML = '<canvas width="44" height="52"></canvas><span class="tname">' + Art.CHARS[c].name + '<small></small></span>';
+      b.onclick = () => {
+        AU.init();
+        setShopTab(c);
+      };
+      tabs.appendChild(b);
+    }
     const grid = $('shopGrid');
     for (const id of Object.keys(Art.SKINS)) {
       const b = document.createElement('button');
       b.className = 'card';
       b.dataset.skin = id;
+      b.dataset.char = Art.charOf(id);
       b.innerHTML = '<canvas width="100" height="110"></canvas><span class="cname">' + Art.SKINS[id].name + '</span><span class="cbtn"></span>';
       b.onclick = () => shopClick(id, b);
       grid.appendChild(b);
@@ -252,7 +269,12 @@
       small.textContent = p.wins ? (p.wins === 1 ? 'win' : 'wins') : 'best';
     }
     $('coinsMenu').textContent = G.coins;
-    $('skinName').textContent = Art.SKINS[G.skin].name;
+    $('skinName').textContent = skinLabel(G.skin);
+  }
+  // "Affelito · Black tee", but just "King Vippe" when the skin name already says who it is
+  function skinLabel(id) {
+    const name = Art.SKINS[id].name, who = Art.CHARS[Art.charOf(id)].name;
+    return name.indexOf(who) >= 0 ? name : who + ' · ' + name;
   }
 
   // ------------------------------------------------------------------ shop
@@ -260,8 +282,15 @@
     AU.init();
     AU.sfx('click');
     G.shopOpen = true;
+    G.shopTab = Art.charOf(G.skin);
     show('menu', false);
     show('shop', true);
+    refreshShop();
+  }
+  function setShopTab(c) {
+    if (c === G.shopTab) return;
+    AU.sfx('click');
+    G.shopTab = c;
     refreshShop();
   }
   function closeShop() {
@@ -299,8 +328,14 @@
   }
   function refreshShop() {
     $('coinsShop').textContent = G.coins;
+    for (const b of document.querySelectorAll('.tab')) {
+      const c = b.dataset.char, ids = Object.keys(Art.SKINS).filter((id) => Art.charOf(id) === c);
+      b.classList.toggle('on', c === G.shopTab);
+      b.querySelector('small').textContent = ids.filter(owns).length + ' / ' + ids.length + ' owned';
+    }
     for (const b of document.querySelectorAll('.card')) {
       const id = b.dataset.skin, k = Art.SKINS[id], mine = owns(id);
+      b.classList.toggle('hidden', b.dataset.char !== G.shopTab);
       const state = id === G.skin ? 'wearing' : mine ? 'owned' : G.coins >= k.price ? 'buy' : 'locked';
       b.classList.remove('wearing', 'owned', 'buy', 'locked');
       b.classList.add(state);
@@ -314,7 +349,15 @@
   // skin previews are redrawn every frame while the shop is open, so rainbow / gold / galaxy shimmer
   function drawShop() {
     Art.setDark(0);
+    for (const b of document.querySelectorAll('.tab')) {
+      const c = b.querySelector('canvas'), x = c.getContext('2d');
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      x.clearRect(0, 0, c.width, c.height);
+      x.translate(22, 34);
+      Art.cube(x, 28, 'grin', Art.CHARS[b.dataset.char].first, 0);
+    }
     for (const b of document.querySelectorAll('.card')) {
+      if (b.dataset.char !== G.shopTab) continue;
       const c = b.querySelector('canvas'), x = c.getContext('2d');
       x.setTransform(1, 0, 0, 1, 0, 0);
       x.clearRect(0, 0, c.width, c.height);
@@ -416,7 +459,7 @@
     const s = G.s, ph = Ph.boxH(s);
     const cx = s.x + 0.5, cy = s.y + ph / 2;
     const k = Art.SKINS[G.skin];
-    const cols = [k.main, '#f2c6a0', '#6b4526', '#ffffff', '#ffd634'];
+    const cols = [k.main, '#f2c6a0', Art.CHARS[Art.charOf(G.skin)].hair, '#ffffff', '#ffd634'];
     for (let i = 0; i < 26; i++) {
       const a = Math.random() * Math.PI * 2, sp = 4 + Math.random() * 10;
       particle({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.5 + Math.random() * 0.5, size: 6 + Math.random() * 10, color: cols[i % cols.length], grav: 12 });

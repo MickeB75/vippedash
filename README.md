@@ -22,6 +22,7 @@ Then open <http://localhost:8765>.
 | Mute | **M** / 🔊 button |
 | Pick a level in the menu | click it, or **1** / **2** |
 | Open the shop | **Shop** button or **S** |
+| Switch between Vippe and Affelito in the shop | click the tab, or **←** / **→** |
 
 ## Coins and the shop
 
@@ -35,7 +36,9 @@ You win coins every time you finish a level:
 
 So a harder level and fewer crashes give more coins. The coin total is shown at the top right of the menu.
 
-The shop has 13 skins. Red jersey, black hoodie and blue & black are free. The others cost coins:
+The shop has two tabs, one per character. The shop opens on the tab of the character you are wearing.
+
+**Vippe** (curly brown hair) has 13 skins. Red jersey, black hoodie and blue & black are free. The others cost coins:
 
 | Skin | Coins | | Skin | Coins |
 | --- | --- | --- | --- | --- |
@@ -44,6 +47,17 @@ The shop has 13 skins. Red jersey, black hoodie and blue & black are free. The o
 | Fox (fox ears) | 300 | | Galaxy (orbiting stars) | 800 |
 | Tiger (ears and whiskers) | 350 | | Rainbow (propeller cap) | 1000 |
 | Moose (antlers) | 400 | | King Vippe (gold crown) | 1500 |
+
+**Affelito** (Alfred: straight light-brown hair swept to the side, hazel eyes, a lopsided grin and nearly always a trucker cap) has 14 skins. Black tee, grey hoodie and blue fleece are free. The others cost coins:
+
+| Skin | Coins | | Skin | Coins |
+| --- | --- | --- | --- | --- |
+| Pixel camo (patchwork beanie) | 150 | | Robot (metal dome, blinking antenna) | 600 |
+| Cowboy (cowboy hat, sheriff star) | 200 | | Astronaut (glass space helmet) | 800 |
+| Ninja (headband) | 300 | | Dragon (hood with horns) | 1000 |
+| Pirate (tricorn, eye patch) | 350 | | Fire (flames for hair) | 1500 |
+| MODO Affelito (MoDo cap and jersey) | 400 | | Diamond (diamond cap) | 2000 |
+| Goalie (hockey helmet and cage) | 450 | | | |
 
 Coins, skins and progress are saved in the browser (`localStorage`), so they stay on that device and browser.
 
@@ -67,9 +81,9 @@ Shorter than level 1 but harder, with fewer checkpoints. New things: triple spik
 
 | Section | Where | What happens |
 | --- | --- | --- |
-| **Skogsbrynet** | the forest edge: pines, a hunting stand, squirrels, a hare, a moose | Hedgehogs, logs, a stump staircase over thorns and a moose crossing. Low-flying crows: stay on the ground under them. |
-| **Granskogen** | deep spruce forest, an owl, a fox, a squirrel running up a pine | Branch hopping over a floor of thorns, an orb chain, and a timber pile with a crow above it (jump early). |
-| **Myren** | the misty bog: cranes, frogs on lily pads, dead trees | **Flying-bike mode** under the spruce boughs, weaving between dead trees and crows. |
+| **Skogsbrynet** | the forest edge: pines, a hunting stand, squirrels, a hare, a moose | Hedgehogs, logs, a stump staircase over thorns, a moose crossing and stepping stones across a pool. Low-flying crows: stay on the ground under them. |
+| **Granskogen** | deep spruce forest, an owl, a fox, a squirrel running up a pine | A woodpile with a spike on it, branch hopping over a floor of thorns, an orb chain, and a timber pile with a crow above it (jump early). |
+| **Myren** | the misty bog: cranes, frogs on lily pads, dead trees | **Flying-bike mode** under the spruce boughs, weaving between dead trees and crows. The dead trees and the boughs are thorny: touching them crashes the bike. |
 | **Björngrottan** | the bear cave: a sleeping bear, bats, glowing crystals | **Floorball mode** with a lower roof and a spike group every 5 blocks. |
 | **Bäckravinen** | the brook ravine: deer, a woodpecker | Stones across the brook, a fox in the path, branches over the rapids. |
 | **Gläntan** | the sunny clearing: a tent and a campfire | A last moose, an orb chain and the finish. |
@@ -88,7 +102,7 @@ js/physics.js     deterministic fixed-step physics (240 Hz): cube, ship, ball, p
 js/level.js       level builder, both level layouts, their themes and the level list
 js/solver.js      search bot that proves the levels are beatable
 js/audio.js       procedural chiptune (one song per level) + sound effects
-js/art.js         all drawing: Vippe and his skins, obstacles, animals, landmarks
+js/art.js         all drawing: Vippe, Affelito and their skins, obstacles, animals, landmarks
 js/render.js      parallax scene, camera, HUD
 js/game.js        game loop, input, checkpoints, menus, coins and the shop
 tools/verify.html level verifier
@@ -103,6 +117,7 @@ b.spike(26);                 // spike on the ground at x = 26
 b.spikes(50, 2);             // two spikes in a row
 b.spike(24, 0, 'hedgehog');  // a hedgehog is a spike with a different look
 b.block(80, 0, 3, 1, 'stone'); // solid block: x, y, width, height, style
+b.thorny(410, 0, 2, 3, 'deadtree'); // looks like a block, but crashes you on touch (no sliding along it)
 b.bird(147, 1.35);           // a crow hovering at x, y (a hazard)
 b.pad(128);                  // yellow jump pad
 b.orb(154, 2);               // yellow orb (tap in mid-air)
@@ -126,5 +141,5 @@ Open `index.html#debug`. This shows hitboxes and FPS and adds these keys:
 
 ## Notes
 
-- The `Vincent/` photos were only used as reference for the character design. They are not used in the game and are git-ignored so they stay private.
+- The `Vincent/` and `Alfred/` photos were only used as reference for the character designs. They are not used in the game and are git-ignored so they stay private.
 - `.venv/` holds Python and Pillow, used once to convert the HEIC photos. The game doesn't need it, it is git-ignored, and it can be deleted.

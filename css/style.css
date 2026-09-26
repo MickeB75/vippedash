@@ -153,6 +153,24 @@ html, body {
 .shoppanel { gap: calc(var(--u) * 8px); padding-top: calc(var(--u) * 18px); padding-bottom: calc(var(--u) * 20px); }
 .shophead { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .shophead h2 { margin: 0; font-size: calc(var(--u) * 48px); color: #ffd634; -webkit-text-stroke: calc(var(--u) * 2px) #6b3a00; }
+.shoptabs { display: flex; gap: calc(var(--u) * 6px); padding: calc(var(--u) * 5px); border-radius: calc(var(--u) * 20px); background: rgba(0, 0, 0, 0.3); }
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 6px);
+  padding: calc(var(--u) * 2px) calc(var(--u) * 18px) calc(var(--u) * 2px) calc(var(--u) * 8px);
+  border-radius: calc(var(--u) * 15px);
+  border: calc(var(--u) * 3px) solid transparent;
+  background: transparent;
+  font: inherit;
+  color: #aab6d8;
+  cursor: pointer;
+}
+.tab:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.tab.on { border-color: #ffd634; background: rgba(255, 214, 52, 0.15); color: #fff; }
+.tab canvas { width: calc(var(--u) * 38px); height: calc(var(--u) * 45px); }
+.tname { display: flex; flex-direction: column; align-items: flex-start; font-size: calc(var(--u) * 26px); line-height: 1; }
+.tname small { font-family: system-ui, sans-serif; font-size: calc(var(--u) * 13px); color: #aab6d8; margin-top: calc(var(--u) * 3px); }
 .shopgrid { display: grid; grid-template-columns: repeat(7, calc(var(--u) * 132px)); gap: calc(var(--u) * 10px); margin: calc(var(--u) * 6px) 0; }
 .card {
   display: flex;
@@ -190,6 +208,7 @@ html, body {
 .card.locked .cbtn { background: rgba(0, 0, 0, 0.35); color: #9aa3b8; }
 .card.shake { animation: shake 0.35s; }
 .card.bought { animation: pop 0.45s ease-out; }
+.card.hidden { display: none; }
 @keyframes shake { 20%, 60% { transform: translateX(calc(var(--u) * -6px)); } 40%, 80% { transform: translateX(calc(var(--u) * 6px)); } }
 
 /* ---------- level complete: coin reward ---------- */

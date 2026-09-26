@@ -133,6 +133,9 @@
   const sy = (wy) => GY - wy * BS;
   R.sx = sx;
   R.sy = sy;
+  // first x <= x0 on a world-aligned grid of `step` px (off = how far the layer has scrolled, in px).
+  // Patterns start from here so they scroll with the world, even where an area or a corridor starts on screen.
+  const gridStart = (x0, off, step) => x0 - ((((x0 + off) % step) + step) % step);
 
   // ------------------------------------------------------------------ main draw
   R.draw = function (G, dt) {
@@ -337,7 +340,7 @@
       const x = (m.u - offM) * BS;
       if (x < -m.hw * BS - 40 || x > W + m.hw * BS + 40) continue;
       if (m.t === 'pine1') Art.pineTree(ctx, x, mb + 2, m.d.h, '#2f5e37');
-      else if (m.t === 'birch1') Art.birchTree(ctx, x, mb + 2, m.d.h, t);
+      else if (m.t === 'birch1') Art.birchTree(ctx, x, mb + 2, m.d.h);
       else if (m.t === 'spruce1') Art.spruceTree(ctx, x, mb + 2, m.d.h);
       else if (m.t === 'dead1') Art.deadSnag(ctx, x, mb + 2, m.d.h * 0.8);
       else if (Art.mid[m.t]) Art.mid[m.t](ctx, x, mb + 2, m.d, t, FONT);
@@ -458,7 +461,10 @@
       ctx.fillStyle = T('#5a86ad');
       ctx.fillRect(x0, mb - 6, w, GY - mb + 10);
       ctx.fillStyle = 'rgba(255,220,180,0.35)';
-      for (let x = x0 - ((offM * BS) % 60); x < x1; x += 60) ctx.fillRect(x + Math.sin(t + x) * 4, mb + 4 + ((x * 7) % 8), 26, 2);
+      for (let x = gridStart(x0, offM * BS, 60); x < x1; x += 60) {
+        const i = Math.round((x + offM * BS) / 60);
+        ctx.fillRect(x + Math.sin(t + i) * 4, mb + 4 + ((i * 7) & 7), 26, 2);
+      }
       return;
     }
     const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a' }[style] || '#7dbb4e';
@@ -467,47 +473,55 @@
     if (style === 'forest') {
       // mossy forest floor with blueberry bushes
       ctx.fillStyle = T('#2f5528');
-      for (let x = x0 - ((offM * BS) % 90); x < x1; x += 90) {
+      for (let x = gridStart(x0, offM * BS, 90); x < x1; x += 90) {
         ctx.beginPath();
         ctx.ellipse(x + 30, mb - 2, 26, 8, 0, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.fillStyle = T('#2f3f8a');
-      for (let x = x0 - ((offM * BS) % 90); x < x1; x += 90) ctx.fillRect(x + 24, mb - 5, 3, 3), ctx.fillRect(x + 38, mb - 3, 3, 3);
+      for (let x = gridStart(x0, offM * BS, 90); x < x1; x += 90) ctx.fillRect(x + 24, mb - 5, 3, 3), ctx.fillRect(x + 38, mb - 3, 3, 3);
     } else if (style === 'bog') {
       // open bog: pools of water and tufts of cotton grass
       ctx.fillStyle = T('#5a7684');
-      for (let x = x0 - ((offM * BS) % 220); x < x1; x += 220) {
+      for (let x = gridStart(x0, offM * BS, 220); x < x1; x += 220) {
         ctx.beginPath();
         ctx.ellipse(x + 90, mb + 2, 60, 5, 0, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.fillStyle = T('#f4f2ea');
-      for (let x = x0 - ((offM * BS) % 40); x < x1; x += 40) ctx.fillRect(x + ((x * 7) & 15), mb - 7 - ((x * 3) & 3), 3, 3);
+      for (let x = gridStart(x0, offM * BS, 40); x < x1; x += 40) {
+        const i = Math.round((x + offM * BS) / 40);
+        ctx.fillRect(x + ((i * 7) & 15), mb - 7 - ((i * 3) & 3), 3, 3);
+      }
     } else if (style === 'glade') {
       const cols = ['#ffffff', '#ffd21c', '#d65ab0', '#7b5bd6'];
-      for (let x = x0 - ((offM * BS) % 26), i = 0; x < x1; x += 26, i++) {
-        ctx.fillStyle = T(cols[Math.abs(Math.floor((x + offM * BS) / 26)) % 4]);
-        ctx.fillRect(x, mb - 4 + ((i * 5) % 7), 3, 3);
+      for (let x = gridStart(x0, offM * BS, 26); x < x1; x += 26) {
+        const i = Math.round((x + offM * BS) / 26);
+        ctx.fillStyle = T(cols[(i & 3)]);
+        ctx.fillRect(x, mb - 4 + ((i * 5) & 7), 3, 3);
       }
     }
     if (style === 'meadow' || style === 'farm') {
       // rapeseed stripes
       ctx.fillStyle = T('#f2d43a');
-      for (let x = x0 - ((offM * BS) % 520); x < x1; x += 520) ctx.fillRect(Math.max(x0, x), mb - 2, Math.min(260, x1 - Math.max(x0, x)), 7);
+      for (let x = gridStart(x0, offM * BS, 520); x < x1; x += 520) {
+        const a0 = Math.max(x0, x), a1 = Math.min(x1, x + 260);
+        if (a1 > a0) ctx.fillRect(a0, mb - 2, a1 - a0, 7);
+      }
     }
     if (style === 'farm') {
       // railway embankment + tracks
       ctx.fillStyle = T('#7c7468');
       ctx.fillRect(x0, mb - 4, w, 8);
       ctx.fillStyle = T('#4a3b2e');
-      for (let x = x0 - ((offM * BS) % 14); x < x1; x += 14) ctx.fillRect(x, mb - 3, 6, 5);
+      for (let x = gridStart(x0, offM * BS, 14); x < x1; x += 14) if (x >= x0) ctx.fillRect(x, mb - 3, Math.min(6, x1 - x), 5);
       ctx.fillStyle = T('#b8bcc2');
       ctx.fillRect(x0, mb - 4, w, 2);
       // power line poles
       ctx.strokeStyle = T('#4a3b2e');
       ctx.lineWidth = 3;
-      for (let x = x0 - ((offM * BS) % 240) + 60; x < x1; x += 240) {
+      for (let x = gridStart(x0, offM * BS, 240) + 60; x < x1; x += 240) {
+        if (x < x0) continue;
         ctx.beginPath();
         ctx.moveTo(x, mb);
         ctx.lineTo(x, mb - 120);
@@ -518,7 +532,8 @@
       ctx.strokeStyle = T('#333a44');
       ctx.lineWidth = 1;
       ctx.beginPath();
-      for (let x = x0 - ((offM * BS) % 240) + 60; x < x1 - 240; x += 240) {
+      for (let x = gridStart(x0, offM * BS, 240) + 60; x < x1 - 240; x += 240) {
+        if (x < x0) continue;
         ctx.moveTo(x - 18, mb - 110);
         ctx.quadraticCurveTo(x + 102, mb - 96, x + 222, mb - 110);
         ctx.moveTo(x + 18, mb - 110);
@@ -784,7 +799,7 @@
         for (let r = 0; r < 9; r++) {
           const yy = GY + 6 + r * (shh + 3);
           const shift = (r % 2) * (sw / 2);
-          const start = x0 - (((camX * BS + shift) % (sw + 3)) + (sw + 3)) % (sw + 3);
+          const start = gridStart(x0, camX * BS + shift, sw + 3);
           for (let x = start; x < x1; x += sw + 3) {
             const a0 = Math.max(x0, x), a1 = Math.min(x1, x + sw);
             if (a1 > a0) Art.rr(ctx, a0, yy, a1 - a0, shh, 5), ctx.fill();
@@ -798,8 +813,7 @@
         ctx.fillStyle = T('#b9b4a8');
         ctx.fillRect(x0, GY, x1 - x0, 8);
         ctx.fillStyle = T('#f2f2f2');
-        const start = x0 - ((camX * BS) % 120 + 120) % 120;
-        for (let x = start; x < x1; x += 120) {
+        for (let x = gridStart(x0, camX * BS, 120); x < x1; x += 120) {
           const a0 = Math.max(x0, x), a1 = Math.min(x1, x + 60);
           if (a1 > a0) ctx.fillRect(a0, GY + 70, a1 - a0, 6);
         }
@@ -811,8 +825,7 @@
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
         ctx.fillRect(x0, GY, x1 - x0, 5);
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        const start = x0 - ((camX * BS) % 480 + 480) % 480;
-        for (let x = start; x < x1; x += 480) if (x >= x0) ctx.fillRect(x, GY, 5, H - GY);
+        for (let x = gridStart(x0, camX * BS, 480); x < x1; x += 480) if (x >= x0) ctx.fillRect(x, GY, 5, Math.min(H - GY, x1 - x));
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
         ctx.fillRect(x0, GY + 50, x1 - x0, 30);
       }
@@ -829,17 +842,21 @@
         ctx.fillRect(x0, 0, x1 - x0, y);
         ctx.strokeStyle = '#4b5566';
         ctx.lineWidth = 3;
+        ctx.save();
         ctx.beginPath();
-        const start = x0 - ((camX * BS) % 60 + 60) % 60;
-        for (let x = start; x < x1; x += 60) {
-          ctx.moveTo(Math.max(x0, x), y - 4);
-          ctx.lineTo(Math.min(x1, x + 30), y - 40);
-          ctx.lineTo(Math.min(x1, x + 60), y - 4);
+        ctx.rect(x0, 0, x1 - x0, y);
+        ctx.clip();
+        ctx.beginPath();
+        for (let x = gridStart(x0, camX * BS, 60); x < x1; x += 60) {
+          ctx.moveTo(x, y - 4);
+          ctx.lineTo(x + 30, y - 40);
+          ctx.lineTo(x + 60, y - 4);
         }
         ctx.moveTo(x0, y - 40);
         ctx.lineTo(x1, y - 40);
         ctx.stroke();
-        for (let x = start + 30; x < x1; x += 240) {
+        ctx.restore();
+        for (let x = gridStart(x0, camX * BS, 240) + 30; x < x1; x += 240) {
           if (x < x0) continue;
           const gl = ctx.createRadialGradient(x, y + 4, 2, x, y + 4, 90);
           gl.addColorStop(0, 'rgba(255,255,235,0.55)');
@@ -876,11 +893,10 @@
         ctx.fillStyle = g;
         ctx.fillRect(x0, 0, x1 - x0, y);
         ctx.fillStyle = '#3a3444';
-        const start = x0 - ((camX * BS) % 36 + 36) % 36;
         ctx.beginPath();
         ctx.moveTo(x0, y - 2);
-        for (let x = start; x < x1 + 36; x += 36) {
-          const i = Math.floor((x + camX * BS) / 36);
+        for (let x = gridStart(x0, camX * BS, 36); x < x1 + 36; x += 36) {
+          const i = Math.round((x + camX * BS) / 36);
           ctx.lineTo(U.clamp(x + 18, x0, x1), y + 4 + ((i * 7) % 9));
           ctx.lineTo(U.clamp(x + 36, x0, x1), y - 2);
         }
@@ -897,11 +913,10 @@
         ctx.fillStyle = g;
         ctx.fillRect(x0, 0, x1 - x0, y);
         ctx.fillStyle = Art.T('#2a5c33');
-        const start = x0 - ((camX * BS) % 32 + 32) % 32;
         ctx.beginPath();
         ctx.moveTo(x0, y - 4);
-        for (let x = start; x < x1 + 32; x += 32) {
-          const i = Math.floor((x + camX * BS) / 32);
+        for (let x = gridStart(x0, camX * BS, 32); x < x1 + 32; x += 32) {
+          const i = Math.round((x + camX * BS) / 32);
           ctx.lineTo(U.clamp(x + 8, x0, x1), y + 2);
           ctx.lineTo(U.clamp(x + 16, x0, x1), y + 8 + ((i * 5) % 7));
           ctx.lineTo(U.clamp(x + 24, x0, x1), y + 2);
@@ -920,15 +935,19 @@
         ctx.fillStyle = g;
         ctx.fillRect(x0, 0, x1 - x0, y);
         ctx.fillStyle = Art.T('#3f7a34');
-        const start = x0 - ((camX * BS) % 40 + 40) % 40;
-        for (let x = start; x < x1 + 40; x += 40) {
-          const cx = Math.floor((x + camX * BS) / 40);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x0, 0, x1 - x0, y + 30);
+        ctx.clip();
+        ctx.beginPath();
+        for (let x = gridStart(x0, camX * BS, 40); x < x1 + 40; x += 40) {
+          const cx = Math.round((x + camX * BS) / 40);
           const r = 16 + ((cx * 13) % 9);
-          if (x + r < x0 || x - r > x1) continue;
-          ctx.beginPath();
-          ctx.arc(U.clamp(x, x0, x1), y, r, 0, Math.PI);
-          ctx.fill();
+          ctx.moveTo(x + r, y);
+          ctx.arc(x, y, r, 0, Math.PI);
         }
+        ctx.fill();
+        ctx.restore();
         ctx.fillStyle = 'rgba(255,220,240,0.6)';
         ctx.fillRect(x0, y - 2, x1 - x0, 2);
       }
@@ -959,6 +978,7 @@
           else if (o.kind === 'spikeDown') Art.spike(ctx, x, y, w, h, true, o.style, glow(o.x), t);
           else if (o.kind === 'half') Art.half(ctx, x, y, w, h, o.style, glow(o.x));
           else if (o.kind === 'bird') Art.bird(ctx, x + w / 2, y + h / 2, BS, t, o.id, glow(o.x));
+          else if (o.kind === 'thorny') Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
           break;
         case 'pad':
           Art.pad(ctx, x, y, w, h, o.color, t);

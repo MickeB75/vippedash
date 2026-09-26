@@ -24,6 +24,12 @@
     block(x, y, w = 1, h = 1, style = 'stone') {
       return this.add({ t: 'solid', x, y, w, h, style });
     }
+    // drawn like a block, but it's jagged (a snapped-off dead tree, a clump of spruce boughs), so it
+    // kills on touch instead of letting you slide along it; the hitbox leaves out the jagged edge
+    thorny(x, y, w, h, style) {
+      const top = style === 'deadtree'; // dead trees are jagged on top, boughs hang down with jagged tips
+      return this.add({ t: 'haz', kind: 'thorny', x, y, w, h, style, hx0: x + 0.1, hx1: x + w - 0.1, hy0: top ? y : y + 0.15, hy1: top ? y + h - 0.15 : y + h });
+    }
     spike(x, y = 0, style) {
       return this.add({ t: 'haz', kind: 'spike', x, y, w: 1, h: 1, style, hx0: x + 0.35, hx1: x + 0.65, hy0: y + 0.05, hy1: y + 0.6 });
     }
@@ -384,7 +390,6 @@
     b.deco('fence', 98, { len: 7 });
     b.deco('runestone', 116);
     b.deco('lupins', 138);
-    b.deco('bales', 160);
     b.deco('fence', 184, { len: 6 });
     b.deco('birch', 196);
     b.deco('lupins', 224);
@@ -400,7 +405,7 @@
     b.deco('sign_place', 388, { text: 'Gamla Uppsala' });
     b.deco('runestone', 416);
     b.deco('birch', 446);
-    b.deco('runestone', 472);
+    b.deco('runestone', 485);
     b.deco('lupins', 492);
     b.deco('sign_place', 514, { text: 'Uppsala' });
     b.deco('bike', 526);
@@ -515,20 +520,21 @@
     b.bird(148.5, 1.55);
     b.bird(150, 1.35);
     b.spike(158, 0, 'hedgehog');
-    // stepping stones across the forest pool
-    b.block(168, 0, 2, 1, 'rock');
-    b.water(170, 4);
-    b.block(174, 0, 2, 1, 'rock');
-    b.water(176, 4);
-    b.block(180, 0, 2, 2, 'rock');
-    b.water(182, 4);
-    b.block(186, 0, 2, 1, 'rock');
+    // stepping stones across the forest pool; only a short gap after the tall stone, so the drop off
+    // it works whether you jump straight away, a little later or just run off the edge
+    b.block(168, 0, 3, 1, 'rock');
+    b.water(171, 4);
+    b.block(175, 0, 3, 1, 'rock');
+    b.water(178, 3);
+    b.block(181, 0, 3, 2, 'rock');
+    b.water(184, 2);
+    b.block(186, 0, 3, 1, 'rock');
     b.spikes(196, 2);
 
     // ============ GRANSKOGEN (208 – 384) ============
+    // woodpile with a spike on it: jump up, then over the spike and down (no thorns right behind it)
     b.block(206, 0, 5, 1, 'timber');
     b.spike(209, 1);
-    b.spikes(211, 2);
     b.spikes(222, 2);
     b.spike(232, 0, 'hedgehog');
     b.bird(236, 1.4);
@@ -566,32 +572,33 @@
     b.portal(396, 'ship', { ceil: 9 });
     b.corridor(396, 560, 9, 'boughs');
     b.water(402, 156);
-    b.block(410, 0, 2, 3, 'deadtree');
-    b.block(420, 5, 2, 4, 'boughs');
+    // the dead trees and the boughs are thorny: touching them crashes the bike
+    b.thorny(410, 0, 2, 3, 'deadtree');
+    b.thorny(420, 5, 2, 4, 'boughs');
     b.bird(428, 3.2);
-    b.block(434, 0, 2, 4, 'deadtree');
+    b.thorny(434, 0, 2, 4, 'deadtree');
     b.bird(441, 6.4);
     b.bird(442, 2.2);
-    b.block(448, 5.5, 3, 3.5, 'boughs');
-    b.block(456, 0, 2, 3.5, 'deadtree');
+    b.thorny(448, 5.5, 3, 3.5, 'boughs');
+    b.thorny(456, 0, 2, 3.5, 'deadtree');
     b.bird(463, 6.2);
-    b.block(468, 0, 3, 2.5, 'deadtree');
-    b.block(468, 6, 3, 3, 'boughs');
+    b.thorny(468, 0, 3, 2.5, 'deadtree');
+    b.thorny(468, 6, 3, 3, 'boughs');
 
     b.checkpoint(480, 'ship', 4.15, 9);
-    b.block(490, 0, 2, 4, 'deadtree');
-    b.block(490, 7.2, 2, 1.8, 'boughs');
-    b.block(499, 0, 2, 1.8, 'deadtree');
-    b.block(499, 5, 2, 4, 'boughs');
-    b.block(508, 0, 2, 4.4, 'deadtree');
-    b.block(508, 7.6, 2, 1.4, 'boughs');
+    b.thorny(490, 0, 2, 4, 'deadtree');
+    b.thorny(490, 7.2, 2, 1.8, 'boughs');
+    b.thorny(499, 0, 2, 1.8, 'deadtree');
+    b.thorny(499, 5, 2, 4, 'boughs');
+    b.thorny(508, 0, 2, 4.4, 'deadtree');
+    b.thorny(508, 7.6, 2, 1.4, 'boughs');
     b.bird(516, 2.4);
     b.bird(516, 6.2);
-    b.block(524, 0, 6, 2, 'deadtree');
-    b.block(524, 5.5, 6, 3.5, 'boughs');
+    b.thorny(524, 0, 6, 2, 'deadtree');
+    b.thorny(524, 5.5, 6, 3.5, 'boughs');
     b.bird(535, 4.2);
-    b.block(542, 0, 2, 3.8, 'deadtree');
-    b.block(548, 5.2, 2, 3.8, 'boughs');
+    b.thorny(542, 0, 2, 3.8, 'deadtree');
+    b.thorny(548, 5.2, 2, 3.8, 'boughs');
     b.portal(560, 'cube', { y: 3 });
 
     // ============ BJÖRNGROTTAN — ball (576 – 704) ============
