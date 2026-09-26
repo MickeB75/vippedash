@@ -47,6 +47,11 @@
     F4: parseMelody('D5 D5 . D5 F5 . D5 . | A#4 A#4 . A#4 D5 . A#4 . | G4 G4 . A#4 D5 . G5 . | A4 A4 . C#5 E5 . A5 .'),
     F5: parseMelody('A5 G5 F5 E5 D5 E5 F5 A5 | G5 F5 E5 D5 C5 D5 E5 G5 | F5 E5 D5 C5 A#4 C5 D5 F5 | E5 - A5 - C#6 - E6 -'),
     F6: parseMelody('A5 - G5 F5 - C5 F5 - | G5 - E5 C5 - G4 C5 - | F5 - A5 D6 - C6 A5 - | A#5 - A5 G5 - F5 D5 -'),
+    // the nightmare song (level 4), C minor doom metal: original melodies, in the style of but not copied from any existing song
+    N1: parseMelody('C5 . . D#5 . G5 . . | G#4 . . C5 . D#5 . . | F4 . . G#4 . C5 . . | F#4 . . A#4 . C#5 . -'),
+    N2: parseMelody('C5 - D#5 - . C5 D#5 - | C#5 - . D#5 - C5 . - | G4 - A#4 - C5 - D#5 - | F#4 - . G4 - F5 - -'),
+    N3: parseMelody('C5 D#5 G5 . C6 . G5 D#5 | B4 D5 F5 . B4 D5 F5 . | G#4 C5 D#5 . G#5 . D#5 C5 | F#4 A#4 C#5 . F#5 . C#5 A#4'),
+    N4: parseMelody('C5 D#5 G5 C6 A#5 G5 D#5 C5 | F#5 A#5 C#6 A#5 F#5 D#5 F#5 A#5 | C#5 F5 G#5 F5 C#5 A#4 C#5 F5 | G#5 C6 D#6 C6 G#5 F5 G#5 C6'),
     // the subway song (level 3), E minor: city groove, train rhythm, a sneaky sewer tune, and G major in the sunshine
     M1: parseMelody('E5 - G5 E5 - B4 D5 E5 | C5 - E5 C5 - G4 B4 C5 | D5 - G5 D5 - B4 D5 G5 | F#5 - D5 A4 - D5 F#5 A5'),
     M2: parseMelody('B5 A5 G5 E5 . E5 G5 A5 | A5 F#5 D5 F#5 . D5 F#5 A5 | G5 E5 C5 E5 . C5 E5 G5 | F#5 - D#5 - B4 - D#5 F#5'),
@@ -62,6 +67,9 @@
     E: [40, [56, 59, 64]], Em: [40, [55, 59, 64]], Dm: [38, [57, 62, 65]],
     Bb: [46, [58, 62, 65]], Gm: [43, [55, 58, 62]], A: [45, [57, 61, 64]],
     D: [38, [54, 57, 62]], B: [47, [54, 59, 63]],
+    // level 4 (doom metal, C minor): wide "5th under root" doom-chord voicings, root note kept low for the guitar/bass
+    Cm: [36, [55, 60, 63]], Ab: [32, [51, 56, 60]], Fm: [41, [60, 65, 68]], Db: [37, [56, 61, 65]],
+    Eb: [39, [58, 63, 67]], Gb: [42, [61, 66, 70]], Bdim: [35, [53, 59, 62]],
   };
   const PROG = {
     main: ['Am', 'F', 'C', 'G'],
@@ -79,6 +87,14 @@
     sewer: ['Em', 'Am', 'Em', 'B'],
     pipe: ['Am', 'Em', 'C', 'B'],
     harbor: ['G', 'D', 'Em', 'C'],
+    // level 4: original doom-metal progressions in C minor, with Phrygian (Db) and tritone (Gb) colour
+    dirge: ['Cm', 'Ab', 'Fm', 'Gb'],
+    doom: ['Cm', 'Db', 'Cm', 'Gb'],
+    doom2: ['Cm', 'Eb', 'Fm', 'Gb'],
+    drone: ['Cm', 'Cm', 'Fm', 'Cm'],
+    circus: ['Cm', 'Bdim', 'Ab', 'Gb'],
+    mirror: ['Gb', 'Ab', 'Bdim', 'Cm'],
+    climax: ['Cm', 'Gb', 'Db', 'Ab'],
   };
   // each song: [fromBar, toBar, settings]. `phrase: 'section'` starts the 4-bar phrases at the section start.
   const SONGS = {
@@ -131,6 +147,34 @@
         [58, 60, { end: true }],
       ],
     },
+    // level 4 "Mardrömmen": doom metal in C minor, half-time (kick/snare every 8 steps, 78 BPM feel).
+    // areas: graveyard 0-8, convent 8-20, chapel 20-28, catacomb 28-40, circus 40-52, mirrors 52-58,
+    // ghost train 58-66, tower 66-70, end 70-72.
+    nightmare: {
+      endChord: 'Cm',
+      phrase: 'section',
+      sections: [
+        // graveyard: bell tolls, a lonely clean plucked arpeggio, wind; the first heavy doom chord at bar 4
+        [0, 4, { prog: 'dirge', lead: 'N1', tone: 'clean', thunder: true, bell: [0] }],
+        [4, 8, { prog: 'dirge', lead: 'N1', tone: 'clean', thunder: true, bell: [16, 48], guitar: 'doom' }],
+        // convent: the main half-time riff, a mournful original lead, organ underneath; thunder joins partway in
+        [8, 12, { prog: 'doom', guitar: 'doom', drums: 'doom', organ: true, lead: 'N2' }],
+        [12, 20, { prog: 'doom', guitar: 'doom', drums: 'doom', organ: true, lead: 'N2', thunder: true }],
+        // chapel: choir and organ over the riff, heavy snare on every beat (the strobe flashes every beat here)
+        [20, 28, { prog: 'doom', guitar: 'doom', drums: 'strobe', organ: true, choir: true, lead: 'N2' }],
+        // catacomb: sparse and slow -- a low drone, choir, heartbeat drums and drips
+        [28, 40, { prog: 'drone', drums: 'sparse', drone: true, choir: true, drips: true }],
+        // circus: a detuned calliope with a sinister original tune over the doom drums
+        [40, 52, { prog: 'circus', drums: 'doom', lead: 'N3', tone: 'calliope' }],
+        // mirrors: the calliope tune played as if backwards, over a chugging riff
+        [52, 58, { prog: 'mirror', guitar: 'chug', drums: 'doom', lead: 'N3', tone: 'reverse' }],
+        // ghost train: the climax -- double-time drums, tremolo guitar, a fast lead
+        [58, 66, { prog: 'climax', guitar: 'tremolo', drums: 'doomfast', lead: 'N4' }],
+        // tower: the main riff returns
+        [66, 70, { prog: 'doom2', guitar: 'doom', drums: 'doom', organ: true, lead: 'N2' }],
+        [70, 72, { end: true, endBell: true }],
+      ],
+    },
   };
   let SONG = SONGS.home;
   A.setSong = function (id) {
@@ -139,6 +183,29 @@
   function sectionAt(bar) {
     for (const s of SONG.sections) if (bar >= s[0] && bar < s[1]) return s;
     return null;
+  }
+
+  // soft-clip waveshaper curve for the doom guitar distortion bus (computed once, reused every level).
+  // A moderate drive: tanh saturates fast, so too high an amount makes even a quiet chord come out
+  // near full scale once several detuned oscillators sum into it.
+  const DIST_CURVE = (() => {
+    const n = 1024, curve = new Float32Array(n), amt = 3.2;
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(x * amt) / Math.tanh(amt);
+    }
+    return curve;
+  })();
+
+  // a decaying-noise impulse response for the reverb send
+  function makeImpulse(ctx, seconds, decay) {
+    const rate = ctx.sampleRate, len = Math.floor(rate * seconds);
+    const buf = ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
   }
 
   // ---------- engine ----------
@@ -164,6 +231,19 @@
     A.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = A.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    // reverb send (level 4): a convolver with a generated ~2.2s decaying-noise tail, built once and reused
+    // for the whole page. Its return goes straight to master (not the per-level music bus), so a tail
+    // already ringing keeps playing smoothly through a crash/respawn instead of being cut off when
+    // startMusic/stopMusic tear down and rebuild A.bus.
+    A.reverb = ctx.createConvolver();
+    A.reverb.buffer = makeImpulse(ctx, 2.2, 2.4);
+    A.reverbIn = ctx.createGain(); // sounds send() into this
+    A.reverbIn.gain.value = 1;
+    A.reverbIn.connect(A.reverb);
+    A.reverbOut = ctx.createGain(); // the wet return level
+    A.reverbOut.gain.value = 0.55;
+    A.reverb.connect(A.reverbOut);
+    A.reverbOut.connect(A.master);
   };
 
   A.setMuted = function (m) {
@@ -178,6 +258,25 @@
     g.gain.value = 0.55;
     g.connect(A.master);
     A.bus = g;
+    // doom guitar distortion bus (level 4): soft-clip waveshaper, then a highpass/lowpass "cabinet".
+    // Rebuilt fresh every startMusic and connected only to this bus, so it stops with the music
+    // (a crash/respawn just drops the reference; nothing here schedules sources that outlive A.bus).
+    const dist = A.ctx.createWaveShaper();
+    dist.curve = DIST_CURVE;
+    dist.oversample = '2x';
+    const hp = A.ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 90;
+    const lp = A.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 3000;
+    const makeup = A.ctx.createGain(); // the waveshaper saturates fast, so tame its output level here
+    makeup.gain.value = 0.45;
+    dist.connect(hp);
+    hp.connect(lp);
+    lp.connect(makeup);
+    makeup.connect(g);
+    A.distBus = dist;
     A.anchorLevel = levelTime;
     A.anchorAudio = A.ctx.currentTime + 0.05;
     A.nextStep = Math.max(0, Math.ceil(levelTime / STEP - 1e-6));
@@ -186,6 +285,7 @@
 
   A.stopMusic = function (fade = 0.12) {
     A.playing = false;
+    A.distBus = null; // the waveshaper/filter chain feeding the old bus is now unreachable and gets GC'd
     if (!A.bus || !A.ctx) return;
     const g = A.bus;
     A.bus = null;
@@ -283,6 +383,129 @@
     for (let i = 0; i < 3; i++) noise(t + i * 0.011, 0.09, 0.3 * v, 'bandpass', 1400, null, 1.2);
   };
   const crash = (t) => noise(t, 1.2, 0.22, 'highpass', 5000);
+  const ride = (t, v = 1) => noise(t, 0.35, 0.1 * v, 'highpass', 7000, null, 0.6);
+
+  // ---- level 4: doom drums (bigger kick/snare with a reverb send) ----
+  function bigKick(t, v = 1) {
+    const ctx = A.ctx;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.frequency.setValueAtTime(115, t);
+    o.frequency.exponentialRampToValueAtTime(34, t + 0.22);
+    g.gain.setValueAtTime(1.05 * v, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    o.connect(g);
+    g.connect(A.bus);
+    noise(t, 0.02, 0.4 * v, 'highpass', 2200); // click transient
+    o.start(t);
+    o.stop(t + 0.6);
+    if (A.reverbIn) {
+      const send = ctx.createGain();
+      send.gain.value = 0.14 * v;
+      g.connect(send);
+      send.connect(A.reverbIn);
+    }
+  }
+  const bigSnare = (t, v = 1) => {
+    noise(t, 0.3, 0.5 * v, 'bandpass', 1500, null, 0.6);
+    noise(t, 0.3, 0.22 * v, 'highpass', 4200);
+    voice('triangle', 170, t, 0.16, 0.28 * v, { slide: 90, hold: 0.5 });
+    if (A.reverbIn) noise(t, 0.4, 0.2 * v, 'bandpass', 1500, A.reverbIn, 0.6);
+  };
+
+  // church bell: inharmonic sine partials with a long exponential decay
+  function churchBell(t, m, vol = 0.35, dest) {
+    dest = dest || A.bus;
+    const f0 = mtof(m);
+    const ratios = [0.5, 1, 1.19, 1.5, 2, 2.74, 3.0, 4.1];
+    const amps = [0.35, 1, 0.5, 0.4, 0.32, 0.22, 0.16, 0.1];
+    const decays = [4.2, 4.5, 3.4, 3.0, 2.4, 1.5, 1.2, 0.8];
+    ratios.forEach((r, i) => {
+      voice('sine', f0 * r, t, decays[i], vol * amps[i] * 0.22, { dest, attack: 0.006, hold: 0.03, release: decays[i] * 0.4 });
+    });
+    if (A.reverbIn) voice('sine', f0, t, 3, vol * 0.12, { dest: A.reverbIn, attack: 0.01, hold: 0.05, release: 1.4 });
+  }
+
+  // thunder: lowpassed rumble with a crack at the start
+  function thunderRumble(t, vol = 1, dest) {
+    dest = dest || A.bus;
+    noise(t, 1.6, 0.32 * vol, 'lowpass', 220, dest, 0.7);
+    noise(t, 0.1, 0.35 * vol, 'highpass', 2600, dest, 1.4);
+    voice('sine', 55, t, 1.1, 0.14 * vol, { dest, slide: 28, hold: 0.55 });
+  }
+
+  // doom guitar: a power chord (root, fifth, octave), 2 detuned saws per note into the distortion bus
+  function guitarChord(t, rootMidi, dur, vol, opts = {}) {
+    const tones = [rootMidi, rootMidi + 7, rootMidi + 12];
+    const w = [1, 0.85, 0.6];
+    tones.forEach((m, i) => {
+      const f = mtof(m);
+      const v = vol * w[i];
+      voice('sawtooth', f, t, dur, v, { dest: A.distBus, attack: opts.attack, hold: opts.hold, release: opts.release, lp: opts.lp, q: opts.q, detune: -9 });
+      voice('sawtooth', f, t, dur, v, { dest: A.distBus, attack: opts.attack, hold: opts.hold, release: opts.release, lp: opts.lp, q: opts.q, detune: 9 });
+    });
+  }
+
+  // heavy bass following the guitar root, an octave (and a sub-octave) below it
+  function doomBass(t, rootMidi, dur, vol, opts = {}) {
+    const m = rootMidi - 12;
+    voice('triangle', mtof(m), t, dur, vol, { dest: A.bus, attack: opts.attack || 0.004, hold: opts.hold || 0.7, release: opts.release, lp: 450 });
+    voice('sine', mtof(m - 12), t, dur, vol * 0.55, { dest: A.bus, attack: opts.attack || 0.004, hold: opts.hold || 0.7, release: opts.release });
+  }
+
+  // church organ: additive sines with a slow attack, holding the chord
+  function organChord(t, tri, dur) {
+    tri.forEach((m) => {
+      voice('sine', mtof(m), t, dur, 0.05, { dest: A.bus, attack: 0.4, hold: 0.85 });
+      voice('sine', mtof(m + 12), t, dur, 0.02, { dest: A.bus, attack: 0.45, hold: 0.85 });
+      voice('triangle', mtof(m - 12), t, dur, 0.025, { dest: A.bus, attack: 0.4, hold: 0.85 });
+    });
+  }
+
+  // "aah" choir: saw into 2 bandpass formants, slow attack, a slight vibrato
+  function choirNote(t, m, dur, vol) {
+    const ctx = A.ctx;
+    const f0 = mtof(m);
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f0, t);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 5.5;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = f0 * 0.008;
+    lfo.connect(lfoGain);
+    lfoGain.connect(o.frequency);
+    const f1 = ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.frequency.value = 700; f1.Q.value = 6;
+    const f2 = ctx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.frequency.value = 1150; f2.Q.value = 6;
+    const g1 = ctx.createGain(); g1.gain.value = 0.5;
+    const g2 = ctx.createGain(); g2.gain.value = 0.35;
+    const amp = ctx.createGain();
+    amp.gain.setValueAtTime(0.0001, t);
+    amp.gain.exponentialRampToValueAtTime(vol, t + 0.5);
+    amp.gain.setTargetAtTime(0.0001, t + dur * 0.7, dur * 0.3 + 0.001);
+    o.connect(f1); f1.connect(g1); g1.connect(amp);
+    o.connect(f2); f2.connect(g2); g2.connect(amp);
+    amp.connect(A.bus);
+    if (A.reverbIn) {
+      const send = ctx.createGain();
+      send.gain.value = 0.3;
+      amp.connect(send);
+      send.connect(A.reverbIn);
+    }
+    o.start(t); o.stop(t + dur + 0.6);
+    lfo.start(t); lfo.stop(t + dur + 0.6);
+  }
+  function choirChord(t, tri, dur) {
+    tri.forEach((m) => choirNote(t, m, dur, 0.045));
+  }
+
+  // a low sustained drone for the catacomb
+  function droneNote(t, rootMidi, dur) {
+    voice('sine', mtof(rootMidi - 12), t, dur, 0.09, { dest: A.bus, attack: 0.6, hold: 0.9 });
+    voice('sawtooth', mtof(rootMidi - 12), t, dur, 0.03, { dest: A.bus, attack: 0.6, hold: 0.9, lp: 500 });
+  }
 
   function playStep(step, t) {
     const bar = Math.floor(step / 16);
@@ -299,6 +522,7 @@
         voice('sawtooth', mtof(root), t, 2.4, 0.2, { lp: 900, hold: 0.8, release: 0.8 });
         tri.forEach((m) => voice('square', mtof(m + 12), t, 2.4, 0.05, { lp: 3000, hold: 0.8, release: 0.8 }));
         voice('sawtooth', mtof(tri[0] + 24), t, 2.4, 0.07, { lp: 4000, hold: 0.8, release: 0.8, detune: 6 });
+        if (cfg.endBell) churchBell(t + 0.12, 48, 0.4);
       }
       return;
     }
@@ -337,6 +561,32 @@
       // a snare roll building up (the floor is caving in!)
       snare(t, 0.15 + s16 * 0.05);
       if (s16 % 4 === 0) kick(t, 0.6);
+    } else if (d === 'doom') {
+      // half-time doom: a big kick on the downbeat, a big snare on the "and" of 2, ride on quarters
+      if (s16 === 0) bigKick(t, 1);
+      if (s16 === 8) bigSnare(t, 1);
+      if (bar % 2 === 0 && s16 === 0) crash(t);
+      if (s16 % 4 === 0) ride(t, 0.5);
+    } else if (d === 'doomfast') {
+      // the ghost train: the same doom kit at double time
+      if (s16 === 0 || s16 === 8) bigKick(t, 1);
+      if (s16 === 4 || s16 === 12) bigSnare(t, 1);
+      if (s16 === 0) crash(t);
+      if (s16 % 2 === 0) ride(t, 0.4);
+    } else if (d === 'sparse') {
+      // a heartbeat "lub-dub" every 8 steps and nothing else
+      if (s16 === 0) {
+        bigKick(t, 0.55);
+        bigKick(t + STEP * 0.55, 0.85);
+      }
+    } else if (d === 'strobe') {
+      // the chapel: a heavy snare on every beat, in time with the strobe flash
+      if (s16 % 4 === 0) {
+        bigKick(t, s16 === 0 ? 1 : 0.7);
+        bigSnare(t, 1);
+      }
+      if (bar % 2 === 0 && s16 === 0) crash(t);
+      if (s16 % 4 === 0) ride(t, 0.45);
     }
     // water dripping in the sewer, with an echo
     if (cfg.drips && s16 % 2 === 1 && ((step * 2654435761) >>> 0) % 7 === 0) {
@@ -344,6 +594,10 @@
       voice('sine', f, t, 0.09, 0.07, { slide: f * 0.45 });
       voice('sine', f, t + STEP * 3, 0.09, 0.025, { slide: f * 0.45 });
     }
+    // thunder rumble in lightning zones, on the downbeat of odd bars (matching the visual flash at x%32==16)
+    if (cfg.thunder && s16 === 0 && bar % 2 === 1) thunderRumble(t);
+    // church bell tolls, at the given step offsets within this section (barInSec * 16 + s16)
+    if (cfg.bell && cfg.bell.includes(barInSec * 16 + s16)) churchBell(t, 48, 0.4);
 
     // ---- bass ----
     if (cfg.bass === 'eighth' && s16 % 2 === 0) {
@@ -353,6 +607,26 @@
     } else if (cfg.bass === 'long' && (s16 === 0 || s16 === 8)) {
       voice('triangle', mtof(root), t, STEP * 7, 0.35, { hold: 0.7 });
     }
+
+    // ---- doom guitar + heavy bass ----
+    if (cfg.guitar === 'doom' && (s16 === 0 || s16 === 8)) {
+      // sustained power chords on the half-time downbeats, letting them ring
+      guitarChord(t, root, STEP * 7.6, 0.07, { attack: 0.015, hold: 0.9, release: 1.3 });
+      doomBass(t, root, STEP * 7.6, 0.22, { hold: 0.85 });
+    } else if (cfg.guitar === 'chug' && s16 % 2 === 0) {
+      // palm-muted 8ths, short and low-passed
+      guitarChord(t, root, STEP * 0.8, 0.06, { attack: 0.002, hold: 0.35, release: 0.06, lp: 900 });
+      doomBass(t, root, STEP * 0.8, 0.2, { hold: 0.4, release: 0.05 });
+    } else if (cfg.guitar === 'tremolo') {
+      // rapid 16ths
+      guitarChord(t, root, STEP * 0.85, 0.045, { attack: 0.002, hold: 0.5, release: 0.08 });
+      if (s16 % 2 === 0) doomBass(t, root, STEP * 1.7, 0.2, { hold: 0.5 });
+    }
+
+    // ---- church organ / choir / catacomb drone (level 4) ----
+    if (cfg.organ && s16 === 0) organChord(t, tri, STEP * 15.5);
+    if (cfg.choir && s16 === 0) choirChord(t, tri, STEP * 15.5);
+    if (cfg.drone && s16 === 0) droneNote(t, root, STEP * 15.5);
 
     // ---- arpeggio ----
     if (cfg.arp) {
@@ -386,6 +660,21 @@
           voice('triangle', mtof(n.midi), t, dur, 0.16, { attack: 0.02, hold: 0.75, detune: -3 });
           voice('sine', mtof(n.midi + 12), t, dur, 0.03, { attack: 0.03, hold: 0.6 });
           noise(t, 0.05, 0.03, 'bandpass', 2500, null, 2);
+        } else if (cfg.tone === 'clean') {
+          // a lonely clean plucked guitar for the graveyard intro
+          voice('triangle', mtof(n.midi), t, dur, 0.12, { attack: 0.003, hold: 0.3, release: dur * 0.5, lp: 2200, lpEnd: 900 });
+          voice('sine', mtof(n.midi + 12), t, Math.min(dur, STEP * 1.2), 0.03, { attack: 0.002, hold: 0.4 });
+          if (A.reverbIn) voice('triangle', mtof(n.midi), t, dur, 0.05, { dest: A.reverbIn, attack: 0.003, hold: 0.3 });
+        } else if (cfg.tone === 'calliope') {
+          // a detuned music-box calliope for the circus, wobbling a little out of tune
+          const wobble = Math.sin(t * 7.3 + n.midi) * 12; // +-12 cents, deterministic so offline renders match
+          voice('square', mtof(n.midi), t, dur, 0.085, { detune: wobble, lp: 3500, hold: 0.6 });
+          voice('triangle', mtof(n.midi + 12), t, dur, 0.035, { detune: -wobble * 0.6, hold: 0.55 });
+        } else if (cfg.tone === 'reverse') {
+          // the mirror hall: a slow swell attack and an abrupt stop, so it sounds backwards
+          const swell = Math.min(dur * 0.85, 0.4);
+          voice('sawtooth', mtof(n.midi), t, dur, 0.09, { attack: swell, hold: 0.97, release: 0.03, lp: 2600 });
+          voice('square', mtof(n.midi), t, dur, 0.04, { attack: swell, hold: 0.97, release: 0.03, lp: 2000 });
         } else {
           voice('sawtooth', mtof(n.midi), t, dur, 0.075, { lp: 3200, hold: 0.7, detune: -5 });
           voice('square', mtof(n.midi), t, dur, 0.045, { lp: 2400, hold: 0.7, detune: 5 });
@@ -446,6 +735,68 @@
       case 'nope':
         voice('square', 180, t, 0.12, 0.08, { dest, lp: 1200 });
         voice('square', 140, t + 0.12, 0.18, 0.08, { dest, lp: 1200 });
+        break;
+      // ---- level 4: horror sound effects ----
+      case 'scare_nun': {
+        // a dissonant shriek: a cluster of detuned saws sliding upward, plus a noise burst and reverb
+        const base = 640;
+        [-14, -5, 5, 16].forEach((cents) => {
+          voice('sawtooth', base, t, 0.75, 0.085, { dest, slide: base * 3.4, detune: cents, attack: 0.008, hold: 0.55, release: 0.28 });
+        });
+        noise(t, 0.3, 0.32, 'highpass', 3200, dest, 1.1);
+        if (A.reverbIn) noise(t, 0.6, 0.22, 'bandpass', 1800, A.reverbIn, 2);
+        break;
+      }
+      case 'scare_clown': {
+        // a distorted "HA-HA-HA" laugh (formant-filtered saw bursts with pitch wobble), then a stinger chord
+        [0, 0.16, 0.32, 0.47].forEach((dt, i) => {
+          const f = 250 + (i % 2) * 35;
+          voice('sawtooth', f, t + dt, 0.13, 0.15, { dest, slide: f * 1.5, attack: 0.005, hold: 0.4, release: 0.08, lp: 1200 });
+        });
+        const st = t + 0.58;
+        const [sr, stri] = CH.Bdim;
+        voice('sawtooth', mtof(sr), st, 0.5, 0.13, { dest, lp: 1000, hold: 0.5 });
+        stri.forEach((m) => voice('square', mtof(m), st, 0.5, 0.06, { dest, lp: 2200, hold: 0.5 }));
+        break;
+      }
+      case 'scare_skull':
+        // a low boom and a metallic screech
+        voice('sine', 60, t, 0.6, 0.32, { dest, slide: 28, hold: 0.5 });
+        noise(t, 0.5, 0.32, 'lowpass', 300, dest);
+        noise(t + 0.05, 0.45, 0.16, 'bandpass', 3200, dest, 6);
+        voice('sawtooth', 1900, t + 0.05, 0.35, 0.05, { dest, slide: 2600, lp: 4200 });
+        break;
+      case 'laugh':
+        // a shorter, quieter clown laugh
+        [0, 0.13, 0.26].forEach((dt) => {
+          voice('sawtooth', 280, t + dt, 0.1, 0.07, { dest, slide: 380, hold: 0.4, release: 0.06, lp: 1100 });
+        });
+        break;
+      case 'hurt':
+        // a meaty thud with a wet squelch
+        voice('sine', 110, t, 0.22, 0.35, { dest, slide: 45, hold: 0.4 });
+        noise(t, 0.18, 0.3, 'lowpass', 700, dest);
+        noise(t + 0.03, 0.2, 0.16, 'bandpass', 500, dest, 3);
+        break;
+      case 'heartbeat':
+        // a low "lub-dub"
+        voice('sine', 70, t, 0.14, 0.3, { dest, slide: 38, hold: 0.5 });
+        voice('sine', 60, t + 0.22, 0.16, 0.26, { dest, slide: 32, hold: 0.5 });
+        break;
+      case 'gameover': {
+        // a descending doom chord, a bell and a dark rumble
+        const [gr, gtri] = CH.Cm;
+        voice('sawtooth', mtof(gr - 12), t, 2.3, 0.18, { dest, lp: 700, hold: 0.85, release: 1 });
+        gtri.forEach((m, i) => voice('square', mtof(m - 12), t + i * 0.12, 2.0 - i * 0.12, 0.05, { dest, lp: 1500, hold: 0.8 }));
+        churchBell(t + 0.15, 48, 0.35, dest);
+        noise(t, 2.4, 0.22, 'lowpass', 200, dest);
+        break;
+      }
+      case 'thunder':
+        thunderRumble(t, 1, dest);
+        break;
+      case 'bell':
+        churchBell(t, 55, 0.4, dest);
         break;
     }
   };

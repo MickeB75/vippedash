@@ -84,13 +84,13 @@ html, body {
 .btn.shopbtn:hover { filter: brightness(1.08); background: linear-gradient(#ffe066, #f2b705); }
 .levelbox { display: flex; flex-direction: column; gap: calc(var(--u) * 8px); }
 .pick { margin: 0; text-align: left; font-size: calc(var(--u) * 20px); color: #aab6d8; }
-.levels { display: flex; flex-direction: column; gap: calc(var(--u) * 10px); }
+.levels { display: flex; flex-direction: column; gap: calc(var(--u) * 8px); }
 .lvl {
   display: flex;
   align-items: center;
   gap: calc(var(--u) * 14px);
   width: calc(var(--u) * 540px);
-  padding: calc(var(--u) * 10px) calc(var(--u) * 16px);
+  padding: calc(var(--u) * 8px) calc(var(--u) * 16px);
   border-radius: calc(var(--u) * 18px);
   border: calc(var(--u) * 3px) solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.07);
@@ -101,6 +101,9 @@ html, body {
 }
 .lvl:hover { background: rgba(255, 255, 255, 0.13); }
 .lvl.on { border-color: #ffd634; background: rgba(255, 214, 52, 0.14); }
+.lvl.d5 { background: rgba(122, 0, 16, 0.22); border-color: rgba(255, 42, 58, 0.3); }
+.lvl.d5:hover { background: rgba(122, 0, 16, 0.32); }
+.lvl.d5.on { border-color: #ff2a3a; background: rgba(255, 42, 58, 0.16); }
 .lnum {
   flex: none;
   width: calc(var(--u) * 52px);
@@ -115,13 +118,17 @@ html, body {
 }
 .lvl.d2 .lnum { background: #2ea84a; }
 .lvl.d3 .lnum { background: #d2412f; }
+.lvl.d5 .lnum { background: #7a0010; }
 .linfo { flex: 1; display: flex; flex-direction: column; gap: calc(var(--u) * 2px); }
 .linfo b { font-weight: normal; font-size: calc(var(--u) * 28px); line-height: 1; }
 .linfo small { font-family: system-ui, sans-serif; font-size: calc(var(--u) * 14px); color: #cfd8f0; }
 .lmeta { display: flex; gap: calc(var(--u) * 14px); font-size: calc(var(--u) * 17px); }
+.age { display: inline-block; background: #d4001a; color: #fff; font-weight: bold; border-radius: calc(var(--u) * 6px); padding: 0 calc(var(--u) * 8px); font-size: calc(var(--u) * 15px); vertical-align: middle; margin-left: calc(var(--u) * 6px); }
+.flashico { display: inline-block; margin-left: calc(var(--u) * 6px); color: #ffd634; }
 .diff { color: #7dff9a; }
 .diff.d2 { color: #ffb347; }
 .diff.d3 { color: #ff6b5e; }
+.diff.d5 { color: #ff2a3a; }
 .lcoins { color: #ffd634; display: inline-flex; align-items: center; gap: calc(var(--u) * 5px); }
 .lprog { flex: none; display: flex; flex-direction: column; align-items: center; min-width: calc(var(--u) * 70px); }
 .lprog b { font-weight: normal; font-size: calc(var(--u) * 26px); color: #5cc8ff; }
@@ -236,6 +243,9 @@ html, body {
 .rtotal { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 10px); margin-top: calc(var(--u) * 4px); font-size: calc(var(--u) * 34px); color: #ffd634; }
 .rtotal .coin { width: calc(var(--u) * 32px); height: calc(var(--u) * 32px); }
 .rtotal span { font-size: calc(var(--u) * 18px); color: #aab6d8; }
+.gameover { background: rgba(40, 0, 6, 0.92); border-color: #7a0010; }
+.gotitle { color: #ff2a3a; text-shadow: 0 calc(var(--u) * 4px) calc(var(--u) * 8px) rgba(0, 0, 0, 0.6); }
+.gocoins { color: #ffb3b3; font-family: system-ui, sans-serif; font-size: calc(var(--u) * 18px); margin: 0; }
 .btn {
   font: inherit;
   font-size: calc(var(--u) * 24px);

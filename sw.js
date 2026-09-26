@@ -16,6 +16,7 @@ const FILES = [
   'js/solver.js',
   'js/audio.js',
   'js/art.js',
+  'js/horror.js',
   'js/render.js',
   'js/game.js',
   'js/mobile.js',

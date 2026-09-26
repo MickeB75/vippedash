@@ -1,6 +1,6 @@
 # VippeDash
 
-A Geometry Dash–style runner starring **Vippe** (Vincent). There are three levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Vilda skogen** (medium, about 1:37) runs through the wild forest, and **3 · Tunnelbanan** (hard, about 1:29) runs through the Stockholm subway and down into the sewers. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
+A Geometry Dash–style runner starring **Vippe** (Vincent). There are four levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Vilda skogen** (medium, about 1:37) runs through the wild forest, **3 · Tunnelbanan** (hard, about 1:29) runs through the Stockholm subway and down into the sewers, and **4 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
 
 ## Play
 
@@ -20,7 +20,7 @@ Then open <http://localhost:8765>.
 | Hold to keep jumping or keep flying | hold any of the above |
 | Pause | **Esc** / **P** / ⏸ button |
 | Mute | **M** / 🔊 button |
-| Pick a level in the menu | click it, or **1** / **2** / **3** |
+| Pick a level in the menu | click it, or **1** / **2** / **3** / **4** |
 | Open the shop | **Shop** button or **S** |
 | Switch between Vippe and Affelito in the shop | click the tab, or **←** / **→** |
 
@@ -64,11 +64,11 @@ The installed app, the e-mailed file and the browser each keep their own coins a
 
 You win coins every time you finish a level:
 
-| | Level 1 (easy) | Level 2 (medium) | Level 3 (hard) |
-| --- | --- | --- | --- |
-| Level cleared | 50 | 100 | 150 |
-| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 50 | up to 100 | up to 150 |
-| First time you beat the level | 50 | 100 | 150 |
+| | Level 1 (easy) | Level 2 (medium) | Level 3 (hard) | Level 4 (nightmare) |
+| --- | --- | --- | --- | --- |
+| Level cleared | 50 | 100 | 150 | 250 |
+| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 50 | up to 100 | up to 150 | up to 250 |
+| First time you beat the level | 50 | 100 | 150 | 250 |
 
 So a harder level and fewer crashes give more coins. The coin total is shown at the top right of the menu.
 
@@ -143,6 +143,39 @@ A little shorter than level 2 but harder, with fewer checkpoints and the tightes
 
 Level 3 has its own soundtrack in E minor: a train rhythm on the tracks, a drum roll as the floor gives way, dripping water in the sewer, and G major when you come out into the sunshine.
 
+## Level 4: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
+
+A dark horror level with blood, jump scares, bloody nuns, creepy clowns and strobe lights, rated 16+ (the menu card shows a red 16+ badge and a ⚡ for flashing lights). It is hard in other ways than tight jumps too: darkness where only your lantern shines, strobe light where you only see the level in the flashes, moving hazards, running upside down on the ceiling, a mirrored screen, and jump scares that distract you. The last stretch, from the ghost train to the finish, has no checkpoint.
+
+It is also the only level with a **health bar**. You start with 100 health, and each crash costs health and restarts you from the last checkpoint as usual. Health is not refilled at checkpoints. When it runs out, "DU DOG!" appears, you lose 10 coins (never below 0), and you start the level over from the beginning with full health.
+
+| Section | Where | What happens |
+| --- | --- | --- |
+| **Kyrkogården** | graveyard at midnight, blood moon | Iron fences, hands clawing out of graves, tombstones, ravens, lightning, a jump scare at the convent gate. |
+| **Klostret** | the convent | Pews, blood pools, candelabras and bloody nuns bobbing up and down in time with the music. |
+| **Kapellet** | the chapel | Gravity flips and you run upside down on the ceiling, in the dark, lit only by strobe flashes (one per beat). |
+| **Katakomberna** | the catacombs | Flying-bike mode in the dark with only your lantern; swinging pendulum axes, bone pillars, bats, a skull jump scare. |
+| **Cirkusen** | the abandoned circus | Jack-in-the-box clowns popping up on the beat, clown balloons, crates and podiums. |
+| **Spegelsalen** | the hall of mirrors | The whole screen is mirrored, so you run to the left. |
+| **Spöktåget** | the ghost train | Floorball mode between skeletons popping out of the floor and ceiling, in strobe light. |
+| **Klocktornet** | the bell tower | The last hard jumps; the bell tolls at the finish. |
+
+### Health
+
+Crashes cost health based on what you hit:
+
+- **10 health:** iron fence spears, hands from graves, bone spikes, blood pools
+- **12 health:** crashing into a block (tombstone, coffin, pew, crate), ravens and bats, candelabras and chandeliers, clown balloons
+- **14 health:** bloody nuns, jack-in-the-box clowns, pendulum axes, ghost-train skeletons
+
+So you can make 8–10 crashes before your health runs out. Below 30 health the bar blinks and you hear a heartbeat.
+
+### Strobe and flashing lights
+
+The strobe flashes are locked to the music at most once per beat (2.6 per second, under the 3-per-second limit in the WCAG accessibility guidelines). Turn the strobe off with the **⚡ Strobe: On/Off** button in the pause menu, which only shows on level 4. With the strobe off there is a steady dim light instead. The setting is saved.
+
+Music: its own doom-metal soundtrack in C minor, in half-time so it feels like 78 BPM. It uses distorted guitar, organ, a choir, church bells, a detuned circus organ in the circus and a double-time climax in the ghost train. The melodies are original: the brief was "in the style of" the doom-metal song *Solitude* by Candlemass, and nothing is copied from it.
+
 ## How it's built
 
 Everything is vanilla JavaScript with Canvas 2D and WebAudio. The game has **no image or audio files**: Vippe, the scenery and the soundtrack are all drawn and synthesised in code. The PNGs in `icons/` are only the app icon, drawn by `tools/icons.html`. The music is generated live at 156 BPM, which is exactly 4 blocks per beat, so obstacles land on the beat. When you respawn, the music restarts from the checkpoint.
@@ -156,6 +189,7 @@ js/level.js       level builder, the level layouts, their themes and the level l
 js/solver.js      search bot that proves the levels are beatable
 js/audio.js       procedural chiptune (one song per level) + sound effects
 js/art.js         all drawing: Vippe, Affelito and their skins, obstacles, animals, landmarks
+js/horror.js      level 4 only: nuns, clowns, pendulums, jump-scare faces, graveyard/convent/circus scenery
 js/render.js      parallax scene, camera (incl. following you down a hole), HUD
 js/game.js        game loop, input, checkpoints, menus, coins and the shop
 js/mobile.js      phone extras: fullscreen + landscape, portrait pause, back button
@@ -168,6 +202,7 @@ tools/verify.html level verifier in the browser
 tools/verify.py   level verifier from the command line (headless Chrome)
 tools/map.html    draws a schematic map of a level's layout and rhythm
 tools/skins.html  gallery of every skin in every mode, for checking designs
+tools/horror.html gallery of all level 4 art: nuns, clowns, pendulums, jump scares; use ?t=<seconds> to freeze time
 tools/shot.py     takes a PNG screenshot of any page with headless Chrome
 tools/headless.py shared helper: runs pages in headless Chrome (finds Chrome or Edge automatically)
 tools/icons.html  draws the app icons
@@ -207,6 +242,25 @@ b.hole(454, 7);              // a hole in the floor: fall through it to the laye
 
 `b.hole()` splits the level into two floors, one above the other. Everything placed after the hole is on the lower floor. When you fall in, the physics moves you up by one screen (15 blocks) and onto the lower floor, so the fall looks continuous and the camera follows you down.
 
+Level 4 adds:
+
+```js
+b.nun(x, y, { bob, beats, phase });      // a bloody nun bobbing up and down in time with the music
+b.nunDrop(x, y, { trigger, dist, fall }); // a nun that drops (or rises, dist < 0) as you come near
+b.jack(x, { beats, phase, rise });        // a jack-in-the-box: the box is a platform, the clown pops up on the beat
+b.pendulum(x, top, { len, amp, beats, phase }); // a swinging axe
+b.balloon(x, y, { bob, beats, phase });   // a clown balloon
+b.water(x, w, 'blood');                   // a blood pool
+b.portal(x, 'cube', { grav: 1, ceil: 7 }); // upside down: run on the ceiling
+b.dark(x0, x1, { r: 7 });                 // darkness with a lantern around you
+b.strobe(x0, x1);                         // strobe light, one flash per beat
+b.mirror(x0, x1);                         // the screen is mirrored
+b.lightning(x0, x1);                      // lightning now and then (with thunder in the music)
+b.scare(x, 'nun');                        // a jump scare: nun, window, skull, clown, mirror, duo, final
+```
+
+Moving hazards are a function of the player's x (the level clock `x / 10.4`), so the physics, the bot and the drawing always agree. Every hazard has a `dmg` value used by the health bar. A `jack`'s `rise` must stay under about 1.3 so a jump can clear an open clown (the level uses 0.8).
+
 After changing a level, verify it with the command line:
 
 ```bash
@@ -215,7 +269,7 @@ python tools/verify.py
 
 This runs the search bot from every checkpoint to the next one using the real game physics. Add a level name to check one level only: `python tools/verify.py forest`. Options: `--windows` to measure timing slack (slower; `!` marks a jump with less than 90 ms, `!!` less than 50 ms), `--json` to print the raw report. Exit code 0 when every level is beatable.
 
-Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2 is harder: its triple spikes have about 80 ms, and everything else has more. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms too, but there are more of them and fewer checkpoints.
+Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2 is harder: its triple spikes have about 80 ms, and everything else has more. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms too, but there are more of them and fewer checkpoints. Level 4's tightest presses are about 67 ms, with more of them than level 3.
 
 To see a level's layout and rhythm at a glance, open `tools/map.html?level=<id>` in a browser. It draws a schematic top-down/side map of the level's hitboxes, obstacles and checkpoints. Options: `from=<x>&to=<x>` (show part of the level), `cols=<n>` (blocks per row), `scale=<px>` (pixels per block, default 12), `bot` (draw the bot's path from every checkpoint, red where it fails), `windows` (also colour each jump by its timing slack). Example: `tools/map.html?level=forest&from=380&to=500&windows&scale=20`.
 
@@ -244,15 +298,17 @@ Open `index.html#debug`. This shows hitboxes and FPS and adds these keys:
 | `G` | God mode |
 | `B` | The bot plays for you |
 | `C` | +500 coins (also works in the menu), for testing the shop |
+| `H` | Refill health to full (level 4 only) |
 
 The hash (or query string) also accepts URL parameters to drop straight into a specific moment for screenshots or video:
 
 | Parameter | Effect |
 | --- | --- |
-| `level=<id>` | Start that level directly, skipping the menu. Ids: `home`, `forest`, `metro` |
+| `level=<id>` | Start that level directly, skipping the menu. Ids: `home`, `forest`, `metro`, `nightmare` |
 | `cp=<n>` | Start at checkpoint *n* (0 = the start) |
 | `x=<blocks>` | Start at any x position. The bot plays from the checkpoint before it up to x, so the mode, gravity and floor are right |
 | `skin=<id>` | Wear any skin for this session only (not saved; coins and owned skins untouched) |
+| `hp=<n>` | Start with that much health on level 4 (e.g. to test game over); has no effect on other levels |
 | `bot` | The bot plays |
 | `god` | God mode |
 | `mute` | Start muted (not saved) |

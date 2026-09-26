@@ -54,6 +54,7 @@
         <h2>Paused</h2>
         <button id="resume" class="btn big">▶&nbsp; Resume</button>
         <button id="restart" class="btn">↺&nbsp; Restart from the beginning</button>
+        <button id="strobeBtn" class="btn hidden">⚡&nbsp; Strobe: On</button>
         <button id="menuBtn" class="btn">Main menu</button>
       </div>
     </div>
@@ -67,6 +68,16 @@
         <button id="next" class="btn big">▶&nbsp; Next level</button>
         <button id="again" class="btn">↺&nbsp; Play again</button>
         <button id="winMenu" class="btn">Main menu</button>
+      </div>
+    </div>
+
+    <div id="gameover" class="overlay hidden">
+      <div class="panel small gameover">
+        <h2 class="gotitle">DU DOG!</h2>
+        <p id="goSub" class="sub"></p>
+        <p id="goCoins" class="gocoins"></p>
+        <button id="goRestart" class="btn big">↺&nbsp; Start over from the start</button>
+        <button id="goMenu" class="btn">Main menu</button>
       </div>
     </div>
 
@@ -87,6 +98,7 @@
 <script src="js/solver.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/art.js"></script>
+<script src="js/horror.js"></script>
 <script src="js/render.js"></script>
 <script src="js/game.js"></script>
 <script src="js/mobile.js"></script>

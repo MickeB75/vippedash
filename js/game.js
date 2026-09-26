@@ -32,6 +32,7 @@
     if (!Art.SKINS[G.skin] || !owns(G.skin)) G.skin = 'red';
     G.progress = loadProgress();
     AU.muted = store.get('muted', false);
+    G.strobeOn = store.get('strobe', true);
     G.debug = /debug/.test(location.hash + location.search);
     G.state = 'menu';
     G.ev = [];
@@ -53,6 +54,7 @@
     store.set('level', G.levelDef.id);
     G.camX = -4;
     G.camV = G.camVT = 0;
+    G.hpMax = G.levelDef.health || 0; // 0 means no health bar; refilled to full on G.start()
   }
   // { levelId: { best: %, wins, fewest: crashes } }. Older saves only had one level's best/wins.
   function loadProgress() {
@@ -106,6 +108,7 @@
       if (e.code === 'Escape' || e.code === 'KeyP') {
         if (G.state === 'play') G.pause();
         else if (G.state === 'paused') G.resume();
+        else if (G.state === 'gameover') G.toMenu();
         else if (G.shopOpen) closeShop();
         return;
       }
@@ -131,6 +134,7 @@
         if (G.state === 'menu') return G.shopOpen ? undefined : G.start();
         if (G.state === 'won') return $('next').classList.contains('hidden') ? G.start() : G.nextLevel();
         if (G.state === 'paused') return G.resume();
+        if (G.state === 'gameover') return G.start();
         keysDown.add(e.code);
         updateHeld();
         G.tapQueued = true;
@@ -186,7 +190,10 @@
     else if (e.code === 'BracketLeft') warp(Math.max(0, G.cpIndex - 1));
     else if (e.code === 'KeyG') G.god = !G.god;
     else if (e.code === 'KeyC') addCoins(500);
-    else if (e.code === 'KeyB') {
+    else if (e.code === 'KeyH') {
+      G.hp = G.hpMax;
+      updateLowHp();
+    } else if (e.code === 'KeyB') {
       G.bot = !G.bot;
       if (G.bot) computeBot(G.s);
     }
@@ -276,6 +283,16 @@
         G.start(startCp || 0);
       }
     }
+    if ('hp' in q) {
+      // sets the starting health after the start above; handy for testing game over
+      const n = +q.hp;
+      if (Number.isFinite(n)) {
+        G.hp = G.hpMax ? U.clamp(n, 0, G.hpMax) : n;
+        updateLowHp();
+      } else {
+        console.warn('VippeDash debug: bad hp value "' + q.hp + '"');
+      }
+    }
     if ('skin' in q) {
       // session-only: bypasses ownership and isn't saved, so coins/owned skins are untouched
       if (Art.SKINS[q.skin]) G.skin = q.skin;
@@ -305,6 +322,13 @@
     $('next').onclick = () => G.nextLevel();
     $('again').onclick = () => G.start();
     $('winMenu').onclick = () => G.toMenu();
+    $('goRestart').onclick = () => G.start();
+    $('goMenu').onclick = () => G.toMenu();
+    $('strobeBtn').onclick = () => {
+      G.strobeOn = !G.strobeOn;
+      store.set('strobe', G.strobeOn);
+      updateStrobeBtn();
+    };
     $('shopBtn').onclick = () => openShop();
     $('shopBack').onclick = () => closeShop();
     $('mute').onclick = (e) => {
@@ -318,9 +342,11 @@
       b.className = 'lvl d' + L.difficulty;
       b.dataset.id = L.id;
       const r = levelReward(L, 0, false), lo = levelReward(L, 10, false);
+      const badges = (L.age ? '<span class="age">16+</span>' : '') +
+        (L.strobe ? '<span class="flashico" title="Flashing lights">⚡</span>' : '');
       b.innerHTML =
         '<span class="lnum">' + L.num + '</span>' +
-        '<span class="linfo"><b>' + L.name + '</b><small>' + L.route + '</small>' +
+        '<span class="linfo"><b>' + L.name + badges + '</b><small>' + L.route + '</small>' +
         '<span class="lmeta"><span class="diff d' + L.difficulty + '">' + '★'.repeat(L.difficulty) + ' ' + L.diffName + '</span>' +
         '<span class="lcoins"><i class="coin"></i>' + lo.total + '–' + r.total + '</span></span></span>' +
         '<span class="lprog"><b></b><small></small></span>';
@@ -477,6 +503,14 @@
   function updateMuteIcon() {
     $('mute').textContent = AU.muted ? '🔇' : '🔊';
   }
+  function updateLowHp() {
+    G.lowHp = G.hpMax > 0 && G.hp > 0 && G.hp < 30;
+  }
+  function updateStrobeBtn() {
+    const btn = $('strobeBtn');
+    btn.classList.toggle('hidden', !G.levelDef.strobe);
+    btn.innerHTML = '⚡&nbsp; Strobe: ' + (G.strobeOn ? 'On' : 'Off');
+  }
 
   // ------------------------------------------------------------------ states
   // cpIndex: which checkpoint to start at (default 0). Used by debug URL params (?cp=, ?x=) to start elsewhere.
@@ -487,6 +521,7 @@
     show('shop', false);
     show('pause', false);
     show('win', false);
+    show('gameover', false);
     G.cpIndex = cpIndex || 0;
     G.attempts = 0;
     G.deaths = 0;
@@ -495,6 +530,13 @@
     G.areaIdx = -1;
     G.particles = [];
     G.banner = null;
+    G.hpMax = G.levelDef.health || 0;
+    G.hp = G.hpMax; // full health at the start of a run; never refilled on respawn
+    G.hurt = null;
+    G.scare = null;
+    G.scared = {}; // which lvl.scares indices have fired this run
+    G.hbT = 0;
+    updateLowHp();
     releaseAll();
     G.respawn();
   };
@@ -522,6 +564,7 @@
     G.state = 'paused';
     AU.stopMusic(0.05);
     releaseAll();
+    updateStrobeBtn();
     show('pause', true);
   };
   G.resume = function () {
@@ -537,6 +580,7 @@
     AU.stopMusic(0.1);
     show('pause', false);
     show('win', false);
+    show('gameover', false);
     show('menu', true);
     G.state = 'menu';
     G.camX = -4;
@@ -557,11 +601,22 @@
     G.deaths++;
     G.shake = 0.3;
     AU.stopMusic(0.08);
-    AU.sfx('death');
     const s = G.s, ph = Ph.boxH(s);
     const cx = s.x + 0.5, cy = s.y + ph / 2;
+    const health = G.hpMax > 0;
+    if (health) {
+      AU.sfx('hurt');
+      const dmg = s.dmg || 12;
+      G.hp = Math.max(0, G.hp - dmg);
+      G.hurt = { n: dmg, t: 0, x: cx, y: cy };
+      updateLowHp();
+    } else {
+      AU.sfx('death');
+    }
     const k = Art.SKINS[G.skin];
-    const cols = [k.main, '#f2c6a0', Art.CHARS[Art.charOf(G.skin)].hair, '#ffffff', '#ffd634'];
+    const cols = health
+      ? ['#c0081a', '#7a0010', '#c0081a', '#7a0010', '#c0081a', '#f2c6a0', Art.CHARS[Art.charOf(G.skin)].hair]
+      : [k.main, '#f2c6a0', Art.CHARS[Art.charOf(G.skin)].hair, '#ffffff', '#ffd634'];
     for (let i = 0; i < 26; i++) {
       const a = Math.random() * Math.PI * 2, sp = 4 + Math.random() * 10;
       particle({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.5 + Math.random() * 0.5, size: 6 + Math.random() * 10, color: cols[i % cols.length], grav: 12 });
@@ -575,11 +630,22 @@
     }
   }
 
+  function gameOver() {
+    G.state = 'gameover';
+    AU.stopMusic(0.1);
+    AU.sfx('gameover');
+    const lost = Math.min(10, G.coins);
+    addCoins(-lost);
+    $('goSub').textContent = 'Your health ran out after ' + G.deaths + (G.deaths === 1 ? ' crash' : ' crashes');
+    $('goCoins').textContent = lost > 0 ? '−' + lost + ' coins  (you have ' + G.coins + ')' : 'No coins to lose';
+    show('gameover', true);
+  }
+
   function win() {
     G.state = 'winning';
     G.winAge = 0;
     G.fwT = 0;
-    AU.sfx('win');
+    AU.sfx(G.hpMax > 0 ? 'bell' : 'win');
     const p = G.progress[G.levelDef.id];
     G.reward = levelReward(G.levelDef, G.deaths, p.wins === 0);
     G.coinsBefore = G.coins;
@@ -638,13 +704,14 @@
     G.tapQueued = false;
     if (G.bot && G.botPath) held = !!G.botPath[Math.floor(G.botTick++ / 4)];
     G.ev.length = 0;
-    const wasGrounded = s.grounded, prevMode = s.mode;
+    const wasGrounded = s.grounded, prevMode = s.mode, prevX = s.x;
     Ph.step(s, held, G.lvl, G.ev);
     if (s.dead && G.god) s.dead = false;
     for (const e of G.ev) onEvent(e);
     if (s.mode !== prevMode) G.vis.rot = 0;
     visuals(s, wasGrounded);
     followDown(s);
+    checkScares(prevX, s.x);
     if (s.dead) return die();
     const cps = G.lvl.checkpoints;
     while (G.cpIndex + 1 < cps.length && s.x >= cps[G.cpIndex + 1].x) {
@@ -706,6 +773,43 @@
     }
   }
 
+  // jump scares (level 4): each one fires once per run, the moment the player's x crosses it
+  function checkScares(prevX, x) {
+    if (G.state === 'menu') return; // never in the menu
+    const scares = (G.lvl && G.lvl.scares) || [];
+    for (let i = 0; i < scares.length; i++) {
+      const sc = scares[i];
+      if (!G.scared[i] && prevX < sc.x && sc.x <= x) {
+        G.scared[i] = true;
+        triggerScare(sc);
+      }
+    }
+  }
+  function triggerScare(sc) {
+    G.scare = { kind: sc.kind, t: 0 };
+    G.vis.oT = 0.6; // Vippe's shocked 'o' face
+    G.shake = sc.kind === 'window' ? 0.1 : 0.4;
+    switch (sc.kind) {
+      case 'nun':
+      case 'final':
+        AU.sfx('scare_nun');
+        break;
+      case 'window':
+        AU.sfx('thunder');
+        break;
+      case 'skull':
+        break; // delayed: played once G.scare.t passes 0.4, see the main loop
+      case 'clown':
+      case 'mirror':
+        AU.sfx('scare_clown');
+        break;
+      case 'duo':
+        AU.sfx('scare_nun');
+        AU.sfx('scare_clown');
+        break;
+    }
+  }
+
   function visuals(s, wasGrounded) {
     const v = G.vis, dt = P.DT;
     if (v.oT > 0) v.oT -= dt;
@@ -748,7 +852,9 @@
   }
   function firework() {
     const x = G.camX + 12 + Math.random() * 12, y = 5 + Math.random() * 4.5;
-    const cols = ['#ffd634', '#ff5fd2', '#5cff7a', '#6bc6ff', '#ffffff', '#fecc00', '#006aa7'];
+    const cols = G.hpMax > 0
+      ? ['#c0081a', '#7a0010', '#ffffff', '#6a1a8a'] // horror win: blood red, white, purple
+      : ['#ffd634', '#ff5fd2', '#5cff7a', '#6bc6ff', '#ffffff', '#fecc00', '#006aa7'];
     const c = cols[Math.floor(Math.random() * cols.length)];
     for (let i = 0; i < 34; i++) {
       const a = (i / 34) * Math.PI * 2, sp = 4 + Math.random() * 2;
@@ -765,6 +871,16 @@
     if (dt > 0.1) dt = 0.1;
     G.clock += dt;
     G.fps = G.fps ? G.fps * 0.95 + (1 / Math.max(dt, 0.001)) * 0.05 : 60;
+
+    if (G.state === 'play' && G.lowHp) {
+      G.hbT = (G.hbT || 0) + dt;
+      if (G.hbT >= 0.8) {
+        G.hbT -= 0.8;
+        AU.sfx('heartbeat');
+      }
+    } else {
+      G.hbT = 0;
+    }
 
     if (G.state === 'play' && !G.freeze) {
       G.acc += dt;
@@ -783,10 +899,15 @@
       if (G.acc > 0.05) G.acc = 0.05;
     } else if (G.state === 'dead') {
       G.deadAge += dt;
-      if (G.deadAge >= 0.9) G.respawn();
+      if (G.deadAge >= 0.9) {
+        if (G.hpMax && G.hp <= 0) gameOver();
+        else G.respawn();
+      }
     } else if (G.state === 'winning' || G.state === 'won') {
       G.winAge += dt;
+      const prevX = G.s.x;
       G.s.x += P.SPEED * dt;
+      checkScares(prevX, G.s.x); // the 'final' scare sits just after the finish line
       G.vis.rot += 7 * dt;
       G.fwT -= dt;
       if (G.fwT <= 0) {
@@ -805,6 +926,13 @@
       else drawHero();
     }
     if (G.banner) G.banner.t += dt;
+    if (G.hurt) G.hurt.t += dt;
+    if (G.scare) {
+      const prevT = G.scare.t;
+      G.scare.t += dt;
+      if (G.scare.kind === 'skull' && prevT <= 0.4 && G.scare.t > 0.4) AU.sfx('scare_skull');
+      if (G.scare.t > 1.2) G.scare = null;
+    }
     G.flash = Math.max(0, G.flash - dt * 2.5);
     G.shake = Math.max(0, G.shake - dt);
     updateParticles(dt);

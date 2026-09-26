@@ -97,7 +97,8 @@
     const pM = 0.4;
     this.pM = pM;
     const mid = [];
-    for (const L of lvl.landmarks) mid.push({ u: (L.X - PX) * pM + HALF, d: L, t: L.type, hw: MID_HALFWIDTH[L.type] || 6 });
+    const hwHorror = (Art.horror && Art.horror.midHalf) || {};
+    for (const L of lvl.landmarks) mid.push({ u: (L.X - PX) * pM + HALF, d: L, t: L.type, hw: MID_HALFWIDTH[L.type] || hwHorror[L.type] || 6 });
     const uMaxM = (lvl.length + 80) * pM + 40;
     const [s0, s1] = th.midStep || [4, 6];
     for (let uu = -10; uu < uMaxM; uu += s0 + rnd() * s1) {
@@ -156,6 +157,47 @@
   // first x <= x0 on a world-aligned grid of `step` px (off = how far the layer has scrolled, in px).
   // Patterns start from here so they scroll with the world, even where an area or a corridor starts on screen.
   const gridStart = (x0, off, step) => x0 - ((((x0 + off) % step) + step) % step);
+  // safe zone lookup: 0 if lvl.zone isn't there yet (level.js still being written)
+  const zoneOf = (lvl, name, x, fade) => (lvl && typeof lvl.zone === 'function' ? lvl.zone(name, x, fade) : 0);
+  // a quarter-circle cobweb anchored at a screen corner (side>0: top-left, side<0: top-right)
+  function drawCobweb(ctx, cx, cy, side) {
+    const a0 = side > 0 ? 0 : Math.PI / 2, a1 = side > 0 ? Math.PI / 2 : Math.PI;
+    ctx.beginPath();
+    for (let r = 16; r <= 72; r += 14) ctx.arc(cx, cy, r, a0, a1);
+    for (let k = 0; k <= 4; k++) {
+      const a = a0 + (k / 4) * (a1 - a0);
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * 76, cy + Math.sin(a) * 76);
+    }
+    ctx.stroke();
+  }
+  function heartPath(ctx, cx, cy, s) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + s * 0.3);
+    ctx.bezierCurveTo(cx - s, cy - s * 0.6, cx - s * 0.5, cy - s * 1.3, cx, cy - s * 0.5);
+    ctx.bezierCurveTo(cx + s * 0.5, cy - s * 1.3, cx + s, cy - s * 0.6, cx, cy + s * 0.3);
+    ctx.closePath();
+  }
+  function makeBloodBlobs() {
+    const r = U.rng(555);
+    const edges = [
+      () => [r() * W, -10 + r() * 6],
+      () => [r() * W, H + 10 - r() * 6],
+      () => [-10 + r() * 6, r() * H],
+      () => [W + 10 - r() * 6, r() * H],
+    ];
+    const blobs = [];
+    for (let i = 0; i < 16; i++) {
+      const [x, y] = edges[i % 4]();
+      blobs.push({ x, y, rx: 14 + r() * 22, ry: 10 + r() * 16, rot: r() * Math.PI });
+    }
+    return blobs;
+  }
+  function scareEnvelope(t) {
+    const scale = t < 0.08 ? 1.3 - 0.3 * U.smooth(U.clamp(t / 0.08, 0, 1)) : 1;
+    const alpha = t < 0.33 ? 1 : U.clamp(1 - (t - 0.33) / 0.27, 0, 1);
+    return { scale, alpha };
+  }
 
   // ------------------------------------------------------------------ main draw
   R.draw = function (G, dt) {
@@ -163,10 +205,35 @@
     const t = G.clock;
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     let camX = G.camX;
+    const lvl = this.lvl;
+    const menu = G.state === 'menu';
+    const px = G.s ? G.s.x : camX + PX; // the player's x, or the camera's in the menu's attract mode
+    this._eyeSpots = this._eyeSpots || [];
+    this._eyeSpots.length = 0;
+    this._lB = menu ? 0 : this.lightningPulse(px) * zoneOf(lvl, 'lightning', px, 6);
+
+    // mirror: the whole world flips horizontally, animated as a "turn" through the middle (never the HUD)
+    const mirW = zoneOf(lvl, 'mirror', px, 2.6);
+    const scaleX = mirW > 0 ? Math.cos(Math.PI * mirW) : 1;
+    const mirrored = scaleX < 0;
+
+    // tilt: a subtle rotation on the heavy downbeats, only in theme.tilt areas
+    let tiltA = 0;
+    if (this.theme.tilt) {
+      const tw = areaWeight(lvl, this.theme.tilt, camX + HALF, 8);
+      if (tw > 0.001) tiltA = this.tiltAngle(px) * tw;
+    }
+
     const shake = G.shake > 0 ? G.shake : 0;
     ctx.save();
     if (shake) ctx.translate((Math.random() - 0.5) * shake * 14, (Math.random() - 0.5) * shake * 14);
-    const drops = this.lvl.drops;
+    if (scaleX !== 1 || tiltA) {
+      ctx.translate(W / 2, H / 2);
+      if (scaleX !== 1) ctx.scale(scaleX, 1);
+      if (tiltA) ctx.rotate(tiltA);
+      ctx.translate(-W / 2, -H / 2);
+    }
+    const drops = lvl.drops;
     if (!drops.length) this.drawScene(ctx, camX, t, G, 0);
     else {
       // Level 3 has one floor on top of another (you fall through a hole into the sewer). Each floor is a
@@ -185,11 +252,114 @@
       }
     }
     ctx.restore();
+
+    // darkness / lantern, with the glowing eyes above the mask
+    this.drawDarkness(ctx, G, px, t, mirrored);
+
     if (G.flash > 0) {
       ctx.fillStyle = 'rgba(255,255,255,' + Math.min(0.6, G.flash) + ')';
       ctx.fillRect(0, 0, W, H);
     }
-    if (G.state !== 'menu') this.drawHUD(ctx, G, t);
+    // strobe + ambient lightning, on top of the flash
+    this.drawStrobe(ctx, G, px, menu);
+    this.drawLightning(ctx);
+
+    if (!menu) this.drawHUD(ctx, G, t, camX, mirrored);
+    if (G.scare) this.drawScare(ctx, G, t);
+  };
+
+  // ------------------------------------------------------------------ nightmare screen effects
+  // darkness/lantern mask: near-black except a soft circular hole around the player, flickering slightly
+  R.drawDarkness = function (ctx, G, px, t, mirrored) {
+    const lvl = this.lvl;
+    const k = zoneOf(lvl, 'dark', px, 4);
+    if (k <= 0.001) {
+      this._eyeSpots.length = 0;
+      return;
+    }
+    let r = 7;
+    const dz = lvl.fx && lvl.fx.dark;
+    if (dz) for (const z of dz) if (px >= z.x0 - 4 && px <= z.x1 + 4) { r = z.r || 7; break; }
+    const s = G.s;
+    const ph = s ? VD.Physics.boxH(s) : 1;
+    let holeX = PX * BS;
+    const holeY = s ? sy(s.y + ph / 2) : sy(0.5);
+    if (mirrored) holeX = W - holeX;
+    const flick = 1 + Math.sin(t * 17.3) * 0.05 + Math.sin(t * 7.1 + 1) * 0.03;
+    const rad = Math.max(12, r * BS * flick);
+
+    if (!this._darkCv) {
+      this._darkCv = document.createElement('canvas');
+      this._darkCv.width = W;
+      this._darkCv.height = H;
+    }
+    const dctx = this._darkCv.getContext('2d');
+    dctx.setTransform(1, 0, 0, 1, 0, 0);
+    dctx.clearRect(0, 0, W, H);
+    dctx.fillStyle = 'rgba(4,2,6,' + (0.96 * k).toFixed(3) + ')';
+    dctx.fillRect(0, 0, W, H);
+    dctx.globalCompositeOperation = 'destination-out';
+    const g = dctx.createRadialGradient(holeX, holeY, 0, holeX, holeY, rad);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(0.65, 'rgba(0,0,0,0.9)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    dctx.fillStyle = g;
+    dctx.beginPath();
+    dctx.arc(holeX, holeY, rad, 0, Math.PI * 2);
+    dctx.fill();
+    dctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(this._darkCv, 0, 0);
+
+    const AH = Art.horror;
+    if (AH && AH.eyes) for (const e of this._eyeSpots) AH.eyes(ctx, e.x, e.y, e.size, t, e.seed, e.color);
+    this._eyeSpots.length = 0;
+  };
+
+  // one flash per beat, full brightness 0.05s then a 0.15s fade; a steady dim light when strobeOn is off
+  R.drawStrobe = function (ctx, G, px, menu) {
+    const w = zoneOf(this.lvl, 'strobe', px, 4);
+    if (w <= 0.001) return;
+    if (menu || G.strobeOn === false) {
+      ctx.fillStyle = 'rgba(4,2,6,' + (0.55 * w).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+      return;
+    }
+    const cyc = ((px % 4) + 4) % 4;
+    const phase = cyc / P.SPEED;
+    let bright = 0;
+    if (phase < 0.05) bright = 1;
+    else if (phase < 0.2) bright = 1 - (phase - 0.05) / 0.15;
+    const dark = 0.97 * (1 - bright) * w;
+    ctx.fillStyle = 'rgba(4,2,6,' + dark.toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+    if (bright > 0.001) {
+      ctx.fillStyle = 'rgba(232,240,255,' + Math.min(0.18, bright * 0.18 * w).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+  };
+  // double flicker (~0.3s) where x mod 32 crosses 16, i.e. on the downbeat of every odd bar
+  R.lightningPulse = function (px) {
+    const cyc = ((px % 32) + 32) % 32;
+    const dphase = (cyc - 16) / P.SPEED;
+    if (dphase < 0 || dphase > 0.3) return 0;
+    const p1 = Math.exp(-Math.pow((dphase - 0.03) / 0.05, 2));
+    const p2 = 0.85 * Math.exp(-Math.pow((dphase - 0.17) / 0.06, 2));
+    return Math.min(1, p1 + p2);
+  };
+  R.drawLightning = function (ctx) {
+    const a = Math.min(0.25, this._lB * 0.25);
+    if (a <= 0.002) return;
+    ctx.fillStyle = 'rgba(255,255,255,' + a.toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+  };
+  // a subtle rotation on the half-time downbeat (every 8 blocks), alternating sign, decaying over ~0.3s
+  R.tiltAngle = function (px) {
+    const cyc = ((px % 8) + 8) % 8;
+    const dphase = cyc / P.SPEED;
+    if (dphase > 0.3) return 0;
+    const sign = Math.floor(px / 8) % 2 === 0 ? 1 : -1;
+    const decay = Math.exp(-dphase * 9);
+    return sign * (0.8 * Math.PI / 180) * decay;
   };
 
   // one floor of the level: background, scenery, ground, obstacles, and the player if they're on it
@@ -223,6 +393,21 @@
         this.drawNear(ctx, camX, t, true, L);
       } else if (inKind === 'sewer') {
         this.drawSewer(ctx, camX, t, center);
+        this.drawNear(ctx, camX, t, true, L);
+      } else if (inKind === 'convent') {
+        this.drawConvent(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true, L);
+      } else if (inKind === 'chapel') {
+        this.drawChapel(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true, L);
+      } else if (inKind === 'catacomb') {
+        this.drawCatacomb(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true, L);
+      } else if (inKind === 'mirrors') {
+        this.drawMirrors(ctx, camX, t, G);
+        this.drawNear(ctx, camX, t, true, L);
+      } else if (inKind === 'ghosttrain') {
+        this.drawGhosttrain(ctx, camX, t);
         this.drawNear(ctx, camX, t, true, L);
       } else {
         this.drawHall(ctx, camX, t);
@@ -265,17 +450,21 @@
         ctx.fillRect(s.x, s.y, s.r, s.r);
       }
       ctx.globalAlpha = sa;
-      const mg = ctx.createRadialGradient(260, 120, 20, 260, 120, 110);
-      mg.addColorStop(0, 'rgba(255,246,218,0.35)');
-      mg.addColorStop(1, 'rgba(255,246,218,0)');
+      const blood = !!th.moon;
+      const moonCol = th.moon || '#fff6da';
+      const moonR = blood ? 46 : 32, haloR = blood ? 170 : 110;
+      const haloCol = blood ? '#8a0018' : '#fff6da';
+      const mg = ctx.createRadialGradient(260, 120, 20, 260, 120, haloR);
+      mg.addColorStop(0, U.rgba(haloCol, blood ? 0.22 : 0.35));
+      mg.addColorStop(1, U.rgba(haloCol, 0));
       ctx.fillStyle = mg;
-      ctx.fillRect(150, 10, 220, 220);
-      ctx.fillStyle = '#fff6da';
+      ctx.fillRect(260 - haloR, 120 - haloR, haloR * 2, haloR * 2);
+      ctx.fillStyle = moonCol;
       ctx.beginPath();
-      ctx.arc(260, 120, 32, 0, Math.PI * 2);
+      ctx.arc(260, 120, moonR, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = 'rgba(190,180,150,0.35)';
-      for (const [mx, my, mr] of [[250, 110, 7], [272, 126, 5], [256, 134, 4], [268, 106, 3]]) {
+      ctx.fillStyle = blood ? 'rgba(60,0,10,0.35)' : 'rgba(190,180,150,0.35)';
+      for (const [mx, my, mr] of blood ? [[246, 106, 10], [278, 130, 7], [258, 138, 6], [272, 100, 4]] : [[250, 110, 7], [272, 126, 5], [256, 134, 4], [268, 106, 3]]) {
         ctx.beginPath();
         ctx.arc(mx, my, mr, 0, Math.PI * 2);
         ctx.fill();
@@ -523,7 +712,7 @@
       }
       return;
     }
-    const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93' }[style] || '#7dbb4e';
+    const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93', graves: '#332b22', fairground: '#5f3f2e' }[style] || '#7dbb4e';
     ctx.fillStyle = T(base);
     ctx.fillRect(x0, mb - 6, w, GY - mb + 10);
     if (style === 'forest') {
@@ -555,6 +744,45 @@
         const i = Math.round((x + offM * BS) / 26);
         ctx.fillStyle = T(cols[(i & 3)]);
         ctx.fillRect(x, mb - 4 + ((i * 5) & 7), 3, 3);
+      }
+    } else if (style === 'graves') {
+      // a dead field of leaning crosses and low mounds, fading into the fog
+      ctx.fillStyle = T('#1c1712');
+      for (let x = gridStart(x0, offM * BS, 70); x < x1; x += 70) {
+        const i = Math.round((x + offM * BS) / 70);
+        const gx = x + 20 + ((i * 13) % 24), gh = 10 + ((i * 7) % 10);
+        if (i % 2) {
+          ctx.fillRect(gx, mb - gh, 3, gh);
+          ctx.fillRect(gx - 5, mb - gh + 4, 13, 3);
+        } else {
+          ctx.beginPath();
+          ctx.ellipse(gx, mb - gh * 0.6, 6, gh * 0.6, 0, Math.PI, 0);
+          ctx.fill();
+        }
+      }
+      ctx.fillStyle = T('#4a4030');
+      for (let x = gridStart(x0, offM * BS, 30); x < x1; x += 30) {
+        const i = Math.round((x + offM * BS) / 30);
+        ctx.fillRect(x, mb - 3 - ((i * 5) & 3), 2, 5);
+      }
+    } else if (style === 'fairground') {
+      // dusty circus lot: striped tent tops and poles poking up from the trampled grass
+      ctx.fillStyle = T('#3a2c1e');
+      for (let x = gridStart(x0, offM * BS, 30); x < x1; x += 30) {
+        const i = Math.round((x + offM * BS) / 30);
+        if (i % 4 === 0) ctx.fillRect(x, mb - 4 - ((i * 3) & 3), 2, 6);
+      }
+      const cols = ['#c0081a', '#efe9dc'];
+      for (let x = gridStart(x0, offM * BS, 140); x < x1; x += 140) {
+        const i = Math.round((x + offM * BS) / 140);
+        const tw = 30, th2 = 22;
+        ctx.fillStyle = T(cols[i & 1]);
+        ctx.beginPath();
+        ctx.moveTo(x, mb);
+        ctx.lineTo(x + tw / 2, mb - th2);
+        ctx.lineTo(x + tw, mb);
+        ctx.closePath();
+        ctx.fill();
       }
     }
     if (style === 'meadow' || style === 'farm') {
@@ -1116,6 +1344,268 @@
     }
   };
 
+  // ------------------------------------------------------------------ inside the convent (level 4)
+  R.drawConvent = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#140810');
+    g.addColorStop(1, '#2c1522');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const moonCol = this.theme.moon || '#b3121e';
+    const off = camX * BS * 0.55, step = 220;
+    const start = gridStart(0, off, step) - step;
+    for (let x = start; x < W + step; x += step) {
+      const wx = x + step * 0.5, ww = 66, wtop = 46, wh = 230;
+      // the moon glowing through the tall pointed window
+      const mg = ctx.createRadialGradient(wx, wtop + wh * 0.4, 4, wx, wtop + wh * 0.4, ww * 1.1);
+      mg.addColorStop(0, U.rgba(moonCol, 0.45));
+      mg.addColorStop(1, U.rgba(moonCol, 0));
+      ctx.fillStyle = mg;
+      ctx.fillRect(wx - ww * 1.1, wtop - ww * 0.3, ww * 2.2, wh + ww);
+      ctx.fillStyle = '#100710';
+      ctx.beginPath();
+      ctx.moveTo(wx - ww / 2, wtop + wh);
+      ctx.lineTo(wx - ww / 2, wtop + ww / 2);
+      ctx.arc(wx, wtop + ww / 2, ww / 2, Math.PI, 0);
+      ctx.lineTo(wx + ww / 2, wtop + wh);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = moonCol;
+      ctx.beginPath();
+      ctx.ellipse(wx, wtop + wh * 0.4, ww * 0.28, ww * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(wx, wtop);
+      ctx.lineTo(wx, wtop + wh);
+      ctx.moveTo(wx - ww / 2, wtop + wh * 0.66);
+      ctx.lineTo(wx + ww / 2, wtop + wh * 0.66);
+      ctx.stroke();
+      // the pillar beside it
+      ctx.fillStyle = '#241019';
+      ctx.fillRect(x + step - 30, 10, 28, GY - 10);
+      ctx.fillStyle = '#33151f';
+      ctx.fillRect(x + step - 26, 10, 6, GY - 10);
+      ctx.fillStyle = '#1a0a12';
+      ctx.fillRect(x + step - 36, 10, 48, 14);
+    }
+    // vaulted arches along the top
+    ctx.fillStyle = '#140812';
+    ctx.beginPath();
+    ctx.moveTo(-10, 0);
+    ctx.lineTo(-10, 60);
+    for (let x = start; x < W + step; x += step) ctx.quadraticCurveTo(x + step * 0.5, 8, x + step, 60);
+    ctx.lineTo(W + 10, 0);
+    ctx.closePath();
+    ctx.fill();
+    // cobwebs in the top corners
+    ctx.strokeStyle = 'rgba(215,208,220,0.22)';
+    ctx.lineWidth = 1.2;
+    drawCobweb(ctx, 4, 4, 1);
+    drawCobweb(ctx, W - 4, 4, -1);
+  };
+
+  // ------------------------------------------------------------------ inside the chapel (level 4)
+  R.drawChapel = function (ctx, camX, t) {
+    const lb = this._lB || 0; // ambient lightning brightens the glass
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, U.mixHex('#0c0810', '#3a3450', lb * 0.5));
+    g.addColorStop(1, '#231228');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const off = camX * BS * 0.5, step = 170;
+    const start = gridStart(0, off, step) - step;
+    const glass = ['#7a1030', '#1a3f7a', '#7a6a10', '#2a6a3a'];
+    for (let x = start; x < W + step; x += step) {
+      const i = Math.round((x + off) / step);
+      const wx = x + step * 0.5, ww = 60, wtop = 60, wh = 180;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(wx - ww / 2, wtop + wh);
+      ctx.lineTo(wx - ww / 2, wtop + ww / 2);
+      ctx.arc(wx, wtop + ww / 2, ww / 2, Math.PI, 0);
+      ctx.lineTo(wx + ww / 2, wtop + wh);
+      ctx.closePath();
+      ctx.clip();
+      const cols = [glass[i % 4], glass[(i + 1) % 4], glass[(i + 2) % 4]];
+      for (let p = 0; p < 3; p++) {
+        ctx.fillStyle = U.mixHex(cols[p], '#ffffff', lb * 0.6);
+        ctx.fillRect(wx - ww / 2 + p * (ww / 3), wtop - 10, ww / 3, wh + 20);
+      }
+      ctx.globalAlpha = 0.35 + lb * 0.4;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(wx - ww / 2, wtop + wh * 0.3, ww, 5);
+      ctx.fillRect(wx - ww / 2, wtop + wh * 0.62, ww, 5);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+      ctx.strokeStyle = '#100714';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(wx - ww / 2, wtop + wh);
+      ctx.lineTo(wx - ww / 2, wtop + ww / 2);
+      ctx.arc(wx, wtop + ww / 2, ww / 2, Math.PI, 0);
+      ctx.lineTo(wx + ww / 2, wtop + wh);
+      ctx.stroke();
+    }
+    // organ pipes at the head of the nave
+    ctx.fillStyle = '#1a1018';
+    const pipeX = 60;
+    for (let k = 0; k < 7; k++) {
+      const ph = 90 + Math.abs(3 - k) * -14 + 70;
+      ctx.fillRect(pipeX + k * 16, GY - ph, 12, ph);
+    }
+    // pews receding down the nave
+    const offP = camX * BS * 0.75;
+    ctx.fillStyle = '#150a16';
+    for (let x = gridStart(0, offP, 96) - 96; x < W + 96; x += 96) {
+      ctx.fillRect(x, GY - 46, 70, 14);
+      ctx.fillRect(x + 4, GY - 70, 8, 24);
+      ctx.fillRect(x + 58, GY - 70, 8, 24);
+    }
+  };
+
+  // ------------------------------------------------------------------ inside the catacombs (level 4)
+  R.drawCatacomb = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#0a0705');
+    g.addColorStop(1, '#1c150f');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const off = camX * BS * 0.42, step = 130;
+    const start = gridStart(0, off, step) - step;
+    const eyes = this._eyeSpots;
+    for (let x = start; x < W + step; x += step) {
+      const i = Math.round((x + off) / step);
+      ctx.fillStyle = '#0d0906';
+      ctx.fillRect(x + 10, 70, step - 20, GY - 90);
+      for (let r = 0; r < 5; r++) {
+        const ry = 96 + r * 76;
+        for (let c = 0; c < 3; c++) {
+          const rx = x + 24 + c * ((step - 48) / 2);
+          const bump = ((i * 7 + r * 5 + c * 3) % 5) - 2;
+          ctx.fillStyle = '#c9bda2';
+          ctx.beginPath();
+          ctx.ellipse(rx + bump, ry, 15, 12, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#0d0906';
+          ctx.fillRect(rx + bump - 6, ry - 2, 4, 5);
+          ctx.fillRect(rx + bump + 2, ry - 2, 4, 5);
+          // one skull per handful of niches glows once the lantern reaches it
+          if (eyes && (i * 7 + r * 3 + c) % 6 === 0 && rx > -30 && rx < W + 30) {
+            eyes.push({ x: rx + bump, y: ry - 1, size: BS * 0.34, seed: i * 11 + r * 3 + c, color: '#f4f8ff' });
+          }
+        }
+      }
+      ctx.fillStyle = '#241c14';
+      ctx.fillRect(x, 60, 10, GY - 60);
+    }
+  };
+
+  // ------------------------------------------------------------------ the hall of mirrors (level 4)
+  R.drawMirrors = function (ctx, camX, t, G) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#120c1a');
+    g.addColorStop(1, '#241830');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const off = camX * BS * 0.5, step = 210;
+    const start = gridStart(0, off, step) - step;
+    const s = G.s, skin = G.skin;
+    const expr = G.vis && G.vis.oT > 0 ? 'o' : 'grin';
+    for (let x = start; x < W + step; x += step) {
+      const i = Math.round((x + off) / step);
+      ctx.fillStyle = '#2a1f14';
+      ctx.fillRect(x + 6, 30, step - 12, GY - 50);
+      const px0 = x + step / 2, ptop = 60, pw = step - 60, ph = GY - 120;
+      ctx.fillStyle = '#c9a13a';
+      Art.rr(ctx, px0 - pw / 2 - 8, ptop - 8, pw + 16, ph + 16, 14);
+      ctx.fill();
+      ctx.fillStyle = '#8a6a1e';
+      Art.rr(ctx, px0 - pw / 2 - 4, ptop - 4, pw + 8, ph + 8, 12);
+      ctx.fill();
+      ctx.save();
+      ctx.beginPath();
+      Art.rr(ctx, px0 - pw / 2, ptop, pw, ph, 8);
+      ctx.clip();
+      const mgc = ctx.createLinearGradient(px0 - pw / 2, ptop, px0 + pw / 2, ptop + ph);
+      mgc.addColorStop(0, '#5a6a82');
+      mgc.addColorStop(0.5, '#8a9ab2');
+      mgc.addColorStop(1, '#3a4658');
+      ctx.fillStyle = mgc;
+      ctx.fillRect(px0 - pw / 2, ptop, pw, ph);
+      // a warped, stretched reflection of Vippe, in a few panels only
+      if (s && i % 2 === 0) {
+        ctx.translate(px0, ptop + ph * 0.62);
+        const sway = Math.sin(t * 1.3 + i) * 0.18;
+        const stretch = 1.35 + 0.25 * Math.sin(t * 0.7 + i * 1.7);
+        ctx.transform(1 + sway * 0.3, sway * 0.5, 0, stretch, 0, 0);
+        Art.cube(ctx, BS * 1.3, expr, skin, 1);
+      }
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(px0 - pw / 2 + 10, ptop + ph * 0.2);
+      ctx.lineTo(px0 + pw / 2 - 14, ptop + ph * 0.1);
+      ctx.stroke();
+    }
+  };
+
+  // ------------------------------------------------------------------ the ghost train tunnel (level 4)
+  R.drawGhosttrain = function (ctx, camX, t) {
+    ctx.fillStyle = '#030204';
+    ctx.fillRect(0, 0, W, GY + 4);
+    const off = camX * BS * 0.4, step = 260;
+    const start = gridStart(0, off, step) - step;
+    const uv = '#7dff9a', purple = '#c04aff';
+    for (let x = start; x < W + step; x += step) {
+      const i = Math.round((x + off) / step);
+      const bx = x + step * 0.5, bh = 120 + ((i * 37) % 60);
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = i % 2 ? uv : purple;
+      ctx.beginPath();
+      ctx.moveTo(bx - 34, GY - 40);
+      ctx.lineTo(bx - 46, GY - bh);
+      ctx.lineTo(bx - 10, GY - bh - 20);
+      ctx.lineTo(bx + 12, GY - bh - 40);
+      ctx.lineTo(bx + 30, GY - bh);
+      ctx.lineTo(bx + 44, GY - 40);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(bx - 8, GY - bh - 10, 4, 0, Math.PI * 2);
+      ctx.arc(bx + 10, GY - bh - 10, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // flickering bulbs strung along the tunnel
+    const offB = camX * BS * 0.7;
+    for (let x = gridStart(0, offB, 90) - 90; x < W + 90; x += 90) {
+      const i = Math.round((x + offB) / 90);
+      if (U.hash(i * 3.7 + Math.floor(t * 8)) < 0.15) continue;
+      const gl = ctx.createRadialGradient(x, 60, 2, x, 60, 40);
+      gl.addColorStop(0, 'rgba(255,240,180,0.55)');
+      gl.addColorStop(1, 'rgba(255,240,180,0)');
+      ctx.fillStyle = gl;
+      ctx.fillRect(x - 40, 20, 80, 80);
+      ctx.fillStyle = '#fff3b0';
+      ctx.beginPath();
+      ctx.arc(x, 60, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // the ride track receding into the black
+    ctx.strokeStyle = 'rgba(125,255,154,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 4, GY);
+    ctx.lineTo(W * 0.5 - 60, GY - 260);
+    ctx.moveTo(W / 2 + 4, GY);
+    ctx.lineTo(W * 0.5 + 60, GY - 260);
+    ctx.stroke();
+  };
+
   // ------------------------------------------------------------------ holes in the floor (level 3)
   // the ragged hole in the tunnel floor, and where it comes out through the sewer roof one layer down
   R.drawHoles = function (ctx, camX, t, L) {
@@ -1370,6 +1860,126 @@
         ctx.fillRect(x0, GY, x1 - x0, 6);
         ctx.fillStyle = 'rgba(210,255,130,0.55)';
         ctx.fillRect(x0, GY, x1 - x0, 2);
+      } else if (st === 'grave') {
+        // packed grave-dirt path with patches of dead grass
+        ctx.fillStyle = '#241d16';
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = 'rgba(0,0,0,0.16)';
+        for (let i = Math.floor(camX + x0 / BS); i <= Math.ceil(camX + x1 / BS); i++) {
+          if (i & 1) continue;
+          const x = (i - camX) * BS, a0 = Math.max(x0, x), a1 = Math.min(x1, x + BS);
+          if (a1 > a0) ctx.fillRect(a0, GY + 36, a1 - a0, BS);
+        }
+        ctx.fillStyle = '#3a3a24';
+        ctx.fillRect(x0, GY, x1 - x0, 10);
+        ctx.fillStyle = '#55552e';
+        ctx.fillRect(x0, GY, x1 - x0, 3);
+        ctx.fillStyle = '#2c2c1a';
+        for (let i = Math.floor(camX * 4 + x0 / 12); i <= Math.ceil(camX * 4 + x1 / 12); i++) {
+          const x = i * 12 - camX * BS;
+          if (x >= x0 && x + 5 <= x1) ctx.fillRect(x, GY + 10, 5, 3 + ((i * 7) & 3));
+        }
+      } else if (st === 'flagstone') {
+        ctx.fillStyle = '#232025';
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = '#332e35';
+        const sw = 46, shh = 24;
+        for (let r = 0; r < 8; r++) {
+          const yy = GY + 4 + r * (shh + 3);
+          const shift = (r % 2) * (sw / 2);
+          const start = gridStart(x0, camX * BS + shift, sw + 3);
+          for (let x = start; x < x1; x += sw + 3) {
+            const a0 = Math.max(x0, x), a1 = Math.min(x1, x + sw);
+            if (a1 > a0) {
+              Art.rr(ctx, a0, yy, a1 - a0, shh, 4);
+              ctx.fill();
+            }
+          }
+        }
+        ctx.fillStyle = '#463f47';
+        ctx.fillRect(x0, GY, x1 - x0, 5);
+      } else if (st === 'bones') {
+        ctx.fillStyle = '#171310';
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        for (let i = Math.floor(camX * 2 + x0 / 26) - 1; i <= Math.ceil(camX * 2 + x1 / 26); i++) {
+          const x = i * 26 - camX * BS;
+          if (x + 20 < x0 || x > x1) continue;
+          const yy = GY + 4 + ((i * 23) % 10);
+          ctx.fillStyle = '#d8cdb8';
+          if (i % 3 === 0) {
+            // a little skull half-buried
+            ctx.beginPath();
+            ctx.ellipse(x + 10, yy, 7, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#171310';
+            ctx.fillRect(x + 7, yy - 1, 2, 3);
+            ctx.fillRect(x + 11, yy - 1, 2, 3);
+          } else {
+            ctx.save();
+            ctx.translate(x + 10, yy);
+            ctx.rotate(((i * 37) % 10) / 10 - 0.5);
+            ctx.fillRect(-12, -2, 24, 4);
+            ctx.beginPath();
+            ctx.arc(-12, 0, 4, 0, Math.PI * 2);
+            ctx.arc(12, 0, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+        ctx.fillStyle = '#2a2118';
+        ctx.fillRect(x0, GY, x1 - x0, 4);
+      } else if (st === 'sawdust') {
+        ctx.fillStyle = '#5a3f26';
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        for (let i = Math.floor(camX + x0 / BS); i <= Math.ceil(camX + x1 / BS); i++) {
+          if (i & 1) continue;
+          const x = (i - camX) * BS, a0 = Math.max(x0, x), a1 = Math.min(x1, x + BS);
+          if (a1 > a0) ctx.fillRect(a0, GY + 36, a1 - a0, BS);
+        }
+        ctx.fillStyle = '#caa15c';
+        for (let i = Math.floor(camX * 5 + x0 / 10); i <= Math.ceil(camX * 5 + x1 / 10); i++) {
+          const x = i * 10 - camX * BS + ((i * 7) % 5);
+          if (x >= x0 && x + 4 <= x1) ctx.fillRect(x, GY + 4 + ((i * 5) % 8), 4, 1.5);
+        }
+        ctx.fillStyle = '#7a5230';
+        ctx.fillRect(x0, GY, x1 - x0, 4);
+      } else if (st === 'mirrorfloor') {
+        const g = ctx.createLinearGradient(0, GY, 0, H);
+        g.addColorStop(0, '#1a1622');
+        g.addColorStop(0.4, '#332a44');
+        g.addColorStop(1, '#0c0a12');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.strokeStyle = 'rgba(200,220,255,0.14)';
+        ctx.lineWidth = 1;
+        const dw = 60;
+        for (let r = 0; r < 6; r++) {
+          const yy = GY + r * dw;
+          const shift = (r % 2) * (dw / 2);
+          ctx.beginPath();
+          for (let x = gridStart(x0, camX * BS + shift, dw); x < x1; x += dw) {
+            ctx.moveTo(x, yy);
+            ctx.lineTo(x + dw / 2, yy + dw / 2);
+            ctx.lineTo(x, yy + dw);
+            ctx.lineTo(x - dw / 2, yy + dw / 2);
+          }
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillRect(x0, GY, x1 - x0, 3);
+      } else if (st === 'ghostrail') {
+        ctx.fillStyle = '#0c0a10';
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = '#241c28';
+        for (let x = gridStart(x0, camX * BS, 20); x < x1; x += 20) {
+          const a0 = Math.max(x0, x), a1 = Math.min(x1, x + 12);
+          if (a1 > a0) ctx.fillRect(a0, GY + 10, a1 - a0, 8);
+        }
+        ctx.fillStyle = '#5a4a68';
+        ctx.fillRect(x0, GY, x1 - x0, 5);
+        ctx.fillStyle = 'rgba(160,255,180,0.4)';
+        ctx.fillRect(x0, GY, x1 - x0, 2);
       } else if (st === 'hall') {
         ctx.fillStyle = '#2d6fb8';
         ctx.fillRect(x0, GY, x1 - x0, H - GY);
@@ -1552,6 +2162,71 @@
         ctx.fillRect(x0, y - 4, x1 - x0, 4);
         ctx.fillStyle = 'rgba(210,255,130,0.55)';
         ctx.fillRect(x0, y - 2, x1 - x0, 2);
+      } else if (c.style === 'vault') {
+        // a stone groin-vault ceiling with ribs, lit faintly red by the windows below
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#0c0810');
+        g.addColorStop(1, '#2e1c28');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let x = gridStart(x0, camX * BS, 130) - 130; x < x1 + 130; x += 130) {
+          ctx.moveTo(x, y);
+          ctx.quadraticCurveTo(x + 65, y - 70, x + 130, y);
+        }
+        ctx.stroke();
+        for (let x = gridStart(x0, camX * BS, 130) + 65; x < x1; x += 130) {
+          if (x < x0) continue;
+          const gl = ctx.createRadialGradient(x, y + 4, 2, x, y + 4, 70);
+          gl.addColorStop(0, 'rgba(179,18,30,0.3)');
+          gl.addColorStop(1, 'rgba(179,18,30,0)');
+          ctx.fillStyle = gl;
+          ctx.fillRect(x - 70, y - 20, 140, 90);
+        }
+        ctx.fillStyle = '#1c0f18';
+        ctx.fillRect(x0, y - 4, x1 - x0, 4);
+      } else if (c.style === 'bones') {
+        // bones jammed into the low catacomb roof
+        ctx.fillStyle = '#0a0806';
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.fillStyle = '#c9bda2';
+        for (let x = gridStart(x0, camX * BS, 30) - 30; x < x1 + 30; x += 30) {
+          const i = Math.round((x + camX * BS) / 30);
+          const len = 10 + ((i * 13) % 14);
+          ctx.save();
+          ctx.translate(x + 15, y);
+          ctx.rotate(((i * 29) % 10) / 20 - 0.25);
+          ctx.fillRect(-2, 0, 4, len);
+          ctx.beginPath();
+          ctx.arc(0, len, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.fillStyle = '#1a1512';
+        ctx.fillRect(x0, y - 3, x1 - x0, 3);
+      } else if (c.style === 'ghosttrain') {
+        // a black tunnel roof with slack wires and smears of UV paint
+        ctx.fillStyle = '#050308';
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.strokeStyle = '#1c1622';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let x = gridStart(x0, camX * BS, 90) - 90; x < x1 + 90; x += 90) {
+          ctx.moveTo(x, y - 30);
+          ctx.quadraticCurveTo(x + 45, y - 10, x + 90, y - 30);
+        }
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(125,255,154,0.18)';
+        for (let x = gridStart(x0, camX * BS, 220) + 40; x < x1; x += 220) {
+          if (x < x0) continue;
+          ctx.beginPath();
+          ctx.ellipse(x, y - 40, 40, 16, 0.3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#100a16';
+        ctx.fillRect(x0, y - 4, x1 - x0, 4);
       } else {
         // leafy canopy of the riverside trees
         const g = ctx.createLinearGradient(0, 0, 0, y);
@@ -1583,13 +2258,25 @@
   const WATER_STYLE = { peat: 'bog', sewer: 'sludge' };
   R.drawObjects = function (ctx, camX, t, G, L = 0) {
     const lvl = this.lvl;
+    const AH = Art.horror;
     const vis = lvl.visible(camX - 2, camX + W / BS + 2).filter((o) => (o.layer || 0) === L);
     const glow = (x) => this.theme.glow[this.areaIn(L, x).id];
+    const px = G.s ? G.s.x : camX + PX; // the menu's attract mode has no s, so use the camera instead
+    const darkZones = lvl.fx && lvl.fx.dark;
+    const inDark = (x) => {
+      if (!darkZones) return false;
+      for (const z of darkZones) if (x >= z.x0 - 6 && x <= z.x1 + 6) return true;
+      return false;
+    };
     // water and the live rail first (they sit in the ground)
     for (const o of vis) {
       if (o.t !== 'haz') continue;
-      if (o.kind === 'water') Art.water(ctx, sx(o.x, camX), sx(o.x + o.w, camX), sy(0.22), H, t, WATER_STYLE[this.theme.ground[this.areaIn(L, o.x).id]]);
-      else if (o.kind === 'rail') Art.rail(ctx, sx(o.x, camX), sx(o.x + o.w, camX), GY, t, this.theme.ground[this.areaIn(L, o.x).id]);
+      if (o.kind === 'water') {
+        const x0 = sx(o.x, camX), x1 = sx(o.x + o.w, camX), ys = sy(0.22);
+        const wf = AH && AH.water && AH.water[o.style];
+        if (wf) wf(ctx, x0, x1, ys, H, t);
+        else Art.water(ctx, x0, x1, ys, H, t, o.style || WATER_STYLE[this.theme.ground[this.areaIn(L, o.x).id]]);
+      } else if (o.kind === 'rail') Art.rail(ctx, sx(o.x, camX), sx(o.x + o.w, camX), GY, t, this.theme.ground[this.areaIn(L, o.x).id]);
     }
     // checkpoints
     for (const cp of lvl.checkpoints) {
@@ -1600,17 +2287,80 @@
     for (const o of vis) {
       const x = sx(o.x, camX), y = sy(o.y + o.h), w = o.w * BS, h = o.h * BS;
       switch (o.t) {
-        case 'solid':
-          Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
+        case 'solid': {
+          const bf = AH && AH.block && AH.block[o.style];
+          if (bf) bf(ctx, x, y, w, h, BS, o.id, t);
+          else Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
           break;
+        }
         case 'haz':
-          if (o.kind === 'spike') Art.spike(ctx, x, y, w, h, false, o.style, glow(o.x), t, o.id);
-          else if (o.kind === 'spikeDown') Art.spike(ctx, x, y, w, h, true, o.style, glow(o.x), t, o.id);
-          else if (o.kind === 'half') Art.half(ctx, x, y, w, h, o.style, glow(o.x));
-          else if (o.kind === 'bird') Art.bird(ctx, x + w / 2, y + h / 2, BS, t, o.id, glow(o.x), o.style);
-          else if (o.kind === 'thorny') Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
-          else if (o.kind === 'croc') Art.crocHead(ctx, x, y, w, h, o.dir, t, o.id, glow(o.x));
+          if (o.kind === 'spike' || o.kind === 'spikeDown') {
+            const down = o.kind === 'spikeDown';
+            const sf = AH && AH.spike && AH.spike[o.style];
+            if (sf) sf(ctx, x, y, w, h, down, glow(o.x), t, o.id);
+            else Art.spike(ctx, x, y, w, h, down, o.style, glow(o.x), t, o.id);
+          } else if (o.kind === 'half') Art.half(ctx, x, y, w, h, o.style, glow(o.x));
+          else if (o.kind === 'bird') {
+            const cx2 = x + w / 2, cy2 = y + h / 2;
+            const brf = AH && AH.bird && AH.bird[o.style];
+            if (brf) brf(ctx, cx2, cy2, BS, t, o.id, glow(o.x));
+            else Art.bird(ctx, cx2, cy2, BS, t, o.id, glow(o.x), o.style);
+            if (o.style === 'bat' && inDark(o.x)) this._eyeSpots.push({ x: cx2, y: cy2, size: BS * 0.3, seed: o.id, color: '#f4f8ff' });
+          } else if (o.kind === 'thorny') {
+            const bf = AH && AH.block && AH.block[o.style];
+            if (bf) bf(ctx, x, y, w, h, BS, o.id, t);
+            else Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
+          } else if (o.kind === 'croc') Art.crocHead(ctx, x, y, w, h, o.dir, t, o.id, glow(o.x));
           else if (o.kind === 'snapper') Art.snapper(ctx, x, y, w, h, t, o.id, glow(o.x));
+          else if (o.kind === 'nun') {
+            const mv = VD.Physics.moveOf(o, px);
+            const ncx = sx(o.x + o.w / 2 + mv.dx, camX), ncy = sy(o.y + o.h / 2 + mv.dy);
+            if (AH && AH.hazard && AH.hazard.nun) AH.hazard.nun(ctx, ncx, ncy, BS, t, o.id, glow(o.x), o.style);
+            else {
+              ctx.fillStyle = '#3a0810';
+              Art.rr(ctx, ncx - w / 2, ncy - h / 2, w, h, 6);
+              ctx.fill();
+            }
+            if (inDark(o.x)) this._eyeSpots.push({ x: ncx, y: ncy - h * 0.28, size: BS * 0.4, seed: o.id, color: '#f4f8ff' });
+          } else if (o.kind === 'jack') {
+            const mv = VD.Physics.moveOf(o, px);
+            const jx = sx(o.x, camX), jy = sy(o.y + o.h);
+            const rise = (o.mv && o.mv.rise) || 1.5;
+            if (AH && AH.hazard && AH.hazard.jack) AH.hazard.jack(ctx, jx, jy, BS, mv.k, rise, t, o.id, glow(o.x));
+            else if (mv.k > 0.02) {
+              ctx.fillStyle = '#efe9dc';
+              ctx.beginPath();
+              ctx.arc(jx + BS / 2, jy + BS * 0.45 - mv.k * rise * BS, BS * 0.35, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else if (o.kind === 'pendulum' && o.mv) {
+            const mv = VD.Physics.moveOf(o, px);
+            const pvx = sx(o.mv.px, camX), pvy = sy(o.mv.py);
+            if (AH && AH.hazard && AH.hazard.pendulum) AH.hazard.pendulum(ctx, pvx, pvy, o.mv.len * BS, mv.a, BS, t, o.id, glow(o.x));
+            else {
+              const bx2 = pvx + Math.sin(mv.a) * o.mv.len * BS, by2 = pvy - Math.cos(mv.a) * o.mv.len * BS;
+              ctx.strokeStyle = '#5a4a3a';
+              ctx.lineWidth = 4;
+              ctx.beginPath();
+              ctx.moveTo(pvx, pvy);
+              ctx.lineTo(bx2, by2);
+              ctx.stroke();
+              ctx.fillStyle = '#8a1018';
+              ctx.beginPath();
+              ctx.arc(bx2, by2, BS * 0.4, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else if (o.kind === 'balloon') {
+            const mv = VD.Physics.moveOf(o, px);
+            const bcx = sx(o.x + o.w / 2 + mv.dx, camX), bcy = sy(o.y + 1.1 + mv.dy);
+            if (AH && AH.hazard && AH.hazard.balloon) AH.hazard.balloon(ctx, bcx, bcy, BS, t, o.id, glow(o.x));
+            else {
+              ctx.fillStyle = '#c0081a';
+              ctx.beginPath();
+              ctx.arc(bcx, bcy, BS * 0.4, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
           break;
         case 'pad':
           Art.pad(ctx, x, y, w, h, o.color, t);
@@ -1620,7 +2370,23 @@
           break;
         case 'portal': {
           const cy = o.mode === 'cube' ? sy(o.y + 1.5) : sy(1.5);
-          Art.portal(ctx, sx(o.x + 0.5, camX), cy, BS * 3, o.mode, t);
+          const cxp = sx(o.x + 0.5, camX);
+          if (o.grav) {
+            // a gravity portal: a purple halo, and the swirl itself flipped upside-down
+            const hg = ctx.createRadialGradient(cxp, cy, 0, cxp, cy, BS * 1.8);
+            hg.addColorStop(0, 'rgba(200,40,255,0.4)');
+            hg.addColorStop(1, 'rgba(200,40,255,0)');
+            ctx.fillStyle = hg;
+            ctx.beginPath();
+            ctx.arc(cxp, cy, BS * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.save();
+            ctx.translate(cxp, cy);
+            ctx.scale(1, -1);
+            ctx.translate(-cxp, -cy);
+            Art.portal(ctx, cxp, cy, BS * 3, o.mode, t);
+            ctx.restore();
+          } else Art.portal(ctx, cxp, cy, BS * 3, o.mode, t);
           break;
         }
       }
@@ -1680,6 +2446,7 @@
     const expr = G.state === 'won' || G.state === 'winning' ? 'happy' : v.oT > 0 ? 'o' : 'grin';
     if (s.mode === 'cube') {
       ctx.rotate(v.rot);
+      if (s.gdir > 0) ctx.scale(1, -1); // a gravity portal flipped him: run on the ceiling
       Art.cube(ctx, BS, expr, G.skin, 1);
     } else if (s.mode === 'ship') {
       ctx.rotate(v.rot);
@@ -1722,8 +2489,16 @@
     for (const o of this.lvl.visible(camX - 2, camX + 30)) {
       if ((o.layer || 0) !== (s.layer || 0)) continue;
       if (o.t === 'haz') {
+        let hx0 = o.hx0, hx1 = o.hx1, hy0 = o.hy0, hy1 = o.hy1;
+        if (o.mv) {
+          const mv = VD.Physics.moveOf(o, s.x);
+          hx0 += mv.dx;
+          hx1 += mv.dx;
+          hy0 += mv.dy;
+          hy1 += mv.dy;
+        }
         ctx.strokeStyle = '#f00';
-        ctx.strokeRect(sx(o.hx0, camX), sy(o.hy1), (o.hx1 - o.hx0) * BS, (o.hy1 - o.hy0) * BS);
+        ctx.strokeRect(sx(hx0, camX), sy(hy1), (hx1 - hx0) * BS, (hy1 - hy0) * BS);
       } else if (o.t === 'solid') {
         ctx.strokeStyle = '#0ff';
         ctx.strokeRect(sx(o.x, camX), sy(o.y + o.h), o.w * BS, o.h * BS);
@@ -1736,7 +2511,7 @@
   };
 
   // ------------------------------------------------------------------ HUD
-  R.drawHUD = function (ctx, G, t) {
+  R.drawHUD = function (ctx, G, t, camX, mirrored) {
     const lvl = this.lvl;
     const prog = G.s ? U.clamp(G.s.x / lvl.finishX, 0, 1) : 0;
     const bw = 440, bx = (W - bw) / 2, by = 18;
@@ -1789,6 +2564,210 @@
       ctx.fillStyle = '#ffffff';
       ctx.fillText(b.sub, W / 2, 160 + slide);
       ctx.globalAlpha = 1;
+    }
+
+    // ---- health bar (nightmare and any future level with a health pool) ----
+    if (G.hpMax > 0) {
+      const ratio = U.clamp(G.hp / G.hpMax, 0, 1);
+      const low = !!G.lowHp;
+      const hurtOn = !!(G.hurt && G.hurt.t < 0.6 && G.hurt.n > 0);
+      let ghostRatio = ratio;
+      if (hurtOn) {
+        const preRatio = U.clamp((G.hp + G.hurt.n) / G.hpMax, 0, 1);
+        const k = 1 - U.smooth(U.clamp(G.hurt.t / 0.6, 0, 1));
+        ghostRatio = ratio + (preRatio - ratio) * k;
+      }
+      const blink = low ? 0.55 + 0.45 * Math.sin(t * 10) : 1;
+      const hx0 = 108, hx1 = 338, hy0 = 14, hy1 = 38, hw = hx1 - hx0, hh = hy1 - hy0;
+      ctx.globalAlpha = blink;
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      Art.rr(ctx, hx0 - 3, hy0 - 3, hw + 6, hh + 6, 8);
+      ctx.fill();
+      if (ghostRatio > 0.004) {
+        ctx.fillStyle = '#ffffff';
+        Art.rr(ctx, hx0, hy0, Math.max(2, hw * ghostRatio), hh, 6);
+        ctx.fill();
+      }
+      if (ratio > 0.004) {
+        ctx.fillStyle = ratio > 0.5 ? U.mixHex('#ffd634', '#3cff78', (ratio - 0.5) * 2) : U.mixHex('#ff2a3a', '#ffd634', ratio * 2);
+        Art.rr(ctx, hx0, hy0, Math.max(2, hw * ratio), hh, 6);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // heart icon, beating when low
+      const beat = low ? 1 + 0.2 * Math.max(0, Math.sin(t * 9)) : 1;
+      ctx.save();
+      ctx.translate(86, (hy0 + hy1) / 2); // right of the mute button (a DOM button at the top left)
+      ctx.scale(beat, beat);
+      heartPath(ctx, 0, 0, 15);
+      ctx.fillStyle = low ? '#ff3a4a' : '#ff5a68';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+      // hp number
+      ctx.font = '20px ' + FONT;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.lineWidth = 4;
+      const hpTxt = String(Math.max(0, Math.ceil(G.hp)));
+      ctx.strokeText(hpTxt, hx1 + 12, (hy0 + hy1) / 2);
+      ctx.fillText(hpTxt, hx1 + 12, (hy0 + hy1) / 2);
+
+      if (low) {
+        if (!this._vignette) {
+          const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.78);
+          vg.addColorStop(0, 'rgba(255,20,30,0)');
+          vg.addColorStop(1, 'rgba(255,20,30,0.55)');
+          this._vignette = vg;
+        }
+        ctx.globalAlpha = 0.25 + 0.25 * (0.5 + 0.5 * Math.sin(t * 6));
+        ctx.fillStyle = this._vignette;
+        ctx.fillRect(0, 0, W, H);
+        ctx.globalAlpha = 1;
+      }
+
+      if (hurtOn) {
+        const hk = 1 - G.hurt.t / 0.6;
+        if (!this._bloodBlobs) this._bloodBlobs = makeBloodBlobs();
+        ctx.fillStyle = 'rgba(170,8,18,' + (0.5 * hk).toFixed(3) + ')';
+        for (const bl of this._bloodBlobs) {
+          ctx.beginPath();
+          ctx.ellipse(bl.x, bl.y, bl.rx, bl.ry, bl.rot, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // the floating "-n": drawn in world space, so it scrolls with the world
+        const wx = mirrored ? W - sx(G.hurt.x, camX) : sx(G.hurt.x, camX);
+        const wy = sy(G.hurt.y) - (1 - hk) * 46;
+        ctx.font = '30px ' + FONT;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(255,50,60,' + hk.toFixed(3) + ')';
+        ctx.strokeStyle = 'rgba(0,0,0,' + (0.6 * hk).toFixed(3) + ')';
+        ctx.lineWidth = 5;
+        const dtx = '-' + G.hurt.n;
+        ctx.strokeText(dtx, wx, wy);
+        ctx.fillText(dtx, wx, wy);
+      }
+    }
+  };
+
+  // ------------------------------------------------------------------ jump scares
+  R.drawScare = function (ctx, G, clock) {
+    const sc = G.scare;
+    if (!sc) return;
+    const AH = Art.horror;
+    const et = sc.t || 0;
+    const cx = W / 2, cy = H * 0.44, size = Math.min(W, H) * 0.6;
+
+    if (sc.kind === 'window') {
+      // NOT full-screen: a small lit gothic window near the top right with a nun silhouette
+      if (et > 0.5) return;
+      const a = (et < 0.08 ? et / 0.08 : 1) * U.clamp(1 - et / 0.5, 0, 1);
+      if (a <= 0.002) return;
+      const wx = W - 150, wy = 110, ww = 90, wh = 130;
+      ctx.save();
+      ctx.globalAlpha = a;
+      const gl = ctx.createRadialGradient(wx, wy, 4, wx, wy, 150);
+      gl.addColorStop(0, 'rgba(255,220,150,0.5)');
+      gl.addColorStop(1, 'rgba(255,220,150,0)');
+      ctx.fillStyle = gl;
+      ctx.fillRect(wx - 150, wy - 150, 300, 300);
+      ctx.fillStyle = '#2a1c22';
+      ctx.beginPath();
+      ctx.moveTo(wx - ww / 2, wy + wh / 2);
+      ctx.lineTo(wx - ww / 2, wy - wh / 2 + ww / 2);
+      ctx.arc(wx, wy - wh / 2 + ww / 2, ww / 2, Math.PI, 0);
+      ctx.lineTo(wx + ww / 2, wy + wh / 2);
+      ctx.closePath();
+      ctx.fill();
+      if (AH && AH.hazard && AH.hazard.nun) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(wx - ww / 2, wy - wh / 2, ww, wh + 2);
+        ctx.clip();
+        AH.hazard.nun(ctx, wx, wy + wh * 0.2, BS * 0.85, clock, 1, '#f4f8ff', null);
+        ctx.restore();
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(wx - ww / 2, wy + wh / 2);
+      ctx.lineTo(wx - ww / 2, wy - wh / 2 + ww / 2);
+      ctx.arc(wx, wy - wh / 2 + ww / 2, ww / 2, Math.PI, 0);
+      ctx.lineTo(wx + ww / 2, wy + wh / 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    let tt = et;
+    if (sc.kind === 'skull') {
+      // the lantern goes fully out first, then face.skull runs on the same timeline shifted by 0.4s
+      if (et < 0.4) {
+        ctx.fillStyle = '#020103';
+        ctx.fillRect(0, 0, W, H);
+        if (AH && AH.eyes) {
+          const pulse = 0.7 + 0.3 * Math.sin(et * 22);
+          ctx.globalAlpha = pulse;
+          AH.eyes(ctx, cx - 40, cy, 30, clock, 2, '#f4f8ff');
+          AH.eyes(ctx, cx + 40, cy + 14, 26, clock, 3, '#f4f8ff');
+          ctx.globalAlpha = 1;
+        }
+        return;
+      }
+      tt = et - 0.4;
+    }
+
+    const env = scareEnvelope(tt);
+    if (env.alpha <= 0.002) return;
+    const backA = Math.min(0.6, env.alpha), faceA = Math.min(0.9, env.alpha);
+    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.75);
+    bg.addColorStop(0, 'rgba(120,4,10,' + backA.toFixed(3) + ')');
+    bg.addColorStop(1, 'rgba(120,4,10,0)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    const face = (fn, x) => {
+      if (!fn) return;
+      ctx.save();
+      ctx.globalAlpha = faceA;
+      ctx.translate(x, cy);
+      ctx.scale(env.scale, env.scale);
+      fn(ctx, 0, 0, size, clock, faceA);
+      ctx.restore();
+    };
+
+    if (sc.kind === 'nun' || sc.kind === 'final') face(AH && AH.face && AH.face.nun, cx);
+    else if (sc.kind === 'clown') face(AH && AH.face && AH.face.clown, cx);
+    else if (sc.kind === 'skull') face(AH && AH.face && AH.face.skull, cx);
+    else if (sc.kind === 'duo') {
+      face(AH && AH.face && AH.face.nun, cx - size * 0.32);
+      face(AH && AH.face && AH.face.clown, cx + size * 0.32);
+    } else if (sc.kind === 'mirror') {
+      face(AH && AH.face && AH.face.clown, cx);
+      // a quick cracked-glass line pattern over it
+      ctx.save();
+      ctx.globalAlpha = faceA;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 2;
+      const cr = U.rng(7);
+      ctx.beginPath();
+      for (let i = 0; i < 7; i++) {
+        let x = cx, y = cy, ang = cr() * Math.PI * 2;
+        ctx.moveTo(x, y);
+        for (let sgm = 0; sgm < 3; sgm++) {
+          ang += (cr() - 0.5) * 1.2;
+          x += Math.cos(ang) * size * 0.14;
+          y += Math.sin(ang) * size * 0.14;
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
     }
   };
 })();

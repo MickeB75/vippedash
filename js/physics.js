@@ -2,6 +2,8 @@
 (function () {
   const VD = (window.VD = window.VD || {});
 
+  const BEAT = 60 / 156; // seconds per beat (156 BPM), used by moveOf's periodic movement types
+
   const P = {
     SPEED: 10.4, // blocks / second (156 BPM -> exactly 4 blocks per beat)
     DT: 1 / 240,
@@ -29,6 +31,45 @@
     return s.mode === 'ship' ? P.SHIP_H : 1;
   }
 
+  // Shared scratch object returned by moveOf — read it right away and never keep a reference,
+  // so the bot's hot loop (millions of steps) allocates nothing.
+  const MV = { dx: 0, dy: 0, a: 0, k: 0 };
+
+  // The player's x-based "level clock" offset/state of a moving hazard, at player position x.
+  // mv.type: 'bob' (sine bob), 'pop' (jack-in-the-box), 'drop' (falling/rising nun), 'swing' (pendulum).
+  function moveOf(o, x) {
+    MV.dx = 0;
+    MV.dy = 0;
+    MV.a = 0;
+    MV.k = 0;
+    const mv = o.mv;
+    if (!mv) return MV;
+    if (mv.type === 'drop') {
+      // x, not the beat clock: how far the player has travelled since the trigger point
+      let p = (x - (o.x - mv.trigger)) / mv.fall;
+      if (p < 0) p = 0;
+      else if (p > 1) p = 1;
+      MV.dy = -mv.dist * p * p;
+      return MV;
+    }
+    const t = x / P.SPEED;
+    const u = t / (mv.beats * BEAT) + (mv.phase || 0);
+    if (mv.type === 'bob') {
+      MV.dy = mv.amp * Math.sin(2 * Math.PI * u);
+    } else if (mv.type === 'pop') {
+      const f = u - Math.floor(u);
+      const k = f < 0.08 ? f / 0.08 : f < 0.5 ? 1 : f < 0.65 ? 1 - (f - 0.5) / 0.15 : 0;
+      MV.k = k;
+      MV.dy = k * mv.rise;
+    } else if (mv.type === 'swing') {
+      const a = mv.amp * Math.sin(2 * Math.PI * u);
+      MV.a = a;
+      MV.dx = mv.len * Math.sin(a);
+      MV.dy = mv.len * (1 - Math.cos(a));
+    }
+    return MV;
+  }
+
   function spawn(cp) {
     return {
       x: cp.x,
@@ -46,6 +87,7 @@
       layer: cp.layer || 0, // 0 = the normal floor; +1 for every hole you've fallen through (level 3)
       dead: false,
       cause: null,
+      dmg: null, // how much damage the last death dealt (null until a hazard/solid kills)
     };
   }
 
@@ -53,7 +95,7 @@
     return {
       x: s.x, y: s.y, vy: s.vy, mode: s.mode, gdir: s.gdir, ceil: s.ceil, grounded: s.grounded,
       held: s.held, pressAge: s.pressAge, lastOrb: s.lastOrb, lastPad: s.lastPad,
-      lastPortal: s.lastPortal, layer: s.layer, dead: s.dead, cause: s.cause,
+      lastPortal: s.lastPortal, layer: s.layer, dead: s.dead, cause: s.cause, dmg: s.dmg,
     };
   }
 
@@ -64,7 +106,7 @@
     s.y += (oldH - newH) / 2;
     if (s.y < 0) s.y = 0;
     s.ceil = portal.ceil;
-    s.gdir = -1;
+    s.gdir = portal.grav || -1;
     s.grounded = false;
     if (portal.mode === 'ship') s.vy *= 0.4;
     else s.vy *= 0.5;
@@ -165,6 +207,7 @@
         } else {
           s.dead = true;
           s.cause = 'solid';
+          s.dmg = o.dmg || 12;
           return s;
         }
       }
@@ -177,9 +220,15 @@
       const o = near[i];
       const t = o.t;
       if (t === 'haz') {
-        if (ix0 < o.hx1 + m && ix1 > o.hx0 - m && iy0 < o.hy1 + m && iy1 > o.hy0 - m) {
+        let hx0 = o.hx0, hx1 = o.hx1, hy0 = o.hy0, hy1 = o.hy1;
+        if (o.mv) {
+          const mo = moveOf(o, s.x);
+          hx0 += mo.dx; hx1 += mo.dx; hy0 += mo.dy; hy1 += mo.dy;
+        }
+        if (ix0 < hx1 + m && ix1 > hx0 - m && iy0 < hy1 + m && iy1 > hy0 - m) {
           s.dead = true;
           s.cause = o.kind;
+          s.dmg = o.dmg || 12;
           return s;
         }
       } else if (t === 'pad') {
@@ -212,5 +261,5 @@
     return s;
   }
 
-  VD.Physics = { spawn, clone, step, boxH };
+  VD.Physics = { spawn, clone, step, boxH, moveOf };
 })();

@@ -66,6 +66,6 @@
       if (G.state === 'dead') pauseOnRespawn = true;
       else G.pause();
       guardBack();
-    } else if (G.state === 'paused' || G.state === 'winning' || G.state === 'won') G.toMenu();
+    } else if (G.state === 'paused' || G.state === 'winning' || G.state === 'won' || G.state === 'gameover') G.toMenu();
   });
 })();

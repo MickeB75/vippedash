@@ -15,6 +15,9 @@
       this.drops = [];
       this.nextId = 1;
       this.finishX = 0;
+      // level 4: screen effects (always present, empty by default) and jump-scare markers
+      this.fx = { dark: [], strobe: [], mirror: [], lightning: [] };
+      this.scares = [];
     }
     add(o) {
       o.id = this.nextId++;
@@ -29,35 +32,35 @@
     // kills on touch instead of letting you slide along it; the hitbox leaves out the jagged edge
     thorny(x, y, w, h, style) {
       const top = y === 0; // things standing on the ground are jagged on top, things hanging down at the bottom
-      return this.add({ t: 'haz', kind: 'thorny', x, y, w, h, style, hx0: x + 0.1, hx1: x + w - 0.1, hy0: top ? y : y + 0.15, hy1: top ? y + h - 0.15 : y + h });
+      return this.add({ t: 'haz', kind: 'thorny', x, y, w, h, style, hx0: x + 0.1, hx1: x + w - 0.1, hy0: top ? y : y + 0.15, hy1: top ? y + h - 0.15 : y + h, dmg: 12 });
     }
     spike(x, y = 0, style) {
-      return this.add({ t: 'haz', kind: 'spike', x, y, w: 1, h: 1, style, hx0: x + 0.35, hx1: x + 0.65, hy0: y + 0.05, hy1: y + 0.6 });
+      return this.add({ t: 'haz', kind: 'spike', x, y, w: 1, h: 1, style, hx0: x + 0.35, hx1: x + 0.65, hy0: y + 0.05, hy1: y + 0.6, dmg: style === 'skeleton' ? 14 : 10 });
     }
     spikes(x, n, y = 0, style) {
       for (let i = 0; i < n; i++) this.spike(x + i, y, style);
     }
     // spike hanging down from `top`
     spikeDown(x, top, style) {
-      return this.add({ t: 'haz', kind: 'spikeDown', x, y: top - 1, w: 1, h: 1, style, hx0: x + 0.35, hx1: x + 0.65, hy0: top - 0.6, hy1: top - 0.05 });
+      return this.add({ t: 'haz', kind: 'spikeDown', x, y: top - 1, w: 1, h: 1, style, hx0: x + 0.35, hx1: x + 0.65, hy0: top - 0.6, hy1: top - 0.05, dmg: style === 'skeleton' ? 14 : 10 });
     }
     spikesDown(x, n, top, style) {
       for (let i = 0; i < n; i++) this.spikeDown(x + i, top, style);
     }
     half(x, y = 0, style) {
-      return this.add({ t: 'haz', kind: 'half', x, y, w: 1, h: 0.5, style, hx0: x + 0.38, hx1: x + 0.62, hy0: y, hy1: y + 0.32 });
+      return this.add({ t: 'haz', kind: 'half', x, y, w: 1, h: 0.5, style, hx0: x + 0.38, hx1: x + 0.62, hy0: y, hy1: y + 0.32, dmg: 10 });
     }
-    water(x, w) {
-      return this.add({ t: 'haz', kind: 'water', x, y: 0, w, h: 0.3, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28 });
+    water(x, w, style) {
+      return this.add({ t: 'haz', kind: 'water', x, y: 0, w, h: 0.3, style, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28, dmg: 10 });
     }
     // a crow (or a pigeon, a gull) hovering at (x, y); its hitbox is smaller than the drawing
     bird(x, y, style) {
-      return this.add({ t: 'haz', kind: 'bird', x, y, w: 1, h: 1, style, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.25, hy1: y + 0.7 });
+      return this.add({ t: 'haz', kind: 'bird', x, y, w: 1, h: 1, style, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.25, hy1: y + 0.7, dmg: 12 });
     }
     // ---- level 3: the subway and the sewers ----
     // a stretch of live third rail: touch it and you're out (like water)
     rail(x, w) {
-      return this.add({ t: 'haz', kind: 'rail', x, y: 0, w, h: 0.3, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28 });
+      return this.add({ t: 'haz', kind: 'rail', x, y: 0, w, h: 0.3, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28, dmg: 10 });
     }
     // a parked metro train: too tall to jump onto from the ground, so use a pad or a step
     train(x, w) {
@@ -86,7 +89,7 @@
       return this.add({ t: 'orb', x: x - 0.1, y: y - 0.1, w: 1.2, h: 1.2, cx: x + 0.5, cy: y + 0.5, color });
     }
     portal(x, mode, opts = {}) {
-      return this.add({ t: 'portal', x, y: opts.y == null ? 0 : opts.y, w: 1, h: 3, mode, ceil: opts.ceil == null ? null : opts.ceil });
+      return this.add({ t: 'portal', x, y: opts.y == null ? 0 : opts.y, w: 1, h: 3, mode, ceil: opts.ceil == null ? null : opts.ceil, grav: opts.grav || null });
     }
     checkpoint(x, mode = 'cube', y = 0, ceil = null) {
       this.checkpoints.push({ x, mode, y, ceil, index: this.checkpoints.length });
@@ -96,6 +99,53 @@
     }
     finish(x) {
       this.finishX = x;
+    }
+    // ---- level 4: the nightmare (bloody nuns, clowns, moving hazards) ----
+    // a nun bobbing up and down in place (mv.type 'bob'); her phase at any x is fixed since x is locked
+    // to the level clock, so where she is when you arrive is a level-design choice, not a player one
+    nun(x, y, { bob = 0.8, beats = 4, phase = 0 } = {}) {
+      return this.add({ t: 'haz', kind: 'nun', x, y, w: 1, h: 1.4, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.1, hy1: y + 1.25, dmg: 14, mv: { type: 'bob', amp: bob, beats, phase } });
+    }
+    // a nun who falls (or, with a negative dist, rises) into place as you approach, starting `trigger`
+    // blocks before her x and taking `fall` blocks of travel to finish
+    nunDrop(x, y, { trigger = 8, dist = 3, fall = 4 } = {}) {
+      return this.add({ t: 'haz', kind: 'nun', x, y, w: 1, h: 1.4, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.1, hy1: y + 1.25, dmg: 14, style: 'drop', mv: { type: 'drop', trigger, dist, fall } });
+    }
+    // a jack-in-the-box: a solid box with a clown head that pops up on a beat (mv.type 'pop'). At rest
+    // the head hides inside the box, so standing on the closed box is safe.
+    jack(x, { beats = 2, phase = 0, rise = 1.5 } = {}) {
+      this.block(x, 0, 1, 1, 'jackbox');
+      return this.add({ t: 'haz', kind: 'jack', x, y: 0, w: 1, h: 1, hx0: x + 0.2, hx1: x + 0.8, hy0: 0.15, hy1: 0.9, dmg: 14, mv: { type: 'pop', beats, phase, rise } });
+    }
+    // an axe pendulum swinging from a pivot at (x+0.5, top) (mv.type 'swing')
+    pendulum(x, top, { len = 4, amp = 0.9, beats = 4, phase = 0 } = {}) {
+      const half = len * Math.sin(amp) + 0.6; // how far sideways the swing reaches, so the column index covers it
+      return this.add({
+        t: 'haz', kind: 'pendulum',
+        x: x + 0.5 - half, w: half * 2, y: top - len - 0.35, h: len + 0.7,
+        hx0: x + 0.05, hx1: x + 0.95, hy0: top - len - 0.35, hy1: top - len + 0.35,
+        dmg: 14, mv: { type: 'swing', px: x + 0.5, py: top, len, amp, beats, phase },
+      });
+    }
+    // a clown balloon bobbing at head height (mv.type 'bob')
+    balloon(x, y, { bob = 0.6, beats = 4, phase = 0 } = {}) {
+      return this.add({ t: 'haz', kind: 'balloon', x, y, w: 1, h: 1.6, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.55, hy1: y + 1.5, dmg: 12, mv: { type: 'bob', amp: bob, beats, phase } });
+    }
+    // ---- level 4: screen effects and jump scares ----
+    dark(x0, x1, { r = 7 } = {}) {
+      this.fx.dark.push({ x0, x1, r });
+    }
+    strobe(x0, x1) {
+      this.fx.strobe.push({ x0, x1 });
+    }
+    mirror(x0, x1) {
+      this.fx.mirror.push({ x0, x1 });
+    }
+    lightning(x0, x1) {
+      this.fx.lightning.push({ x0, x1 });
+    }
+    scare(x, kind) {
+      this.scares.push({ x, kind });
     }
     // ---- scenery ----
     area(id, x0, name, sub) {
@@ -125,6 +175,8 @@
       this.landmarks = b.landmarks;
       this.corridors = b.corridors;
       this.texts = b.texts;
+      this.fx = b.fx || { dark: [], strobe: [], mirror: [], lightning: [] };
+      this.scares = (b.scares || []).slice().sort((a, c) => a.x - c.x);
       this.finishX = b.finishX;
       this.length = b.finishX + 40;
       this.areas = b.areas.sort((a, c) => a.x0 - c.x0);
@@ -194,6 +246,22 @@
       let best = 0;
       for (let i = 0; i < this.checkpoints.length; i++) if (this.checkpoints[i].x <= x) best = i;
       return best;
+    }
+    // level 4: 0..1 strength of a screen effect (fx.dark/strobe/mirror/lightning) at x — 1 inside any
+    // zone, ramping linearly over `fade` blocks at both edges, 0 outside
+    zone(name, x, fade = 4) {
+      const list = this.fx[name];
+      if (!list || !list.length) return 0;
+      let best = 0;
+      for (const z of list) {
+        let v;
+        if (x < z.x0 - fade || x > z.x1 + fade) v = 0;
+        else if (x < z.x0) v = fade > 0 ? (x - (z.x0 - fade)) / fade : 1;
+        else if (x > z.x1) v = fade > 0 ? (z.x1 + fade - x) / fade : 1;
+        else v = 1;
+        if (v > best) best = v;
+      }
+      return best < 0 ? 0 : best > 1 ? 1 : best;
     }
   }
 
@@ -1082,6 +1150,304 @@
   }
 
   // ======================================================================
+  // LEVEL 4 — Mardrömmen (the nightmare). Age-rated 16+: a health bar, bloody nuns, creepy clowns,
+  // jump scares and strobe lights. Graveyard -> convent -> upside-down chapel -> catacombs by ship ->
+  // fairground -> mirror hall -> ghost train by ball -> the bell tower.
+  // ======================================================================
+  function buildNightmare() {
+    const b = new Builder();
+
+    // ============ AREAS ============
+    b.area('graveyard', -60, 'KYRKOGÅRDEN', 'Midnight. The bell is tolling…');
+    b.area('convent', 128, 'KLOSTRET', 'The bloody nuns are awake');
+    b.area('chapel', 320, 'KAPELLET', 'Upside down in the lightning');
+    b.area('catacomb', 448, 'KATAKOMBERNA', 'Only your lantern shines');
+    b.area('circus', 640, 'CIRKUSEN', 'The clowns want to play');
+    b.area('mirrors', 832, 'SPEGELSALEN', 'Which way is forward?');
+    b.area('ghosttrain', 928, 'SPÖKTÅGET', 'Hold on tight!');
+    b.area('tower', 1056, 'KLOCKTORNET', 'Ring the bell and get out!');
+
+    // ============ KYRKOGÅRDEN (0 – 128) ============
+    b.checkpoint(0);
+    b.text(12, 4.6, 'Level 4 · Mardrömmen', 0.55);
+    b.text(12, 3.9, '⚠ Flashing lights: turn them off in the pause menu (Esc)', 0.4);
+    b.lightning(40, 128);
+    b.spike(20, 0, 'fence');
+    b.spike(28, 0, 'fence');
+    b.spikes(36, 2, 0, 'fence');
+    b.spikes(44, 3, 0, 'hand'); // hands clawing out of the graves
+    b.bird(54, 1.35, 'raven');
+    b.bird(56, 1.35, 'raven'); // a pair, at head height — stay low
+    b.spikes(64, 3, 0, 'fence');
+    // a small tomb staircase, with fence spikes between the steps
+    b.block(72, 0, 2, 1, 'tomb');
+    b.spikes(74, 2, 0, 'fence');
+    b.block(76, 0, 2, 2, 'tomb');
+    b.spikes(78, 2, 0, 'fence');
+    b.block(80, 0, 2, 3, 'tomb');
+    b.spikes(88, 2, 0, 'hand');
+    b.spike(96, 0, 'fence');
+    b.spikes(104, 2, 0, 'fence');
+    b.scare(118, 'nun'); // she's waiting at the convent gate — next real obstacle is well past x=124
+
+    // ============ KLOSTRET (128 – 320) ============
+    b.checkpoint(128);
+    b.lightning(200, 320);
+    b.block(132, 0, 3, 1, 'pew');
+    b.thorny(140, 0, 1, 1.5, 'candles');
+    b.water(148, 3, 'blood');
+    b.nun(156, 1.2, { bob: 1.0, beats: 4, phase: 0.5 }); // up when you arrive — run under, and learn to read her
+    b.block(164, 0, 3, 1, 'pew');
+    b.nun(172, 1.2, { bob: 1.0, beats: 4, phase: 0 }); // down — jump!
+    b.thorny(180, 0, 1, 1.5, 'candles');
+    b.water(188, 3, 'blood');
+    b.nunDrop(196, 5, { trigger: 8, dist: 5, fall: 4 }); // drops from the rafters right in front of you
+    b.block(204, 0, 3, 1, 'pew');
+    b.thorny(212, 0, 1, 1.5, 'candles');
+    b.water(220, 3, 'blood');
+
+    b.checkpoint(224);
+    b.nun(228, 1.2, { bob: 1.0, beats: 4, phase: 0 }); // up
+    b.nun(236, 1.2, { bob: 1.0, beats: 4, phase: 0 }); // down
+    b.block(244, 0, 3, 1, 'pew');
+    b.thorny(252, 0, 1, 1.5, 'candles');
+    b.nun(260, 1.2, { bob: 1.0, beats: 4, phase: 0.5 }); // down
+    b.thorny(268, 0, 1, 1.5, 'candles');
+    b.water(272, 3, 'blood');
+    b.block(276, 0, 3, 1, 'pew');
+    b.nun(284, 1.2, { bob: 1.0, beats: 4, phase: 0.5 }); // up
+    b.nun(292, 1.2, { bob: 1.0, beats: 4, phase: 0.5 }); // down
+    b.scare(300, 'window'); // lightning through the stained glass — a small scare
+    b.thorny(308, 0, 1, 1.5, 'candles');
+    b.water(316, 3, 'blood');
+
+    // ============ KAPELLET (320 – 448), cube upside down, ceiling 7 ============
+    b.checkpoint(320); // normal gravity, before the portal
+    b.text(322, 4.6, 'UPSIDE DOWN!', 0.5);
+    b.portal(328, 'cube', { grav: 1, ceil: 7, y: 4 });
+    b.corridor(328, 440, 7, 'vault');
+    b.strobe(332, 440);
+    b.block(336, 6, 4, 1, 'crypt');
+    b.spikesDown(344, 2, 7, 'fence');
+    b.thorny(352, 5.5, 1, 1.5, 'chandelier');
+    b.block(360, 6, 3, 1, 'crypt');
+    b.nunDrop(368, 2, { trigger: 8, dist: -4, fall: 4 }); // rises from below, toward the ceiling
+    b.spikesDown(376, 3, 7, 'fence'); // a tight triple
+    b.thorny(384, 5.5, 1, 1.5, 'chandelier');
+    b.block(388, 6, 3, 1, 'crypt');
+    b.nun(396, 5, { bob: 0.8, beats: 4, phase: 0.125 }); // up here means toward the ceiling — danger
+    b.spikesDown(404, 2, 7, 'fence');
+    b.block(412, 6, 3, 1, 'crypt');
+    b.thorny(420, 5.5, 1, 1.5, 'chandelier');
+    b.portal(436, 'cube', { y: 4 }); // gravity back to normal — you drop to the floor
+    b.spike(443, 0);
+    b.spike(447, 0);
+
+    // ============ KATAKOMBERNA (448 – 640), ship, ceiling 9, dark ============
+    b.checkpoint(448);
+    b.text(450, 5.4, 'HOLD to fly — only your lantern shines', 0.45);
+    b.dark(452, 636, { r: 7 });
+    b.portal(456, 'ship', { ceil: 9 });
+    b.corridor(456, 632, 9, 'bones');
+    b.thorny(460, 0, 2, 3, 'bonespikes');
+    b.thorny(460, 6, 2, 3, 'bonespikes');
+    b.bird(468, 4.5, 'bat');
+    b.spikes(472, 2, 0, 'bone');
+    b.pendulum(476, 9, { len: 4, amp: 0.8, beats: 4, phase: 0 });
+    b.thorny(484, 0, 2, 4, 'bonespikes');
+    b.thorny(484, 7, 2, 2, 'bonespikes');
+    b.bird(492, 4, 'bat');
+    b.pendulum(500, 9, { len: 4.5, amp: 0.7, beats: 4, phase: 0.25 });
+    b.thorny(508, 0, 2, 3, 'bonespikes');
+    b.thorny(508, 6.5, 2, 2.5, 'bonespikes');
+    b.bird(516, 3.5, 'bat');
+    b.scare(520, 'skull'); // the lantern goes out, then a skull — next obstacle is 8+ blocks later
+    b.thorny(528, 0, 2, 3, 'bonespikes');
+    b.thorny(528, 6.5, 2, 2.5, 'bonespikes');
+    b.pendulum(536, 9, { len: 4, amp: 0.85, beats: 4, phase: 0.5 });
+
+    b.checkpoint(544, 'ship', 4, 9);
+    b.thorny(552, 0, 2, 3, 'bonespikes');
+    b.thorny(552, 6.5, 2, 2.5, 'bonespikes');
+    b.bird(560, 4, 'bat');
+    b.pendulum(568, 9, { len: 4, amp: 0.8, beats: 4, phase: 0.75 });
+    b.spikes(576, 2, 0, 'bone');
+    b.thorny(580, 0, 2, 4, 'bonespikes');
+    b.thorny(580, 7, 2, 2, 'bonespikes');
+    b.bird(588, 3.5, 'bat');
+    b.bird(590, 5, 'bat');
+    b.pendulum(596, 9, { len: 5, amp: 0.75, beats: 4, phase: 0 });
+    b.thorny(604, 0, 2, 3, 'bonespikes');
+    b.thorny(604, 6.5, 2, 2.5, 'bonespikes');
+    b.bird(612, 4.5, 'bat');
+    b.thorny(616, 0, 2, 4, 'bonespikes');
+    b.thorny(616, 7, 2, 2, 'bonespikes');
+    b.pendulum(624, 9, { len: 4, amp: 0.7, beats: 4, phase: 0.25 });
+    b.portal(632, 'cube', { y: 4 });
+
+    // ============ CIRKUSEN (640 – 832) ============
+    b.checkpoint(640);
+    b.jack(648, { beats: 2, phase: 0.85, rise: 0.8 }); // closed when you arrive — land on it
+    b.jack(652, { beats: 2, phase: 0.8, rise: 0.8 }); // open — jump clear over the head
+    b.jack(656, { beats: 2, phase: 0.85, rise: 0.8 }); // closed
+    b.balloon(664, 1.4, { bob: 0.6, beats: 4, phase: 0 });
+    b.balloon(667, 1.6, { bob: 0.6, beats: 4, phase: 0.3 });
+    b.block(676, 0, 3, 1, 'crate');
+    b.block(684, 0, 2, 2, 'podium');
+    b.pad(690);
+    b.block(694, 0, 3, 2, 'podium'); // the pad lands you on this podium
+    b.scare(700, 'clown'); // next obstacle is 6+ blocks later
+    b.spikes(708, 3); // a tight triple
+    b.spikes(714, 6);
+    b.orb(716, 2);
+    b.orb(720, 2); // an orb chain over the spike row
+    b.block(728, 0, 3, 1, 'crate');
+
+    b.checkpoint(736);
+    b.jack(740, { beats: 2, phase: 0.8, rise: 0.8 }); // open
+    b.block(748, 0, 2, 1, 'podium');
+    b.block(752, 0, 2, 2, 'podium');
+    b.balloon(760, 1.5, { bob: 0.6, beats: 4, phase: 0.25 });
+    b.spikes(768, 2);
+    b.block(776, 0, 3, 1, 'crate');
+    b.jack(784, { beats: 2, phase: 0.85, rise: 0.8 }); // closed
+    b.spikes(792, 3); // another tight triple
+    b.balloon(800, 1.4, { bob: 0.6, beats: 4, phase: 0.5 });
+    b.balloon(803, 1.6, { bob: 0.6, beats: 4, phase: 0.7 });
+    b.block(808, 0, 2, 1, 'podium');
+    b.block(812, 0, 2, 2, 'podium');
+    b.spikes(820, 2);
+    b.block(828, 0, 3, 1, 'crate');
+
+    // ============ SPEGELSALEN (832 – 928) ============
+    b.checkpoint(832);
+    b.mirror(838, 922); // the flip animation ramps 2.6 blocks outside the zone, so it is done well before the checkpoints at 832 and 928
+    b.block(840, 0, 2, 1, 'mirror');
+    b.spike(846, 0, 'shard');
+    b.block(852, 0, 2, 1, 'mirror');
+    b.block(855, 0, 2, 2, 'mirror');
+    b.spike(862, 0, 'shard');
+    b.spike(866, 0, 'shard');
+    b.nun(872, 1.2, { bob: 1.0, beats: 4, phase: 0.25 }); // down — moderate, the screen is flipped
+    b.scare(880, 'mirror'); // next obstacle is 6+ blocks later
+    b.spikes(888, 2, 0, 'shard');
+    b.block(896, 0, 2, 1, 'mirror');
+    b.spike(906, 0, 'shard');
+    b.block(912, 0, 2, 1, 'mirror');
+    b.block(915, 0, 2, 2, 'mirror');
+    b.spikes(920, 2, 0, 'shard');
+
+    // ============ SPÖKTÅGET (928 – 1056), ball, ceiling 6 ============
+    b.checkpoint(928);
+    b.text(930, 4.3, 'TAP to flip — hold on tight!', 0.45);
+    b.portal(936, 'ball', { ceil: 6 });
+    b.corridor(936, 1040, 6, 'ghosttrain');
+    b.strobe(944, 1036);
+    b.spikes(948, 3, 0, 'skeleton');
+    b.spikesDown(955, 3, 6, 'skeleton');
+    b.spikes(962, 3, 0, 'skeleton');
+    b.spikesDown(969, 3, 6, 'skeleton');
+    b.block(977, 0, 3, 2, 'cart');
+    b.spikesDown(986, 2, 6, 'skeleton');
+    b.spikes(991, 2, 0, 'skeleton');
+    b.spikesDown(996, 2, 6, 'skeleton');
+    b.scare(1000, 'duo'); // next obstacle is 6+ blocks later
+    // faster flips: a spike group every 5 blocks, like the bear cave in level 2
+    b.spikes(1006, 2, 0, 'skeleton');
+    b.spikesDown(1011, 2, 6, 'skeleton');
+    b.spikes(1016, 2, 0, 'skeleton');
+    b.spikesDown(1021, 2, 6, 'skeleton');
+    b.block(1026, 4, 3, 2, 'cart');
+    b.spikesDown(1032, 3, 6, 'skeleton');
+    b.portal(1040, 'cube', { y: 2 });
+    b.spike(1044, 0);
+    b.spikes(1048, 2, 0);
+    b.spike(1052, 0);
+
+    // ============ KLOCKTORNET (1056 – 1120), no checkpoint — the hardest cube stretch ============
+    b.block(1056, 0, 2, 1, 'tomb');
+    b.spikes(1060, 2, 0, 'fence');
+    b.block(1065, 0, 2, 1, 'tomb');
+    b.spikes(1068, 3, 0, 'fence'); // tight triple
+    b.nun(1076, 1.2, { bob: 1.0, beats: 4, phase: 0.5 }); // down
+    b.jack(1084, { beats: 2, phase: 0.8, rise: 0.8 }); // open — jump clear over
+    b.spikes(1090, 5);
+    b.orb(1092, 2); // an orb over the spike row
+    b.spikes(1100, 2, 0, 'fence');
+    b.block(1108, 0, 2, 1, 'tomb');
+    b.spikes(1112, 2, 0, 'fence'); // last tight spot before the finish
+    b.finish(1120);
+    b.scare(1126, 'final');
+
+    // ============ NEAR SCENERY ============
+    b.deco('cross', 5);
+    b.deco('tombstone', 16);
+    b.deco('opengrave', 24);
+    b.deco('gnarltree', 32);
+    b.deco('gaslamp', 48);
+    b.deco('tombstone', 58);
+    b.deco('opengrave', 68);
+    b.deco('cross', 84);
+    b.deco('gnarltree', 100);
+    b.deco('gaslamp', 110);
+    b.deco('convgate', 126);
+    b.deco('stainedglass', 130, { inside: true });
+    b.deco('nunstatue', 146);
+    b.deco('candles', 168, { inside: true });
+    b.deco('stainedglass', 190, { inside: true });
+    b.deco('nunstatue', 210);
+    b.deco('candles', 232, { inside: true });
+    b.deco('stainedglass', 250, { inside: true });
+    b.deco('nunstatue', 270);
+    b.deco('candles', 290, { inside: true });
+    b.deco('stainedglass', 310, { inside: true });
+    b.deco('organ', 324, { inside: true });
+    b.deco('stainedglass', 350, { inside: true });
+    b.deco('stainedglass', 400, { inside: true });
+    b.deco('organ', 430, { inside: true });
+    b.deco('bonepile', 464, { inside: true });
+    b.deco('skullniche', 488, { inside: true });
+    b.deco('bonepile', 512, { inside: true });
+    b.deco('skullniche', 540, { inside: true });
+    b.deco('bonepile', 568, { inside: true });
+    b.deco('skullniche', 592, { inside: true });
+    b.deco('bonepile', 616, { inside: true });
+    b.deco('tent', 644);
+    b.deco('ticketbooth', 660);
+    b.deco('popcorn', 680);
+    b.deco('clownboard', 700);
+    b.deco('tent', 720);
+    b.deco('popcorn', 748);
+    b.deco('ticketbooth', 768);
+    b.deco('clownboard', 790);
+    b.deco('tent', 806);
+    b.deco('popcorn', 824);
+    b.deco('mirrorframe', 838);
+    b.deco('mirrorframe', 860);
+    b.deco('mirrorframe', 884);
+    b.deco('mirrorframe', 908);
+    b.deco('terror', 924); // the ghost train's entrance, seen from outside
+    b.deco('hangskeleton', 940, { inside: true });
+    b.deco('monsterpaint', 960, { inside: true });
+    b.deco('hangskeleton', 985, { inside: true });
+    b.deco('monsterpaint', 1010, { inside: true });
+    b.deco('hangskeleton', 1030, { inside: true });
+    b.deco('bellrope', 1062);
+    b.deco('cross', 1090);
+    b.deco('finish', 1120);
+
+    // ============ MID-LAYER LANDMARKS (outdoor areas only) ============
+    b.landmark('ruinchurch', 46);
+    b.landmark('convent', 100);
+    b.landmark('bigtop', 680);
+    b.landmark('ferris', 740);
+    b.landmark('carousel', 800);
+    b.landmark('belltower', 1110);
+
+    return b;
+  }
+
+  // ======================================================================
   // THEMES — everything the renderer and the music need to know per level
   // ======================================================================
   const HOME_THEME = {
@@ -1150,6 +1516,31 @@
     indoor: { station: 'metro', tracks: 'metro', tunnel: 'metro', sewer: 'sewer', pipe: 'sewer', outlet: 'sewer' },
     song: 'metro',
   };
+  const NIGHTMARE_THEME = {
+    // a moonless midnight the whole way through — always mostly dark, with a blood-red glow low on the horizon
+    sky: [
+      { x: -100, top: '#0b0512', bot: '#3a0e18', far: '#1a0f1e', dark: 0.62, sun: 1.2 },
+      { x: 250, top: '#0a0410', bot: '#340c16', far: '#180d1c', dark: 0.65, sun: 1.2 },
+      { x: 500, top: '#0d0616', bot: '#3e0f1a', far: '#1c1020', dark: 0.66, sun: 1.2 },
+      { x: 750, top: '#100718', bot: '#4a1220', far: '#201224', dark: 0.64, sun: 1.2 },
+      { x: 1000, top: '#0a0410', bot: '#360d18', far: '#180d1e', dark: 0.68, sun: 1.2 },
+      { x: 1200, top: '#070310', bot: '#2c0a14', far: '#140c1a', dark: 0.7, sun: 1.2 },
+    ],
+    moon: '#b3121e', // a blood moon
+    field: { graveyard: 'graves', circus: 'fairground', tower: 'graves', default: 'graves' },
+    ground: { graveyard: 'grave', convent: 'flagstone', chapel: 'flagstone', catacomb: 'bones', circus: 'sawdust',
+              mirrors: 'mirrorfloor', ghosttrain: 'ghostrail', tower: 'grave' },
+    glow: { graveyard: '#b8c4ff', convent: '#ffcf8a', chapel: '#e8f0ff', catacomb: '#ffb347', circus: '#ff5fd2',
+            mirrors: '#9ff3ff', ghosttrain: '#7dff9a', tower: '#b8c4ff' },
+    far: { default: 'sparse' },
+    farExtra: [],
+    midFill: { default: null },
+    midStep: [4, 6],
+    indoor: { convent: 'convent', chapel: 'chapel', catacomb: 'catacomb', mirrors: 'mirrors', ghosttrain: 'ghosttrain' },
+    mist: ['graveyard', 'tower'],
+    tilt: ['convent', 'circus'], // a slight camera tilt on the heavy downbeats
+    song: 'nightmare',
+  };
 
   // ======================================================================
   // LEVEL LIST — difficulty sets the coin reward (see game.js)
@@ -1172,6 +1563,13 @@
       difficulty: 3, diffName: 'Hard', reward: 150,
       winTitle: 'Ur kloaken!', winSub: 'Over the trains, through the tunnel, down the hole, past the crocodiles and out into the sunshine.',
       build: buildMetro, theme: METRO_THEME,
+    },
+    {
+      id: 'nightmare', num: 4, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
+      difficulty: 5, diffName: 'Nightmare', reward: 250, health: 100, age: 16, strobe: true,
+      winTitle: 'Du överlevde natten!',
+      winSub: 'Past the graves, the bloody nuns, the catacombs and the clowns, and out before the bell struck one.',
+      build: buildNightmare, theme: NIGHTMARE_THEME,
     },
   ];
 

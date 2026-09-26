@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VippeDash horror gallery</title>
+<style>
+  @font-face {
+    font-family: 'Lilita One';
+    src: url('../fonts/LilitaOne-Regular.ttf') format('truetype');
+    font-display: swap;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0a0610; color: #e8e2d6; font: 14px/1.4 system-ui, sans-serif; }
+  body { padding: 22px; }
+  h1 { font-family: 'Lilita One', 'Arial Black', Impact, sans-serif; font-size: 28px; margin: 0 0 8px; color: #ff5566; }
+  h2.section {
+    font-family: 'Lilita One', 'Arial Black', Impact, sans-serif;
+    font-size: 20px;
+    margin: 30px 0 10px;
+    color: #ffb347;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+    padding-bottom: 4px;
+  }
+  .info { max-width: 980px; color: #b8a8c0; margin: 0 0 18px; }
+  .info code { color: #e8dcff; background: rgba(255, 255, 255, 0.08); padding: 1px 5px; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 6px; }
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .tile canvas { display: block; border-radius: 6px; border: 1px solid rgba(255,255,255,0.12); }
+  .tile .label { font-size: 11px; color: #c8bcd8; font-family: Consolas, monospace; text-align: center; max-width: 160px; }
+  #errors {
+    display: none;
+    background: #3a0008; color: #ffd0d4; border: 2px solid #ff3050; border-radius: 6px;
+    padding: 10px 14px; margin: 0 0 16px; font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap;
+  }
+  .font-warn { color: #ff8a80; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<h1>VippeDash horror gallery — level 4 "Mardrömmen"</h1>
+<p class="info">
+  Every function in <code>Art.horror</code> (../js/horror.js), plus the new <code>Art.near</code> and
+  <code>Art.mid</code> scenery types it adds. Query params: <code>t=&lt;seconds&gt;</code> freeze time for a
+  deterministic screenshot (default: live animation) &middot; <code>shotsize</code> not needed, this page sets
+  <code>data-shot-size</code> itself once drawn.
+</p>
+<div id="errors"></div>
+<div id="app"></div>
+
+<script>
+  window.HORROR_ERRORS = [];
+  window.onerror = function (msg, src, line, col, err) {
+    var text = 'ERROR: ' + msg + ' (' + src + ':' + line + ':' + col + ')' + (err && err.stack ? '\n' + err.stack : '');
+    window.HORROR_ERRORS.push(text);
+    var box = document.getElementById('errors');
+    if (box) {
+      box.style.display = 'block';
+      box.textContent = window.HORROR_ERRORS.join('\n\n');
+    }
+    return false;
+  };
+</script>
+<script src="../js/util.js"></script>
+<script src="../js/art.js"></script>
+<script src="../js/horror.js"></script>
+<script>
+  (function () {
+    try { run(); } catch (e) {
+      window.onerror(e.message, 'horror.html', 0, 0, e);
+      document.body.dataset.shotSize = '1280x400';
+      window.HORROR_DONE = true;
+      throw e;
+    }
+
+    function run() {
+      var Art = window.VD.Art, U = window.VD.U, H = Art.horror;
+      var qs = new URLSearchParams(location.search);
+      var tRaw = qs.get('t');
+      var frozen = tRaw !== null && tRaw !== '' && !isNaN(parseFloat(tRaw));
+      var BS = 48;
+      var FONT = '"Lilita One", "Arial Black", Impact, sans-serif';
+      var BG = '#120a1a';
+      var GLOWS = ['#b8c4ff', '#ffb347', '#7dff9a', '#9ff3ff'];
+
+      Art.setDark(0); // no evening tint in the gallery — horror.js's own colours carry the mood
+
+      var currentT = frozen ? parseFloat(tRaw) : performance.now() / 1000;
+      var tiles = []; // { canvas, ctx, w, h, draw(ctx, t) }
+
+      function addTile(w, h, label, draw) {
+        var c = document.createElement('canvas');
+        c.className = 'tile';
+        c.width = w;
+        c.height = h;
+        var entry = { canvas: c, ctx: c.getContext('2d'), w: w, h: h, draw: draw, label: label };
+        tiles.push(entry);
+        paint(entry);
+        return entry;
+      }
+      function paint(entry) {
+        var ctx = entry.ctx;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, entry.w, entry.h);
+        ctx.fillStyle = BG;
+        ctx.fillRect(0, 0, entry.w, entry.h);
+        entry.draw(ctx, currentT);
+      }
+      function wrapTile(entry) {
+        var wrap = document.createElement('div');
+        wrap.className = 'tile';
+        wrap.appendChild(entry.canvas);
+        if (entry.label) {
+          var lab = document.createElement('div');
+          lab.className = 'label';
+          lab.textContent = entry.label;
+          wrap.appendChild(lab);
+        }
+        return wrap;
+      }
+      function section(title) {
+        var h2 = document.createElement('h2');
+        h2.className = 'section';
+        h2.textContent = title;
+        document.getElementById('app').appendChild(h2);
+      }
+      function row(entries) {
+        var r = document.createElement('div');
+        r.className = 'row';
+        entries.forEach(function (e) { r.appendChild(wrapTile(e)); });
+        document.getElementById('app').appendChild(r);
+      }
+      // scenery tiles get a ground line at `base` (they are decoration behind gameplay)
+      function groundLine(ctx, w, base) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, base);
+        ctx.lineTo(w, base);
+        ctx.stroke();
+      }
+
+      // ------------------------------------------------------------ hazards
+      section('Hazards — Art.horror.hazard');
+      row([
+        addTile(140, 170, 'nun t=0', function (ctx, t) { H.hazard.nun(ctx, 70, 100, BS, 0, 1, '#ffcf8a', null); }),
+        addTile(140, 170, 'nun t=0.3', function (ctx, t) { H.hazard.nun(ctx, 70, 100, BS, 0.3, 1, '#ffcf8a', null); }),
+        addTile(140, 170, 'nun t=0.6', function (ctx, t) { H.hazard.nun(ctx, 70, 100, BS, 0.6, 1, '#ffcf8a', null); }),
+        addTile(140, 170, 'nun (live)', function (ctx, t) { H.hazard.nun(ctx, 70, 100, BS, t, 1, '#ffcf8a', null); }),
+      ]);
+      row([0, 0.2, 0.5, 0.8, 1.0].map(function (k) {
+        return addTile(120, 150, 'jack k=' + k, function (ctx, t) {
+          H.block.jackbox(ctx, 30, 90, BS, BS, BS, 3, t);
+          H.hazard.jack(ctx, 30, 90, BS, k, 1.5, t, 3, '#ffcf8a');
+        });
+      }));
+      row([-0.8, -0.4, 0, 0.4, 0.8].map(function (a) {
+        return addTile(150, 170, 'pendulum a=' + a, function (ctx, t) {
+          H.hazard.pendulum(ctx, 75, 20, BS * 1.8, a, BS, t, 2, '#ffb347');
+        });
+      }));
+      row([0, 1, 2].map(function (seed) {
+        return addTile(120, 150, 'balloon seed=' + seed, function (ctx, t) {
+          H.hazard.balloon(ctx, 60, 75, BS, t, seed, '#ff5fd2');
+        });
+      }));
+
+      // ------------------------------------------------------------ spikes
+      section('Spikes — Art.horror.spike (same box as Art.spike)');
+      ['fence', 'hand', 'bone', 'skeleton', 'shard'].forEach(function (style) {
+        row([false, true].map(function (down) {
+          return addTile(100, 130, style + ' down=' + down, function (ctx, t) {
+            var glow = GLOWS[0];
+            var y = down ? 10 : 30, h = 90;
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.beginPath(); ctx.moveTo(0, down ? y : y + h); ctx.lineTo(100, down ? y : y + h); ctx.stroke();
+            H.spike[style](ctx, 20, y, 60, h, down, glow, t, 5);
+          });
+        }));
+      });
+
+      // ------------------------------------------------------------ birds
+      section('Birds — Art.horror.bird (live animation)');
+      row([
+        addTile(140, 110, 'raven', function (ctx, t) { H.bird.raven(ctx, 70, 55, BS, t, 1, '#ff3020'); }),
+        addTile(140, 110, 'bat', function (ctx, t) { H.bird.bat(ctx, 70, 55, BS, t, 1, '#ff3020'); }),
+      ]);
+
+      // ------------------------------------------------------------ water
+      section('Water — Art.horror.water.blood');
+      row([addTile(400, 120, 'blood pool', function (ctx, t) { H.water.blood(ctx, 0, 400, 40, 120, t); })]);
+
+      // ------------------------------------------------------------ blocks
+      section('Blocks — Art.horror.block (same call as Art.block)');
+      var blockStyles = ['tomb', 'crypt', 'pew', 'coffin', 'altar', 'bonewall', 'skulls', 'crate', 'podium', 'mirror', 'cart', 'jackbox', 'candles', 'chandelier'];
+      row(blockStyles.map(function (style) {
+        return addTile(BS * 2 + 20, BS * 2 + 20, style, function (ctx, t) {
+          H.block[style](ctx, 10, 10, BS * 2, BS * 2, BS, 4, t);
+        });
+      }));
+      row([
+        addTile(BS * 2 + 20, BS * 4 + 20, 'bonespikes (tall 1x4)', function (ctx, t) { H.block.bonespikes(ctx, 10 + BS * 0.5, 10, BS, BS * 4, BS, 6, t); }),
+        addTile(BS * 4 + 20, BS * 2 + 20, 'bonespikes (wide 4x1)', function (ctx, t) { H.block.bonespikes(ctx, 10, 10 + BS * 0.5, BS * 4, BS, BS, 7, t); }),
+      ]);
+
+      // ------------------------------------------------------------ faces (jump scares)
+      section('Jump-scare faces — Art.horror.face (huge: ~70-90% of the 720px screen height)');
+      ['nun', 'clown', 'skull'].forEach(function (kind) {
+        row([0, 1].map(function (k) {
+          return addTile(640, 720, kind + ' k=' + k, function (ctx, t) {
+            H.face[kind](ctx, 320, 360, 560, t, k);
+          });
+        }));
+      });
+
+      // ------------------------------------------------------------ eyes
+      section('Eyes — Art.horror.eyes (blinks now and then)');
+      row([0, 1, 2, 3].map(function (seed) {
+        return addTile(140, 90, 'eyes seed=' + seed, function (ctx, t) {
+          H.eyes(ctx, 70, 45, BS * 0.8, t, seed, GLOWS[seed % GLOWS.length]);
+        });
+      }));
+
+      // ------------------------------------------------------------ near scenery
+      section('Near scenery — Art.near new types (outdoor)');
+      var nearOutdoor = ['cross', 'tombstone', 'opengrave', 'gnarltree', 'convgate', 'gaslamp', 'tent', 'ticketbooth', 'popcorn', 'clownboard', 'terror', 'bellrope'];
+      row(nearOutdoor.map(function (type, i) {
+        var w = type === 'terror' ? 340 : 180, h = 260;
+        var base = h - 30;
+        return addTile(w, h, type, function (ctx, t) {
+          groundLine(ctx, w, base);
+          Art.near[type](ctx, w / 2, base, { seed: i, text: 'STORVRETA' }, t, BS, FONT);
+        });
+      }));
+      section('Near scenery — Art.near new types (indoor)');
+      var nearIndoor = ['stainedglass', 'nunstatue', 'candles', 'organ', 'bonepile', 'skullniche', 'mirrorframe', 'hangskeleton', 'monsterpaint'];
+      row(nearIndoor.map(function (type, i) {
+        var w = 220, h = 280;
+        var base = h - 30;
+        return addTile(w, h, type, function (ctx, t) {
+          groundLine(ctx, w, base);
+          Art.near[type](ctx, w / 2, base, { seed: i }, t, BS, FONT);
+        });
+      }));
+
+      // ------------------------------------------------------------ mid scenery (landmarks)
+      section('Mid scenery — Art.mid new landmarks (halfHw from Art.horror.midHalf)');
+      var midTypes = ['ruinchurch', 'convent', 'belltower', 'bigtop', 'ferris', 'carousel'];
+      row(midTypes.map(function (type, i) {
+        var hw = H.midHalf[type] || 6;
+        var w = hw * 2 * BS + 40, h = 480;
+        var base = h - 20;
+        return addTile(w, h, type + ' (midHalf=' + hw + ')', function (ctx, t) {
+          groundLine(ctx, w, base);
+          Art.mid[type](ctx, w / 2, base, { seed: i }, t, FONT);
+        });
+      }));
+
+      // The afModo skin's cap badge etc. use the Lilita One font; wait for it so a frozen `t` bakes
+      // consistent pixels (see the identical comment/rationale in tools/skins.html).
+      function whenFontReady(run) {
+        var FONT_PROBE = '20px "Lilita One"';
+        var settled = false;
+        function finish() {
+          if (settled) return;
+          settled = true;
+          var loaded = !!(document.fonts && document.fonts.check && document.fonts.check(FONT_PROBE));
+          if (!loaded) {
+            var warn = document.createElement('p');
+            warn.className = 'font-warn';
+            warn.textContent = 'Warning: "Lilita One" was not ready in time, so the terror sign uses the fallback font.';
+            document.body.insertBefore(warn, document.getElementById('app'));
+          }
+          run();
+        }
+        if (!(document.fonts && document.fonts.load && document.fonts.ready)) { finish(); return; }
+        Promise.all([document.fonts.load(FONT_PROBE), document.fonts.ready]).then(finish, finish);
+        setTimeout(finish, 1500);
+      }
+
+      whenFontReady(function () {
+        tiles.forEach(paint);
+        document.body.dataset.shotSize = document.documentElement.scrollWidth + 'x' + document.documentElement.scrollHeight;
+        window.HORROR_DONE = true;
+        if (!frozen) {
+          (function loop() {
+            currentT = performance.now() / 1000;
+            tiles.forEach(paint);
+            requestAnimationFrame(loop);
+          })();
+        }
+      });
+    }
+  })();
+</script>
+</body>
+</html>

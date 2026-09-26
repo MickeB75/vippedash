@@ -59,6 +59,8 @@
       hazardFill: 'rgba(255,90,90,0.55)',
       hazardStroke: '#ff5a5a',
       hitbox: '#ff33aa',
+      movingSweep: 'rgba(255,60,60,0.05)', // faint: the full swept range of a moving hazard (o.mv)
+      movingNow: 'rgba(255,60,60,0.8)', // solid: its hitbox at the x the bot's path was passing it
       water: 'rgba(70,150,230,0.6)',
       waterStroke: '#3f8ddb',
       rail: 'rgba(255,190,40,0.7)',
@@ -258,6 +260,10 @@
       } else {
         legendItems.push({ shape: 'dot', color: COL.pressNeutral, label: 'press starts' });
       }
+    }
+    if (lvl.objs.some((o) => o.mv)) {
+      legendItems.push({ shape: 'strip', color: COL.movingSweep, label: 'moving hazard: swept range' });
+      legendItems.push({ shape: 'rect', color: COL.movingNow, stroke: COL.hazardStroke, label: 'moving hazard @ bot pass' });
     }
 
     const contentW = cols * scale;
@@ -465,6 +471,60 @@
       }
     }
 
+    // ---- level 4: moving hazards (o.mv) ----
+    // the bot point whose x is closest to targetX, across every drawn segment (or null if none is close)
+    function closestBotPoint(targetX, maxDist) {
+      let best = null, bestD = Infinity;
+      for (const seg of botSegs) {
+        for (const p of seg.points) {
+          const d = Math.abs(p.x - targetX);
+          if (d < bestD) { bestD = d; best = p; }
+        }
+      }
+      return best && bestD <= maxDist ? best : null;
+    }
+    // x values to sample moveOf() at, to trace out a moving hazard's whole swept range: one full period
+    // for the periodic types (bob/pop/swing), or the fall/rise window for a 'drop'
+    function sweepSamples(o) {
+      const mv = o.mv, xs = [];
+      if (mv.type === 'drop') {
+        const xa = o.x - mv.trigger, xb = xa + mv.fall;
+        for (let i = 0; i <= 24; i++) xs.push(xa + (xb - xa) * (i / 24));
+      } else {
+        const period = 4 * mv.beats, cx = (o.hx0 + o.hx1) / 2;
+        for (let i = 0; i <= 24; i++) xs.push(cx - period / 2 + period * (i / 24));
+      }
+      return xs;
+    }
+    function drawMovingOverlay(o, x0, x1, r) {
+      // faint: the full swept range, sampled across its cycle
+      ctx.save();
+      ctx.fillStyle = COL.movingSweep;
+      for (const xs of sweepSamples(o)) {
+        const mo = Ph.moveOf(o, xs);
+        const hx0 = o.hx0 + mo.dx, hx1 = o.hx1 + mo.dx, hy0 = o.hy0 + mo.dy, hy1 = o.hy1 + mo.dy;
+        const px0 = xPix(hx0, x0), px1 = xPix(hx1, x0), py0 = yPix(hy1, r), py1 = yPix(hy0, r);
+        ctx.fillRect(px0, py0, px1 - px0, py1 - py0);
+      }
+      ctx.restore();
+      // solid: its hitbox at the exact x the bot's path was passing when it could have touched this hazard
+      if (showBot) {
+        const bp = closestBotPoint((o.hx0 + o.hx1) / 2, 3);
+        if (bp) {
+          const mo = Ph.moveOf(o, bp.x);
+          const hx0 = o.hx0 + mo.dx, hx1 = o.hx1 + mo.dx, hy0 = o.hy0 + mo.dy, hy1 = o.hy1 + mo.dy;
+          const px0 = xPix(hx0, x0), px1 = xPix(hx1, x0), py0 = yPix(hy1, r), py1 = yPix(hy0, r);
+          ctx.save();
+          ctx.fillStyle = COL.movingNow;
+          ctx.strokeStyle = COL.hazardStroke;
+          ctx.lineWidth = 1.5;
+          ctx.fillRect(px0, py0, px1 - px0, py1 - py0);
+          ctx.strokeRect(px0, py0, px1 - px0, py1 - py0);
+          ctx.restore();
+        }
+      }
+    }
+
     function drawRow(r) {
       const x0 = rowX0(r), x1 = rowX1(r);
       const top = rowTopY(r), track = trackTopY(r);
@@ -562,6 +622,7 @@
         const w = o.w || 1;
         if (o.x + w <= x0 || o.x >= x1) continue;
         drawObj(o, x0, x1, r);
+        if (o.mv) drawMovingOverlay(o, x0, x1, r);
       }
 
       // ---- checkpoints ----
