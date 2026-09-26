@@ -594,6 +594,123 @@
     ctx.strokeStyle = line;
     ctx.stroke();
   }
+  // weathered granite standing stone with a faint carved rune-serpent (runestone block + scenery)
+  // rough: 0 = keeps close to its box (solid block you land on), 1 = free-form tapered scenery stone
+  function runestone(ctx, x, y, w, h, seed, C, lw, rough) {
+    const rnd = U.rng(seed * 4099 + 7);
+    const b = y + h, tp = rough * 0.12;
+    // lumpy outline in box units: flat base, bulging sides, lopsided crown sloping to one side
+    let P = [
+      [0.05, 1],
+      [0.01 + rnd() * 0.04, 0.62],
+      [0.04 + rnd() * 0.06 + tp * 0.6, 0.24],
+      [0.2 + tp, 0.03 + rnd() * 0.03],
+      [0.46 + rnd() * 0.12, rnd() * 0.015],
+      [0.84 - tp, 0.05 + rough * 0.12 + rnd() * 0.05],
+      [0.95 - tp * 0.7, 0.36 + rough * 0.08],
+      [0.96 + rnd() * 0.04, 0.74],
+      [0.95, 1],
+    ];
+    if (rnd() < 0.5) P = P.reverse().map(([u, v]) => [1 - u, v]);
+    P = P.map(([u, v]) => [x + u * w, y + v * h]);
+    const curve = (pts, close) => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const [px, py] = pts[i], [nx, ny] = pts[i + 1];
+        const end = i === pts.length - 2;
+        ctx.quadraticCurveTo(px, py, end ? nx : (px + nx) / 2, end ? ny : (py + ny) / 2);
+      }
+      if (close) ctx.closePath();
+    };
+    curve(P, true);
+    const g = ctx.createLinearGradient(x, 0, x + w, 0);
+    g.addColorStop(0, C('#b3b0a6'));
+    g.addColorStop(0.55, C('#8f8c83'));
+    g.addColorStop(1, C('#66635c'));
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    // sunlit crown + shaded base
+    ctx.fillStyle = 'rgba(255,255,255,0.14)';
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.32, y + h * 0.12, w * 0.3, h * 0.1, -0.3, 0, TAU);
+    ctx.fill();
+    const sh = ctx.createLinearGradient(0, b - h * 0.25, 0, b);
+    sh.addColorStop(0, 'rgba(20,18,14,0)');
+    sh.addColorStop(1, 'rgba(20,18,14,0.3)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(x, b - h * 0.25, w, h * 0.25);
+    // granite grain
+    for (let i = 0; i < (w * h) / 70; i++) {
+      ctx.fillStyle = i % 3 ? C('#5d5a53') : C('#d6d3c8');
+      ctx.fillRect(x + rnd() * w, y + rnd() * h, 2, 2);
+    }
+    // lichen crusts (yellow-green and orange)
+    for (let i = 0; i < 4; i++) {
+      const lx = x + w * (0.15 + rnd() * 0.7), ly = y + h * (0.15 + rnd() * 0.7);
+      ctx.fillStyle = U.rgba(i % 2 ? '#d7913e' : '#c7c878', 0.75 - Art.dark() * 0.4);
+      for (let k = 0; k < 3; k++) {
+        circle(ctx, lx + (rnd() - 0.5) * 7, ly + (rnd() - 0.5) * 7, 1.5 + rnd() * 2.5);
+        ctx.fill();
+      }
+    }
+    // moss cushion on the crown
+    const [mx0, my0] = P.reduce((a, p) => (p[1] < a[1] ? p : a));
+    ctx.fillStyle = C('#5e8f34');
+    for (let i = 0; i < 6; i++) {
+      circle(ctx, mx0 + (i - 2.5) * w * 0.1, my0 + 1 + Math.abs(i - 2.5) * 3, 4 + rnd() * 3);
+      ctx.fill();
+    }
+    ctx.fillStyle = C('#80b447');
+    for (let i = 0; i < 4; i++) {
+      circle(ctx, mx0 + (i - 1.5) * w * 0.11, my0 + Math.abs(i - 1.5) * 3, 2 + rnd() * 1.5);
+      ctx.fill();
+    }
+    // carved serpent band following the edge, with rune strokes across it
+    const cx = x + w / 2, cy = y + h * 0.55;
+    const S = P.map(([px, py]) => [cx + (px - cx) * 0.66, cy + (py - cy) * 0.84]);
+    const bw = Math.max(4, w * 0.13);
+    curve(S, false);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(38,30,24,0.45)';
+    ctx.lineWidth = bw;
+    ctx.stroke();
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = C('#9a4b37');
+    ctx.lineWidth = bw * 0.45;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(38,30,24,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 1; i < S.length - 2; i++) {
+      const [ax, ay] = S[i], [nx, ny] = S[i + 1];
+      const mx = (ax + nx) / 2, my = (ay + ny) / 2, len = Math.hypot(nx - ax, ny - ay) || 1;
+      const px = ((ay - ny) / len) * bw * 0.45, py = ((nx - ax) / len) * bw * 0.45;
+      ctx.moveTo(mx - px, my - py);
+      ctx.lineTo(mx + px, my + py);
+    }
+    ctx.stroke();
+    ctx.restore();
+    curve(P, true);
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = C('#34322d');
+    ctx.stroke();
+    // grass tufts hugging the foot
+    ctx.strokeStyle = C('#4f8a2e');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (const [gx, dir] of [[x + w * 0.04, -1], [x + w * 0.14, 1], [x + w * 0.88, 1], [x + w * 0.97, -1]]) {
+      ctx.moveTo(gx, b);
+      ctx.lineTo(gx + dir * 3, b - 9 - rnd() * 5);
+      ctx.moveTo(gx + 3, b);
+      ctx.lineTo(gx + 3 + dir * 5, b - 6 - rnd() * 4);
+    }
+    ctx.stroke();
+  }
   Art.block = function (ctx, st, x, y, w, h, bs, seed, t) {
     const rnd = U.rng(seed * 7919 + 13);
     switch (st) {
@@ -630,37 +747,9 @@
         }
         break;
       }
-      case 'rune': {
-        rr(ctx, x + 2, y + 2, w - 4, h, w * 0.45);
-        const g = ctx.createLinearGradient(x, 0, x + w, 0);
-        g.addColorStop(0, TL('#9b9a93'));
-        g.addColorStop(1, TL('#6c6b66'));
-        ctx.fillStyle = g;
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = TL('#2f2f2c');
-        ctx.stroke();
-        // red rune serpent band
-        ctx.strokeStyle = TL('#b3261e');
-        ctx.lineWidth = 7;
-        rr(ctx, x + 9, y + 10, w - 18, h - 14, w * 0.35);
-        ctx.stroke();
-        ctx.strokeStyle = TL('#3a2020');
-        ctx.lineWidth = 1.5;
-        for (let yy = y + 20; yy < y + h - 14; yy += 12) {
-          ctx.beginPath();
-          ctx.moveTo(x + 6, yy);
-          ctx.lineTo(x + 12, yy + 4);
-          ctx.moveTo(x + w - 6, yy + 3);
-          ctx.lineTo(x + w - 12, yy - 2);
-          ctx.stroke();
-        }
-        ctx.fillStyle = TL('#3a2020');
-        ctx.font = '14px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('ᚢᛒᛚ', x + w / 2, y + h * 0.55);
+      case 'rune':
+        runestone(ctx, x, y, w, h, seed, TL, 3, 0.25);
         break;
-      }
       case 'moose':
         Art.moose(ctx, x, y, w, h, TL);
         break;
@@ -1075,18 +1164,12 @@
     for (let i = 10; i >= 0; i--) ctx.lineTo(x + i * 9, base - 178 - i * 0.2 + Math.sin(t * 4 - i * 0.6) * 4);
     ctx.fill();
   };
-  near.runestone = function (ctx, x, base) {
-    rr(ctx, x - 22, base - 96, 44, 100, 20);
-    ctx.fillStyle = T('#8d8b84');
-    ctx.fill();
-    ctx.strokeStyle = T('#b3261e');
-    ctx.lineWidth = 5;
-    rr(ctx, x - 14, base - 86, 28, 80, 14);
-    ctx.stroke();
-    ctx.strokeStyle = T('#3a3a36');
-    ctx.lineWidth = 2;
-    rr(ctx, x - 22, base - 96, 44, 100, 20);
-    ctx.stroke();
+  near.runestone = function (ctx, x, base, d) {
+    ctx.save();
+    ctx.translate(x, base);
+    ctx.rotate((((d.x * 37) % 11) - 5) * 0.012); // each stone leans a little
+    runestone(ctx, -28, -100, 56, 102, d.x, T, 2.5, 1);
+    ctx.restore();
   };
   near.bales = function (ctx, x, base) {
     for (let i = 0; i < 3; i++) {
