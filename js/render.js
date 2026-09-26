@@ -7,17 +7,8 @@
   const FONT = '"Lilita One", "Arial Black", Impact, sans-serif';
   const R = (VD.Render = { W, H, BS, GY, PX, FONT });
 
-  // time of day follows the journey: noon in Uppland -> sunset over Fyrisån -> night in Storvreta
-  const SKY = [
-    { x: -100, top: '#3d9be9', bot: '#c4e8ff', far: '#8cb3b0', dark: 0, sun: 0.1 },
-    { x: 360, top: '#4b98e0', bot: '#fde6b4', far: '#98ad9f', dark: 0.03, sun: 0.28 },
-    { x: 520, top: '#e0885a', bot: '#ffd59a', far: '#b3948a', dark: 0.1, sun: 0.55 },
-    { x: 720, top: '#a9477a', bot: '#ff9e6a', far: '#8e6888', dark: 0.24, sun: 0.82 },
-    { x: 880, top: '#373a7a', bot: '#dd7a78', far: '#58517f', dark: 0.42, sun: 0.99 },
-    { x: 1040, top: '#141a45', bot: '#40397a', far: '#2d2f5c', dark: 0.6, sun: 1.2 },
-    { x: 1320, top: '#070b24', bot: '#22265c', far: '#1c2046', dark: 0.68, sun: 1.3 },
-  ];
-  function skyAt(x) {
+  // the sky (time of day), ground styles etc. come from the level's theme (see level.js)
+  function skyAt(SKY, x) {
     let i = 0;
     while (i < SKY.length - 2 && x > SKY[i + 1].x) i++;
     const a = SKY[i], b = SKY[i + 1];
@@ -27,15 +18,23 @@
       dark: U.lerp(a.dark, b.dark, t), sun: U.lerp(a.sun, b.sun, t),
     };
   }
-  R.skyAt = skyAt;
 
-  // mid-layer ground bands per area
-  const FIELD = { uppland: 'meadow', gamla: 'golden', uppsala: 'park', fyris: 'river', road: 'farm', hall: 'farm', home: 'lawn' };
-  const GROUND = { uppland: 'grass', gamla: 'golden', uppsala: 'cobble', fyris: 'quay', road: 'asphalt', hall: 'hall', home: 'grass' };
   const MID_HALFWIDTH = {
     cottage: 5, barn: 6, church: 6, mounds: 10, oldchurch: 5, cityrow: 8, castle: 10, stadium: 7, cathedral: 11,
     willows: 6, farm: 9, hall: 6, villas: 9, home: 4, pines: 6, birches: 5, moose: 3,
+    spruces: 6, tarn: 6, cranes: 4, deadtrees: 5, deer: 3, moosecalf: 4, foxrun: 2, rockhill: 9, firetower: 2, jakttorn: 2,
   };
+  // 0..1: how much of x lies inside one of the listed areas, eased over `fade` blocks at each border
+  function areaWeight(lvl, ids, x, fade = 12) {
+    if (!ids) return 0;
+    let w = 0;
+    for (const a of lvl.areas) {
+      if (ids.indexOf(a.id) < 0) continue;
+      const k = U.smooth(U.clamp((x - a.x0 + fade / 2) / fade, 0, 1)) * (1 - U.smooth(U.clamp((x - a.x1 + fade / 2) / fade, 0, 1)));
+      if (k > w) w = k;
+    }
+    return w;
+  }
 
   R.init = function (canvas) {
     this.cv = canvas;
@@ -62,6 +61,9 @@
   // ------------------------------------------------------------------ precompute parallax layers
   R.build = function (lvl) {
     this.lvl = lvl;
+    const th = (this.theme = lvl.theme);
+    this.sky = th.sky;
+    const pick = (map, id) => (id in map ? map[id] : map.default);
     const rnd = U.rng(20250926);
     // far layer (parallax 0.12)
     const pF = 0.12;
@@ -71,19 +73,23 @@
     const uMaxF = (lvl.length + 80) * pF + 40;
     while (u < uMaxF) {
       const X = (u - HALF) / pF + PX;
-      const a = lvl.areaAt(X).id;
-      if (a === 'uppsala' || a === 'fyris') {
+      const kind = pick(th.far, lvl.areaAt(X).id);
+      if (kind === 'city') {
         const w = 0.8 + rnd() * 1.1, h = 1.3 + rnd() * 2.2;
         far.push({ u, t: 'bldg', w, h, seed: Math.floor(rnd() * 1e6) });
         u += w + 0.08;
+      } else if (kind === 'forest' || kind === 'sparse') {
+        // a dense wall of spruces (or a thin line of them across the open bog)
+        const sparse = kind === 'sparse';
+        far.push({ u, t: 'spruce', h: sparse ? 0.6 + rnd() * 0.7 : 1.0 + rnd() * 1.3 });
+        u += sparse ? 0.5 + rnd() * 1.2 : 0.16 + rnd() * 0.3;
       } else {
-        const pine = a === 'road' || a === 'home' || rnd() < 0.55;
+        const pine = kind === 'pine' || rnd() < 0.55;
         far.push({ u, t: pine ? 'pine' : 'birch', h: 0.8 + rnd() * 1.1 });
         u += 0.35 + rnd() * 0.7;
       }
     }
-    // twin spires of the cathedral, visible from far away
-    far.push({ u: (640 - PX) * pF + HALF + 4, t: 'spires' });
+    for (const e of th.farExtra || []) far.push({ u: (e.x - PX) * pF + HALF + 4, t: e.t });
     far.sort((a, b) => a.u - b.u);
     this.far = far;
 
@@ -93,18 +99,28 @@
     const mid = [];
     for (const L of lvl.landmarks) mid.push({ u: (L.X - PX) * pM + HALF, d: L, t: L.type, hw: MID_HALFWIDTH[L.type] || 6 });
     const uMaxM = (lvl.length + 80) * pM + 40;
-    for (let uu = -10; uu < uMaxM; uu += 4 + rnd() * 6) {
+    const [s0, s1] = th.midStep || [4, 6];
+    for (let uu = -10; uu < uMaxM; uu += s0 + rnd() * s1) {
       const X = (uu - HALF) / pM + PX;
-      const a = lvl.areaAt(X).id;
-      if (a === 'hall' || a === 'uppsala' || a === 'fyris') continue;
+      const fill = pick(th.midFill, lvl.areaAt(X).id);
+      if (!fill) continue;
       if (mid.some((m) => Math.abs(m.u - uu) < m.hw + 1.2)) continue;
-      const type = a === 'uppland' || a === 'gamla' ? (rnd() < 0.5 ? 'pine1' : 'birch1') : 'pine1';
-      mid.push({ u: uu, t: type, hw: 1.5, d: { h: 90 + rnd() * 60 } });
+      let type = 'pine1', h;
+      if (fill === 'mixed') type = rnd() < 0.5 ? 'pine1' : 'birch1';
+      else if (fill === 'spruce') type = rnd() < 0.75 ? 'spruce1' : 'pine1';
+      else if (fill === 'dead') type = rnd() < 0.6 ? 'dead1' : 'pine1';
+      h = 90 + rnd() * 60;
+      if (type === 'spruce1') h += 40;
+      mid.push({ u: uu, t: type, hw: 1.5, d: { h } });
     }
     mid.sort((a, b) => a.u - b.u);
     this.mid = mid;
     // field bands in mid-layer space
-    this.fields = lvl.areas.map((ar) => ({ u0: (ar.x0 - PX) * pM + HALF, u1: (ar.x1 - PX) * pM + HALF, style: FIELD[ar.id] }));
+    this.fields = lvl.areas.map((ar) => ({ u0: (ar.x0 - PX) * pM + HALF, u1: (ar.x1 - PX) * pM + HALF, style: th.field[ar.id] }));
+    this.indoors = lvl.areas.filter((a) => th.indoor && th.indoor[a.id]).map((a) => ({ x0: a.x0, x1: a.x1, kind: th.indoor[a.id] }));
+    // flocks of birds for the forest sky: [start offset, height, size, count]
+    this.flocks = [];
+    if (th.flocks) for (let i = 0; i < 4; i++) this.flocks.push({ o: i * 0.27 + rnd() * 0.1, y: 70 + rnd() * 150, s: 0.7 + rnd() * 0.5, n: 3 + Math.floor(rnd() * 5), sp: 0.035 + rnd() * 0.02 });
     // stars
     const sr = U.rng(99);
     this.stars = [];
@@ -128,21 +144,36 @@
     ctx.save();
     if (shake) ctx.translate((Math.random() - 0.5) * shake * 14, (Math.random() - 0.5) * shake * 14);
     const center = camX + HALF;
-    const sky = skyAt(center);
+    const sky = skyAt(this.sky, center);
     Art.setDark(sky.dark);
     const px = G.s ? G.s.x : center - HALF + PX;
-    const hallT = U.smooth(U.clamp((px - 1026) / 6, 0, 1)) * (1 - U.smooth(U.clamp((px - 1144) / 6, 0, 1)));
-
-    if (hallT < 1) {
-      this.drawOutdoor(ctx, camX, sky, t);
-      this.drawNear(ctx, camX, t);
+    // indoor areas (floorball hall, bear cave) fade in as you run through the door
+    let inT = 0, inKind = null;
+    for (const r of this.indoors) {
+      const k = U.smooth(U.clamp((px - r.x0) / 6, 0, 1)) * (1 - U.smooth(U.clamp((px - (r.x1 - 8)) / 6, 0, 1)));
+      if (k > inT) (inT = k), (inKind = r.kind);
     }
-    if (hallT > 0) {
-      ctx.globalAlpha = hallT;
-      this.drawHall(ctx, camX, t);
+
+    if (inT < 1) {
+      this.drawOutdoor(ctx, camX, sky, t, center);
+      this.drawNear(ctx, camX, t, false);
+      if (this.theme.canopy) this.drawCanopy(ctx, camX, t, areaWeight(this.lvl, this.theme.canopy, center));
+    }
+    if (inT > 0) {
+      ctx.globalAlpha = inT;
+      if (inKind === 'cave') {
+        this.drawCave(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true);
+        // a dark veil pushes the bear and the crystals behind the (brightly outlined) hazards
+        ctx.fillStyle = 'rgba(16,12,24,0.45)';
+        ctx.fillRect(0, 0, W, GY);
+      } else {
+        this.drawHall(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true);
+      }
       ctx.globalAlpha = 1;
     }
-    this.drawGround(ctx, camX, t, hallT);
+    this.drawGround(ctx, camX, t, inT);
     this.drawCorridors(ctx, camX, t);
     this.drawObjects(ctx, camX, t, G);
     this.drawTexts(ctx, camX, G);
@@ -158,7 +189,8 @@
   };
 
   // ------------------------------------------------------------------ sky + parallax
-  R.drawOutdoor = function (ctx, camX, sky, t) {
+  R.drawOutdoor = function (ctx, camX, sky, t, center) {
+    const th = this.theme;
     const g = ctx.createLinearGradient(0, 0, 0, GY);
     g.addColorStop(0, sky.top);
     g.addColorStop(1, sky.bot);
@@ -248,6 +280,24 @@
         ctx.lineTo(x, base - h);
         ctx.lineTo(x + h * 0.28, base);
         ctx.fill();
+      } else if (f.t === 'spruce') {
+        // narrow, layered spruce silhouette
+        const h = f.h * 52;
+        ctx.beginPath();
+        ctx.moveTo(x - h * 0.2, base);
+        for (let k = 0; k < 4; k++) {
+          const y0 = base - h * (0.08 + k * 0.23), w = h * (0.2 - k * 0.04);
+          ctx.lineTo(x - w * 0.55, y0 - h * 0.08);
+          ctx.lineTo(x - w, y0 - h * 0.04);
+        }
+        ctx.lineTo(x, base - h);
+        for (let k = 3; k >= 0; k--) {
+          const y0 = base - h * (0.08 + k * 0.23), w = h * (0.2 - k * 0.04);
+          ctx.lineTo(x + w, y0 - h * 0.04);
+          ctx.lineTo(x + w * 0.55, y0 - h * 0.08);
+        }
+        ctx.lineTo(x + h * 0.2, base);
+        ctx.fill();
       } else if (f.t === 'birch') {
         ctx.beginPath();
         ctx.ellipse(x, base - f.h * 30, f.h * 18, f.h * 26, 0, 0, Math.PI * 2);
@@ -288,15 +338,116 @@
       if (x < -m.hw * BS - 40 || x > W + m.hw * BS + 40) continue;
       if (m.t === 'pine1') Art.pineTree(ctx, x, mb + 2, m.d.h, '#2f5e37');
       else if (m.t === 'birch1') Art.birchTree(ctx, x, mb + 2, m.d.h, t);
+      else if (m.t === 'spruce1') Art.spruceTree(ctx, x, mb + 2, m.d.h);
+      else if (m.t === 'dead1') Art.deadSnag(ctx, x, mb + 2, m.d.h * 0.8);
       else if (Art.mid[m.t]) Art.mid[m.t](ctx, x, mb + 2, m.d, t, FONT);
     }
     // light haze pushes the scenery back behind the gameplay layer
     ctx.fillStyle = U.rgba(sky.bot, 0.16);
     ctx.fillRect(0, 0, W, GY);
+    if (th.flocks) this.drawFlocks(ctx, camX, t, sky);
+    if (th.mist) this.drawMist(ctx, camX, t, areaWeight(this.lvl, th.mist, center, 24));
+    if (th.beams) this.drawBeams(ctx, camX, t, areaWeight(this.lvl, th.beams, center, 24) * (1 - sky.dark));
     // the regional train racing along the railway towards Storvreta
-    if (camX > 850 && camX < 1030) {
-      const tx = -700 + (camX - 858) * BS * 0.3;
+    if (th.train && camX > th.train[0] && camX < th.train[1]) {
+      const tx = -700 + (camX - th.train[0] - 8) * BS * 0.3;
       this.drawTrain(ctx, tx, mb - 2, t);
+    }
+  };
+
+  // ------------------------------------------------------------------ forest atmosphere
+  R.drawFlocks = function (ctx, camX, t, sky) {
+    ctx.strokeStyle = U.rgba(U.mixHex('#2a2a36', sky.top, 0.35), 0.8);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const f of this.flocks) {
+      // each flock drifts across the screen, the parallax makes it slide back a little as you run
+      const span = W + 600;
+      const x0 = (((t * f.sp + f.o) * span - camX * 3) % span + span) % span - 300;
+      for (let i = 0; i < f.n; i++) {
+        const row = Math.ceil(i / 2), side = i % 2 ? -1 : 1;
+        const bx = x0 - row * 22 * f.s, by = f.y + row * 12 * f.s * side + Math.sin(t * 1.3 + i) * 3;
+        const flap = Math.sin(t * 9 + i * 1.3 + f.o * 10) * 5 * f.s;
+        const w = 9 * f.s;
+        ctx.lineWidth = 2.2 * f.s;
+        ctx.beginPath();
+        ctx.moveTo(bx - w, by - flap);
+        ctx.quadraticCurveTo(bx - w * 0.4, by - 3 * f.s, bx, by);
+        ctx.quadraticCurveTo(bx + w * 0.4, by - 3 * f.s, bx + w, by - flap);
+        ctx.stroke();
+      }
+    }
+  };
+  R.drawBeams = function (ctx, camX, t, k) {
+    if (k <= 0.01) return;
+    const off = camX * BS * 0.35;
+    for (let i = 0; i < 6; i++) {
+      const x = ((i * 380 - off) % 2280 + 2280) % 2280 - 400;
+      if (x < -500 || x > W + 200) continue;
+      const w = 60 + (i % 3) * 40, a = k * (0.1 + 0.05 * Math.sin(t * 0.7 + i));
+      const g = ctx.createLinearGradient(0, 0, 0, GY);
+      g.addColorStop(0, 'rgba(255,245,200,' + a + ')');
+      g.addColorStop(1, 'rgba(255,245,200,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + w, 0);
+      ctx.lineTo(x + w + 260, GY);
+      ctx.lineTo(x + 180, GY);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // specks of pollen drifting in the light
+    ctx.fillStyle = 'rgba(255,250,210,' + 0.6 * k + ')';
+    for (let i = 0; i < 26; i++) {
+      const x = ((U.hash(i) * W * 1.4 - camX * BS * 0.5 + t * 8) % (W * 1.4) + W * 1.4) % (W * 1.4) - W * 0.2;
+      const y = 120 + U.hash(i * 3.3) * 380 + Math.sin(t * 0.8 + i) * 12;
+      ctx.fillRect(x, y, 2, 2);
+    }
+  };
+  R.drawMist = function (ctx, camX, t, k) {
+    if (k <= 0.01) return;
+    for (let i = 0; i < 3; i++) {
+      const y = GY - 70 - i * 60;
+      const g = ctx.createLinearGradient(0, y - 40, 0, y + 40);
+      g.addColorStop(0, 'rgba(235,240,238,0)');
+      g.addColorStop(0.5, 'rgba(235,240,238,' + k * (0.32 - i * 0.07) + ')');
+      g.addColorStop(1, 'rgba(235,240,238,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, y - 40, W, 80);
+    }
+    ctx.fillStyle = 'rgba(245,248,246,' + 0.22 * k + ')';
+    for (let i = 0; i < 7; i++) {
+      const x = ((i * 260 - camX * BS * (0.25 + i * 0.03) + t * 14) % 1820 + 1820) % 1820 - 270;
+      ctx.beginPath();
+      ctx.ellipse(x, GY - 40 - (i % 3) * 50, 170, 26, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  // spruce branches hanging over the top of the screen in the deep forest
+  R.drawCanopy = function (ctx, camX, t, k) {
+    if (k <= 0.01) return;
+    const off = camX * BS * 0.8;
+    const drop = 80 * k;
+    ctx.fillStyle = Art.T('#16341f');
+    ctx.fillRect(0, 0, W, drop - 40);
+    for (let layer = 0; layer < 2; layer++) {
+      ctx.fillStyle = Art.T(layer ? '#1e4428' : '#16341f');
+      const step = 70;
+      const start = -(((off * (1 - layer * 0.2)) % step) + step) % step - step;
+      ctx.beginPath();
+      ctx.moveTo(-10, 0);
+      for (let x = start; x < W + step * 2; x += step) {
+        const i = Math.floor((x + off * (1 - layer * 0.2)) / step);
+        const d = drop - 30 + layer * 14 + (U.hash(i + layer * 50) * 34 - 10) * k;
+        const sway = Math.sin(t * 0.9 + i) * 3;
+        ctx.lineTo(x + step * 0.2, d * 0.6);
+        ctx.lineTo(x + step * 0.5 + sway, d);
+        ctx.lineTo(x + step * 0.8, d * 0.6);
+      }
+      ctx.lineTo(W + 10, 0);
+      ctx.closePath();
+      ctx.fill();
     }
   };
 
@@ -310,9 +461,36 @@
       for (let x = x0 - ((offM * BS) % 60); x < x1; x += 60) ctx.fillRect(x + Math.sin(t + x) * 4, mb + 4 + ((x * 7) % 8), 26, 2);
       return;
     }
-    const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52' }[style] || '#7dbb4e';
+    const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a' }[style] || '#7dbb4e';
     ctx.fillStyle = T(base);
     ctx.fillRect(x0, mb - 6, w, GY - mb + 10);
+    if (style === 'forest') {
+      // mossy forest floor with blueberry bushes
+      ctx.fillStyle = T('#2f5528');
+      for (let x = x0 - ((offM * BS) % 90); x < x1; x += 90) {
+        ctx.beginPath();
+        ctx.ellipse(x + 30, mb - 2, 26, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = T('#2f3f8a');
+      for (let x = x0 - ((offM * BS) % 90); x < x1; x += 90) ctx.fillRect(x + 24, mb - 5, 3, 3), ctx.fillRect(x + 38, mb - 3, 3, 3);
+    } else if (style === 'bog') {
+      // open bog: pools of water and tufts of cotton grass
+      ctx.fillStyle = T('#5a7684');
+      for (let x = x0 - ((offM * BS) % 220); x < x1; x += 220) {
+        ctx.beginPath();
+        ctx.ellipse(x + 90, mb + 2, 60, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = T('#f4f2ea');
+      for (let x = x0 - ((offM * BS) % 40); x < x1; x += 40) ctx.fillRect(x + ((x * 7) & 15), mb - 7 - ((x * 3) & 3), 3, 3);
+    } else if (style === 'glade') {
+      const cols = ['#ffffff', '#ffd21c', '#d65ab0', '#7b5bd6'];
+      for (let x = x0 - ((offM * BS) % 26), i = 0; x < x1; x += 26, i++) {
+        ctx.fillStyle = T(cols[Math.abs(Math.floor((x + offM * BS) / 26)) % 4]);
+        ctx.fillRect(x, mb - 4 + ((i * 5) % 7), 3, 3);
+      }
+    }
     if (style === 'meadow' || style === 'farm') {
       // rapeseed stripes
       ctx.fillStyle = T('#f2d43a');
@@ -441,25 +619,144 @@
     for (let x = ((-camX * BS * 0.9) % 300) - 300; x < W + 300; x += 300) ctx.fillText('HEJA VIPPE', x + 150, GY - 11);
   };
 
+  // ------------------------------------------------------------------ inside the bear cave
+  R.drawCave = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#15121c');
+    g.addColorStop(1, '#2f2a38');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    // two layers of rock wall, the far one slower
+    for (let layer = 0; layer < 2; layer++) {
+      const off = camX * BS * (0.3 + layer * 0.25), step = 160 - layer * 30;
+      ctx.fillStyle = layer ? '#302a3a' : '#241f2c';
+      const start = -((off % step) + step) % step - step;
+      for (let x = start; x < W + step; x += step) {
+        const i = Math.floor((x + off) / step);
+        const h = 110 + U.hash(i * 1.7 + layer * 9) * 170;
+        ctx.beginPath();
+        ctx.moveTo(x - step * 0.2, GY);
+        ctx.quadraticCurveTo(x + step * 0.1, GY - h, x + step * 0.5, GY - h * (0.9 + 0.1 * U.hash(i)));
+        ctx.quadraticCurveTo(x + step * 0.9, GY - h, x + step * 1.2, GY);
+        ctx.fill();
+        // hanging rock from the roof
+        const hh = 40 + U.hash(i * 2.3 + layer) * 90;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.quadraticCurveTo(x + step * 0.35, hh, x + step * 0.5, hh * 1.1);
+        ctx.quadraticCurveTo(x + step * 0.65, hh, x + step, 0);
+        ctx.fill();
+      }
+    }
+    // glow-worms on the roof
+    for (let i = 0; i < 40; i++) {
+      const x = ((U.hash(i * 5.1) * W * 1.5 - camX * BS * 0.45) % (W * 1.5) + W * 1.5) % (W * 1.5) - W * 0.25;
+      const y = 20 + U.hash(i * 2.9) * 440;
+      ctx.fillStyle = 'rgba(130,255,230,' + (0.35 + 0.35 * Math.sin(t * 2 + i)) + ')';
+      ctx.fillRect(x, y, 2.5, 2.5);
+    }
+    // dripping water
+    ctx.fillStyle = 'rgba(160,220,255,0.7)';
+    for (let i = 0; i < 5; i++) {
+      const x = ((i * 290 - camX * BS * 0.55) % 1450 + 1450) % 1450 - 100;
+      const u = (t * 0.7 + i * 0.37) % 1;
+      ctx.fillRect(x, 200 + u * 330, 2, 6);
+    }
+    // bats fluttering about in the dark
+    ctx.fillStyle = '#0e0b14';
+    for (let i = 0; i < 6; i++) {
+      const x = ((i * 240 + Math.sin(t * 0.6 + i) * 80 - camX * BS * 0.4) % 1440 + 1440) % 1440 - 80;
+      const y = 300 + (i % 3) * 45 + Math.sin(t * 1.7 + i * 2) * 25;
+      const f = Math.sin(t * 14 + i) * 9;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x - 8, y - 4 - f, x - 18, y - f);
+      ctx.quadraticCurveTo(x - 10, y + 2, x - 3, y + 5);
+      ctx.lineTo(x + 3, y + 5);
+      ctx.quadraticCurveTo(x + 10, y + 2, x + 18, y - f);
+      ctx.quadraticCurveTo(x + 8, y - 4 - f, x, y);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(x, y + 2, 4, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+
   // ------------------------------------------------------------------ near scenery (world anchored)
-  R.drawNear = function (ctx, camX, t) {
+  // inside = only the decorations that belong inside a cave/hall (drawn over the indoor background)
+  R.drawNear = function (ctx, camX, t, inside) {
     const decos = this.lvl.decos;
     for (const d of decos) {
-      if (d.x < camX - 14) continue;
+      if (d.x + (d.span || 0) < camX - 14) continue; // span = width in blocks of extra-wide scenery
       if (d.x > camX + 30) break;
+      if (!!d.inside !== inside) continue;
       const f = Art.near[d.type];
       if (f) f(ctx, sx(d.x, camX), GY, d, t, BS, FONT);
     }
   };
 
   // ------------------------------------------------------------------ ground
-  R.drawGround = function (ctx, camX, t, hallT) {
+  R.drawGround = function (ctx, camX, t, inT) {
     const T = Art.TL;
     for (const a of this.lvl.areas) {
       const x0 = Math.max(-5, sx(a.x0, camX)), x1 = Math.min(W + 5, sx(a.x1, camX));
       if (x1 <= x0) continue;
-      const st = GROUND[a.id];
-      if (st === 'grass' || st === 'golden') {
+      const st = this.theme.ground[a.id];
+      if (st === 'forest' || st === 'peat') {
+        // forest floor: dark soil under a carpet of moss and pine needles
+        const peat = st === 'peat';
+        ctx.fillStyle = T(peat ? '#3b2e22' : '#45311f');
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = 'rgba(0,0,0,0.14)';
+        for (let i = Math.floor(camX + x0 / BS); i <= Math.ceil(camX + x1 / BS); i++) {
+          if (i & 1) continue;
+          const x = (i - camX) * BS, a0 = Math.max(x0, x), a1 = Math.min(x1, x + BS);
+          if (a1 > a0) ctx.fillRect(a0, GY + 36, a1 - a0, BS);
+        }
+        // roots and stones
+        ctx.fillStyle = T(peat ? '#54402c' : '#6b5038');
+        for (let i = Math.floor(camX / 3 + x0 / 144) - 1; i <= Math.ceil(camX / 3 + x1 / 144); i++) {
+          const x = i * 144 - camX * BS + ((i * 53) % 60);
+          if (x < x0 - 30 || x > x1) continue;
+          Art.rr(ctx, x, GY + 24 + ((i * 17) % 60), 22, 7, 3);
+          ctx.fill();
+        }
+        ctx.fillStyle = T(peat ? '#6f7a34' : '#3f7a2c');
+        ctx.fillRect(x0, GY, x1 - x0, 12);
+        ctx.fillStyle = T(peat ? '#a0a24a' : '#62a340');
+        ctx.fillRect(x0, GY, x1 - x0, 4);
+        ctx.fillStyle = T(peat ? '#6f7a34' : '#3f7a2c');
+        for (let i = Math.floor(camX * 4 + x0 / 12); i <= Math.ceil(camX * 4 + x1 / 12); i++) {
+          const x = i * 12 - camX * BS;
+          if (x >= x0 && x + 6 <= x1) {
+            ctx.beginPath();
+            ctx.ellipse(x + 3, GY + 12, 5, 3 + ((i * 7) & 3), 0, 0, Math.PI);
+            ctx.fill();
+          }
+        }
+        // pine needles
+        ctx.fillStyle = T('#b07a3e');
+        for (let i = Math.floor(camX * 2 + x0 / 24); i <= Math.ceil(camX * 2 + x1 / 24); i++) {
+          const x = i * 24 - camX * BS + ((i * 11) % 13);
+          if (x >= x0 && x + 6 <= x1) ctx.fillRect(x, GY + 2 + ((i * 5) % 7), 6, 1.5);
+        }
+      } else if (st === 'cave') {
+        ctx.fillStyle = '#2a2530';
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = '#3a3444';
+        for (let i = Math.floor(camX * 2 + x0 / 24) - 1; i <= Math.ceil(camX * 2 + x1 / 24); i++) {
+          const x = i * 24 - camX * BS;
+          if (x + 20 < x0 || x > x1) continue;
+          const yy = GY + 16 + ((i * 29) % 110);
+          ctx.beginPath();
+          ctx.ellipse(Math.max(x0, Math.min(x1, x + 10)), yy, 10 + ((i * 7) % 6), 6, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#5b5563';
+        ctx.fillRect(x0, GY, x1 - x0, 6);
+        ctx.fillStyle = 'rgba(143,243,255,0.35)';
+        ctx.fillRect(x0, GY, x1 - x0, 2);
+      } else if (st === 'grass' || st === 'golden') {
         const top = st === 'golden' ? '#9fbf4a' : '#5fb04a', dirt = st === 'golden' ? '#7a5a36' : '#6b4a2f';
         ctx.fillStyle = T(dirt);
         ctx.fillRect(x0, GY, x1 - x0, H - GY);
@@ -571,6 +868,50 @@
           ctx.font = '44px ' + FONT;
           ctx.fillText('3 – 2', sbx, 116);
         }
+      } else if (c.style === 'cave') {
+        // rock roof with a jagged edge
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#120f17');
+        g.addColorStop(1, '#3a3444');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.fillStyle = '#3a3444';
+        const start = x0 - ((camX * BS) % 36 + 36) % 36;
+        ctx.beginPath();
+        ctx.moveTo(x0, y - 2);
+        for (let x = start; x < x1 + 36; x += 36) {
+          const i = Math.floor((x + camX * BS) / 36);
+          ctx.lineTo(U.clamp(x + 18, x0, x1), y + 4 + ((i * 7) % 9));
+          ctx.lineTo(U.clamp(x + 36, x0, x1), y - 2);
+        }
+        ctx.lineTo(x1, y - 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(143,243,255,0.5)';
+        ctx.fillRect(x0, y - 3, x1 - x0, 2);
+      } else if (c.style === 'boughs') {
+        // the forest canopy closing in over the bog
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, Art.T('#0f2616'));
+        g.addColorStop(1, Art.T('#1f4a2a'));
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.fillStyle = Art.T('#2a5c33');
+        const start = x0 - ((camX * BS) % 32 + 32) % 32;
+        ctx.beginPath();
+        ctx.moveTo(x0, y - 4);
+        for (let x = start; x < x1 + 32; x += 32) {
+          const i = Math.floor((x + camX * BS) / 32);
+          ctx.lineTo(U.clamp(x + 8, x0, x1), y + 2);
+          ctx.lineTo(U.clamp(x + 16, x0, x1), y + 8 + ((i * 5) % 7));
+          ctx.lineTo(U.clamp(x + 24, x0, x1), y + 2);
+          ctx.lineTo(U.clamp(x + 32, x0, x1), y - 2);
+        }
+        ctx.lineTo(x1, y - 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(200,255,200,0.5)';
+        ctx.fillRect(x0, y - 2, x1 - x0, 2);
       } else {
         // leafy canopy of the riverside trees
         const g = ctx.createLinearGradient(0, 0, 0, y);
@@ -598,9 +939,9 @@
   R.drawObjects = function (ctx, camX, t, G) {
     const lvl = this.lvl;
     const vis = lvl.visible(camX - 2, camX + W / BS + 2);
-    const area = (x) => lvl.areaAt(x).id;
+    const glow = (x) => this.theme.glow[lvl.areaAt(x).id];
     // water first (sits in the ground)
-    for (const o of vis) if (o.t === 'haz' && o.kind === 'water') Art.water(ctx, sx(o.x, camX), sx(o.x + o.w, camX), sy(0.22), H, t);
+    for (const o of vis) if (o.t === 'haz' && o.kind === 'water') Art.water(ctx, sx(o.x, camX), sx(o.x + o.w, camX), sy(0.22), H, t, this.theme.ground[lvl.areaAt(o.x).id] === 'peat' ? 'bog' : null);
     // checkpoints
     for (const cp of lvl.checkpoints) {
       if (cp.index === 0 || cp.x < camX - 2 || cp.x > camX + 30) continue;
@@ -614,9 +955,10 @@
           Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
           break;
         case 'haz':
-          if (o.kind === 'spike') Art.spike(ctx, x, y, w, h, false, o.style, area(o.x));
-          else if (o.kind === 'spikeDown') Art.spike(ctx, x, y, w, h, true, o.style, area(o.x));
-          else if (o.kind === 'half') Art.half(ctx, x, y, w, h, o.style, area(o.x));
+          if (o.kind === 'spike') Art.spike(ctx, x, y, w, h, false, o.style, glow(o.x), t);
+          else if (o.kind === 'spikeDown') Art.spike(ctx, x, y, w, h, true, o.style, glow(o.x), t);
+          else if (o.kind === 'half') Art.half(ctx, x, y, w, h, o.style, glow(o.x));
+          else if (o.kind === 'bird') Art.bird(ctx, x + w / 2, y + h / 2, BS, t, o.id, glow(o.x));
           break;
         case 'pad':
           Art.pad(ctx, x, y, w, h, o.color, t);

@@ -40,34 +40,71 @@
     C: parseMelody('A5 - C6 - A5 F5 C5 - | B5 - D6 - B5 G5 D5 - | G5 - B5 - G5 E5 B4 - | A5 - C6 - E6 - - -'),
     D: parseMelody('A4 . E5 . A5 . G5 E5 | F5 . C5 . A4 . C5 F5 | E5 . C5 . G4 . C5 E5 | D5 . B4 . G4 A4 B4 D5'),
     E: parseMelody('A5 A5 . A5 G5 . E5 . | F5 F5 . F5 E5 . C5 . | G5 G5 . G5 F5 . D5 . | E5 - - - G#5 - B5 -'),
+    // the forest song (level 2), D minor with a folk-tune feel
+    F1: parseMelody('D5 - E5 F5 - E5 D5 - | C5 - D5 E5 - D5 C5 - | D5 - F5 A5 - G5 F5 - | E5 - C#5 A4 - - . .'),
+    F2: parseMelody('A5 - F5 D5 A5 - F5 D5 | G5 - E5 C5 G5 - E5 C5 | F5 - D5 A#4 F5 - D5 A#4 | E5 - C#5 A4 E5 G5 F5 E5'),
+    F3: parseMelody('D5 - - - F5 - E5 - | D5 - - - A#4 - - - | A4 - - - F5 - D5 - | C#5 - - - E5 - A4 -'),
+    F4: parseMelody('D5 D5 . D5 F5 . D5 . | A#4 A#4 . A#4 D5 . A#4 . | G4 G4 . A#4 D5 . G5 . | A4 A4 . C#5 E5 . A5 .'),
+    F5: parseMelody('A5 G5 F5 E5 D5 E5 F5 A5 | G5 F5 E5 D5 C5 D5 E5 G5 | F5 E5 D5 C5 A#4 C5 D5 F5 | E5 - A5 - C#6 - E6 -'),
+    F6: parseMelody('A5 - G5 F5 - C5 F5 - | G5 - E5 C5 - G4 C5 - | F5 - A5 D6 - C6 A5 - | A#5 - A5 G5 - F5 D5 -'),
   };
   // chords: [bass root midi, triad midis]
   const CH = {
     Am: [45, [57, 60, 64]], F: [41, [57, 60, 65]], C: [48, [55, 60, 64]], G: [43, [55, 59, 62]],
     E: [40, [56, 59, 64]], Em: [40, [55, 59, 64]], Dm: [38, [57, 62, 65]],
+    Bb: [46, [58, 62, 65]], Gm: [43, [55, 58, 62]], A: [45, [57, 61, 64]],
   };
   const PROG = {
     main: ['Am', 'F', 'C', 'G'],
     viking: ['Am', 'G', 'F', 'E'],
     fyris: ['F', 'G', 'Em', 'Am'],
     hall: ['Am', 'F', 'G', 'E'],
+    forest: ['Dm', 'C', 'Dm', 'A'],
+    forest2: ['Dm', 'C', 'Bb', 'A'],
+    bog: ['Dm', 'Gm', 'Dm', 'A'],
+    cave: ['Dm', 'Bb', 'Gm', 'A'],
+    glade: ['F', 'C', 'Dm', 'Bb'],
   };
-  // [fromBar, toBar, settings]
-  const SECTIONS = [
-    [0, 4, { prog: 'main', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true }],
-    [4, 12, { prog: 'main', drums: 'main', bass: 'eighth', arp: 'up', lead: 'A' }],
-    [12, 20, { prog: 'main', drums: 'main', bass: 'eighth', arp: 'up', lead: 'A2' }],
-    [20, 24, { prog: 'main', drums: 'build', bass: 'eighth', arp: 'up', lead: 'A' }],
-    [24, 32, { prog: 'viking', drums: 'half', bass: 'long', arp: 'wave', lead: 'B', pad: true }],
-    [32, 44, { prog: 'main', drums: 'drop', bass: 'octave', arp: 'up', lead: 'A2' }],
-    [44, 54, { prog: 'fyris', drums: 'main', bass: 'eighth', arp: 'fast', lead: 'C' }],
-    [54, 64, { prog: 'main', drums: 'train', bass: 'eighth', arp: 'wave', lead: 'D' }],
-    [64, 72, { prog: 'hall', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'E' }],
-    [72, 78, { prog: 'main', drums: 'drop', bass: 'octave', arp: 'up', lead: 'A2' }],
-    [78, 80, { end: true }],
-  ];
+  // each song: [fromBar, toBar, settings]. `phrase: 'section'` starts the 4-bar phrases at the section start.
+  const SONGS = {
+    home: {
+      endChord: 'Am',
+      sections: [
+        [0, 4, { prog: 'main', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true }],
+        [4, 12, { prog: 'main', drums: 'main', bass: 'eighth', arp: 'up', lead: 'A' }],
+        [12, 20, { prog: 'main', drums: 'main', bass: 'eighth', arp: 'up', lead: 'A2' }],
+        [20, 24, { prog: 'main', drums: 'build', bass: 'eighth', arp: 'up', lead: 'A' }],
+        [24, 32, { prog: 'viking', drums: 'half', bass: 'long', arp: 'wave', lead: 'B', pad: true }],
+        [32, 44, { prog: 'main', drums: 'drop', bass: 'octave', arp: 'up', lead: 'A2' }],
+        [44, 54, { prog: 'fyris', drums: 'main', bass: 'eighth', arp: 'fast', lead: 'C' }],
+        [54, 64, { prog: 'main', drums: 'train', bass: 'eighth', arp: 'wave', lead: 'D' }],
+        [64, 72, { prog: 'hall', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'E' }],
+        [72, 78, { prog: 'main', drums: 'drop', bass: 'octave', arp: 'up', lead: 'A2' }],
+        [78, 80, { end: true }],
+      ],
+    },
+    // areas of the forest level start at bars 13, 24, 36, 44 and 55; the finish is bar 63
+    forest: {
+      endChord: 'F',
+      phrase: 'section',
+      sections: [
+        [0, 4, { prog: 'forest', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true }],
+        [4, 13, { prog: 'forest', drums: 'main', bass: 'eighth', arp: 'up', lead: 'F1', tone: 'flute' }],
+        [13, 24, { prog: 'forest2', drums: 'drop', bass: 'octave', arp: 'wave', lead: 'F2' }],
+        [24, 36, { prog: 'bog', drums: 'half', bass: 'long', arp: 'wave', lead: 'F3', pad: true, tone: 'flute' }],
+        [36, 44, { prog: 'cave', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'F4' }],
+        [44, 55, { prog: 'forest2', drums: 'train', bass: 'eighth', arp: 'fast', lead: 'F5' }],
+        [55, 63, { prog: 'glade', drums: 'drop', bass: 'octave', arp: 'up', lead: 'F6', tone: 'flute' }],
+        [63, 65, { end: true }],
+      ],
+    },
+  };
+  let SONG = SONGS.home;
+  A.setSong = function (id) {
+    SONG = SONGS[id] || SONGS.home;
+  };
   function sectionAt(bar) {
-    for (const s of SECTIONS) if (bar >= s[0] && bar < s[1]) return s;
+    for (const s of SONG.sections) if (bar >= s[0] && bar < s[1]) return s;
     return null;
   }
 
@@ -225,15 +262,17 @@
       if (bar === sec[0] && s16 === 0) {
         kick(t);
         crash(t);
-        const [root, tri] = CH.Am;
+        const [root, tri] = CH[SONG.endChord];
         voice('sawtooth', mtof(root), t, 2.4, 0.2, { lp: 900, hold: 0.8, release: 0.8 });
         tri.forEach((m) => voice('square', mtof(m + 12), t, 2.4, 0.05, { lp: 3000, hold: 0.8, release: 0.8 }));
-        voice('sawtooth', mtof(81), t, 2.4, 0.07, { lp: 4000, hold: 0.8, release: 0.8, detune: 6 });
+        voice('sawtooth', mtof(tri[0] + 24), t, 2.4, 0.07, { lp: 4000, hold: 0.8, release: 0.8, detune: 6 });
       }
       return;
     }
+    // position inside the 4-bar phrase
+    const pb = SONG.phrase === 'section' ? barInSec : bar;
     const prog = PROG[cfg.prog];
-    const chord = CH[prog[bar % 4]];
+    const chord = CH[prog[pb % 4]];
     const root = chord[0], tri = chord[1];
 
     if (barInSec === 0 && s16 === 0 && sec[0] > 0) crash(t);
@@ -256,7 +295,7 @@
       } else if (s16 % 4 === 2) hat(t);
       if (d === 'build' && barInSec === 3 && s16 >= 8) snare(t, 0.3 + (s16 - 8) * 0.09);
       // fill on the last bar of each 4-bar phrase
-      if (d !== 'build' && bar % 4 === 3 && (s16 === 14 || s16 === 15)) snare(t, 0.6);
+      if (d !== 'build' && pb % 4 === 3 && (s16 === 14 || s16 === 15)) snare(t, 0.6);
     } else if (d === 'half') {
       if (s16 === 0 || s16 === 10) kick(t);
       if (s16 === 8) snare(t);
@@ -290,13 +329,20 @@
     // ---- lead ----
     if (cfg.lead && s16 % 2 === 0) {
       const mel = MEL[cfg.lead];
-      const notes = mel[bar % mel.length];
+      const notes = mel[pb % mel.length];
       const slot = s16 / 2;
       for (const n of notes) {
         if (n.slot !== slot) continue;
         const dur = n.len * STEP * 2 * 0.95;
-        voice('sawtooth', mtof(n.midi), t, dur, 0.075, { lp: 3200, hold: 0.7, detune: -5 });
-        voice('square', mtof(n.midi), t, dur, 0.045, { lp: 2400, hold: 0.7, detune: 5 });
+        if (cfg.tone === 'flute') {
+          // soft woody flute: triangle with a breathy attack and a quiet octave on top
+          voice('triangle', mtof(n.midi), t, dur, 0.16, { attack: 0.02, hold: 0.75, detune: -3 });
+          voice('sine', mtof(n.midi + 12), t, dur, 0.03, { attack: 0.03, hold: 0.6 });
+          noise(t, 0.05, 0.03, 'bandpass', 2500, null, 2);
+        } else {
+          voice('sawtooth', mtof(n.midi), t, dur, 0.075, { lp: 3200, hold: 0.7, detune: -5 });
+          voice('square', mtof(n.midi), t, dur, 0.045, { lp: 2400, hold: 0.7, detune: 5 });
+        }
       }
     }
   }
@@ -335,6 +381,18 @@
         break;
       case 'firework':
         noise(t, 0.6, 0.25, 'lowpass', 900, dest);
+        break;
+      case 'coin':
+        voice('square', mtof(88), t, 0.07, 0.07, { dest, lp: 5000 });
+        voice('square', mtof(95), t + 0.06, 0.18, 0.07, { dest, lp: 5000 });
+        break;
+      case 'buy':
+        [76, 79, 84, 88, 91].forEach((m, i) => voice('square', mtof(m), t + i * 0.06, 0.2, 0.06, { dest, lp: 4500 }));
+        voice('triangle', mtof(96), t + 0.3, 0.4, 0.1, { dest });
+        break;
+      case 'nope':
+        voice('square', 180, t, 0.12, 0.08, { dest, lp: 1200 });
+        voice('square', 140, t + 0.12, 0.18, 0.08, { dest, lp: 1200 });
         break;
     }
   };

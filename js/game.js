@@ -1,4 +1,4 @@
-// VippeDash — game loop, input, checkpoints, menus
+// VippeDash — game loop, input, checkpoints, menus, coins + shop
 (function () {
   const VD = (window.VD = window.VD || {});
   const P = VD.PHYS, Ph = VD.Physics, R = VD.Render, AU = VD.Audio, Art = VD.Art, U = VD.U;
@@ -25,24 +25,63 @@
   const $ = (id) => document.getElementById(id);
 
   G.init = function () {
-    G.lvl = VD.buildLevel();
     R.init($('game'));
-    R.build(G.lvl);
+    G.coins = store.get('coins', 0);
+    G.owned = store.get('owned', []);
     G.skin = store.get('skin', 'red');
-    if (!Art.SKINS[G.skin]) G.skin = 'red';
-    G.best = store.get('best', 0);
-    G.wins = store.get('wins', 0);
+    if (!Art.SKINS[G.skin] || !owns(G.skin)) G.skin = 'red';
+    G.progress = loadProgress();
     AU.muted = store.get('muted', false);
     G.debug = /debug/.test(location.hash + location.search);
     G.state = 'menu';
-    G.camX = -4;
     G.ev = [];
+    selectLevel(store.get('level', VD.LEVELS[0].id));
     bindInput();
     bindUI();
     refreshMenu();
     G.last = performance.now();
     requestAnimationFrame(loop);
   };
+
+  // ------------------------------------------------------------------ levels, progress, coins
+  function selectLevel(id) {
+    G.levelDef = VD.levelDef(id);
+    G.lvl = VD.buildLevel(G.levelDef.id);
+    R.build(G.lvl);
+    AU.setSong(G.lvl.theme.song);
+    store.set('level', G.levelDef.id);
+    G.camX = -4;
+  }
+  // { levelId: { best: %, wins, fewest: crashes } }. Older saves only had one level's best/wins.
+  function loadProgress() {
+    let p = store.get('progress', null);
+    if (!p) {
+      p = {};
+      const best = store.get('best', 0), wins = store.get('wins', 0);
+      if (best || wins) p.home = { best, wins };
+    }
+    for (const L of VD.LEVELS) p[L.id] = Object.assign({ best: 0, wins: 0, fewest: null }, p[L.id]);
+    return p;
+  }
+  function saveProgress() {
+    store.set('progress', G.progress);
+  }
+  function owns(id) {
+    return Art.SKINS[id].price === 0 || G.owned.indexOf(id) >= 0;
+  }
+  function addCoins(n) {
+    G.coins = Math.max(0, G.coins + n);
+    store.set('coins', G.coins);
+  }
+  // Coins for finishing a level: the level's reward, a crash bonus (the same amount again, minus 10% per crash)
+  // and the reward once more the first time you beat it. Harder levels have a bigger reward.
+  function levelReward(def, crashes, firstWin) {
+    const base = def.reward;
+    const bonus = Math.max(0, Math.round(def.reward * (1 - crashes / 10)));
+    const first = firstWin ? def.reward : 0;
+    return { base, bonus, first, total: base + bonus + first };
+  }
+  G.levelReward = levelReward;
 
   // ------------------------------------------------------------------ input
   const JUMP = new Set(['Space', 'ArrowUp', 'KeyW', 'Enter', 'NumpadEnter']);
@@ -64,12 +103,26 @@
       if (e.code === 'Escape' || e.code === 'KeyP') {
         if (G.state === 'play') G.pause();
         else if (G.state === 'paused') G.resume();
+        else if (G.shopOpen) closeShop();
         return;
       }
       if (e.code === 'KeyM') return toggleMute();
+      if (G.state === 'menu') {
+        if (G.shopOpen) {
+          if (e.code === 'Escape' || e.code === 'Backspace') closeShop();
+          return;
+        }
+        const n = /^Digit(\d)$/.exec(e.code);
+        if (n && VD.LEVELS[+n[1] - 1]) return pickLevel(VD.LEVELS[+n[1] - 1].id);
+        if (e.code === 'KeyS') return openShop();
+        if (G.debug && e.code === 'KeyC') {
+          addCoins(500);
+          return refreshMenu();
+        }
+      }
       if (JUMP.has(e.code)) {
-        if (G.state === 'menu') return G.start();
-        if (G.state === 'won') return G.start();
+        if (G.state === 'menu') return G.shopOpen ? undefined : G.start();
+        if (G.state === 'won') return $('next').classList.contains('hidden') ? G.start() : G.nextLevel();
         if (G.state === 'paused') return G.resume();
         keysDown.add(e.code);
         updateHeld();
@@ -123,6 +176,7 @@
     } else if (e.code === 'BracketRight') warp(Math.min(cps.length - 1, G.cpIndex + 1));
     else if (e.code === 'BracketLeft') warp(Math.max(0, G.cpIndex - 1));
     else if (e.code === 'KeyG') G.god = !G.god;
+    else if (e.code === 'KeyC') addCoins(500);
     else if (e.code === 'KeyB') {
       G.bot = !G.bot;
       if (G.bot) computeBot(G.s);
@@ -145,42 +199,130 @@
     $('resume').onclick = () => G.resume();
     $('restart').onclick = () => G.start();
     $('menuBtn').onclick = () => G.toMenu();
+    $('next').onclick = () => G.nextLevel();
     $('again').onclick = () => G.start();
     $('winMenu').onclick = () => G.toMenu();
+    $('shopBtn').onclick = () => openShop();
+    $('shopBack').onclick = () => closeShop();
     $('mute').onclick = (e) => {
       e.stopPropagation();
       toggleMute();
     };
-    const box = $('skins');
+    // level cards
+    const box = $('levels');
+    for (const L of VD.LEVELS) {
+      const b = document.createElement('button');
+      b.className = 'lvl d' + L.difficulty;
+      b.dataset.id = L.id;
+      const r = levelReward(L, 0, false), lo = levelReward(L, 10, false);
+      b.innerHTML =
+        '<span class="lnum">' + L.num + '</span>' +
+        '<span class="linfo"><b>' + L.name + '</b><small>' + L.route + '</small>' +
+        '<span class="lmeta"><span class="diff d' + L.difficulty + '">' + '★'.repeat(L.difficulty) + ' ' + L.diffName + '</span>' +
+        '<span class="lcoins"><i class="coin"></i>' + lo.total + '–' + r.total + '</span></span></span>' +
+        '<span class="lprog"><b></b><small></small></span>';
+      b.onclick = () => pickLevel(L.id);
+      box.appendChild(b);
+    }
+    // shop cards
+    const grid = $('shopGrid');
     for (const id of Object.keys(Art.SKINS)) {
       const b = document.createElement('button');
-      b.className = 'skin';
+      b.className = 'card';
       b.dataset.skin = id;
-      b.title = Art.SKINS[id].name;
-      const c = document.createElement('canvas');
-      c.width = c.height = 72;
-      const x = c.getContext('2d');
-      x.translate(36, 40);
-      Art.setDark(0);
-      Art.cube(x, 44, 'grin', id, 0);
-      b.appendChild(c);
-      const l = document.createElement('span');
-      l.textContent = Art.SKINS[id].name;
-      b.appendChild(l);
-      b.onclick = () => {
-        G.skin = id;
-        store.set('skin', id);
-        AU.init();
-        AU.sfx('click');
-        refreshMenu();
-      };
-      box.appendChild(b);
+      b.innerHTML = '<canvas width="100" height="110"></canvas><span class="cname">' + Art.SKINS[id].name + '</span><span class="cbtn"></span>';
+      b.onclick = () => shopClick(id, b);
+      grid.appendChild(b);
     }
     updateMuteIcon();
   }
+  function pickLevel(id) {
+    AU.init();
+    AU.sfx('click');
+    if (id !== G.levelDef.id) selectLevel(id);
+    refreshMenu();
+  }
   function refreshMenu() {
-    for (const b of document.querySelectorAll('.skin')) b.classList.toggle('on', b.dataset.skin === G.skin);
-    $('best').textContent = G.wins > 0 ? 'Completed ' + G.wins + (G.wins === 1 ? ' time' : ' times') + ' · best 100%' : G.best > 0 ? 'Best: ' + G.best + '%' : '';
+    for (const b of document.querySelectorAll('.lvl')) {
+      const p = G.progress[b.dataset.id];
+      b.classList.toggle('on', b.dataset.id === G.levelDef.id);
+      const big = b.querySelector('.lprog b'), small = b.querySelector('.lprog small');
+      big.className = p.wins ? 'done' : '';
+      big.textContent = p.wins ? '✔ ' + p.wins : p.best + '%';
+      small.textContent = p.wins ? (p.wins === 1 ? 'win' : 'wins') : 'best';
+    }
+    $('coinsMenu').textContent = G.coins;
+    $('skinName').textContent = Art.SKINS[G.skin].name;
+  }
+
+  // ------------------------------------------------------------------ shop
+  function openShop() {
+    AU.init();
+    AU.sfx('click');
+    G.shopOpen = true;
+    show('menu', false);
+    show('shop', true);
+    refreshShop();
+  }
+  function closeShop() {
+    G.shopOpen = false;
+    show('shop', false);
+    show('menu', true);
+    refreshMenu();
+  }
+  function shopClick(id, card) {
+    AU.init();
+    const k = Art.SKINS[id];
+    if (owns(id)) {
+      G.skin = id;
+      store.set('skin', id);
+      AU.sfx('click');
+    } else if (G.coins >= k.price) {
+      addCoins(-k.price);
+      G.owned.push(id);
+      store.set('owned', G.owned);
+      G.skin = id;
+      store.set('skin', id);
+      AU.sfx('buy');
+      bump(card, 'bought');
+      bump($('coinsShop').parentElement, 'pop');
+    } else {
+      AU.sfx('nope');
+      bump(card, 'shake');
+    }
+    refreshShop();
+  }
+  function bump(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth; // restart the CSS animation
+    el.classList.add(cls);
+  }
+  function refreshShop() {
+    $('coinsShop').textContent = G.coins;
+    for (const b of document.querySelectorAll('.card')) {
+      const id = b.dataset.skin, k = Art.SKINS[id], mine = owns(id);
+      const state = id === G.skin ? 'wearing' : mine ? 'owned' : G.coins >= k.price ? 'buy' : 'locked';
+      b.classList.remove('wearing', 'owned', 'buy', 'locked');
+      b.classList.add(state);
+      const btn = b.querySelector('.cbtn');
+      if (state === 'wearing') btn.textContent = '✓ Wearing';
+      else if (state === 'owned') btn.textContent = 'Wear';
+      else btn.innerHTML = '<i class="coin"></i>' + k.price;
+      b.title = state === 'locked' ? 'You need ' + (k.price - G.coins) + ' more coins' : k.name;
+    }
+  }
+  // skin previews are redrawn every frame while the shop is open, so rainbow / gold / galaxy shimmer
+  function drawShop() {
+    Art.setDark(0);
+    for (const b of document.querySelectorAll('.card')) {
+      const c = b.querySelector('canvas'), x = c.getContext('2d');
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      x.clearRect(0, 0, c.width, c.height);
+      const on = b.dataset.skin === G.skin;
+      const hop = on ? Math.abs(Math.sin(G.clock * 5)) * 6 : 0;
+      x.translate(50, 68 - hop);
+      Art.cube(x, 56, 'grin', b.dataset.skin, 0);
+    }
   }
   function show(id, on) {
     $(id).classList.toggle('hidden', !on);
@@ -197,7 +339,9 @@
   // ------------------------------------------------------------------ states
   G.start = function () {
     AU.init();
+    G.shopOpen = false;
     show('menu', false);
+    show('shop', false);
     show('pause', false);
     show('win', false);
     G.cpIndex = 0;
@@ -255,6 +399,12 @@
     G.s = null;
     refreshMenu();
   };
+  G.nextLevel = function () {
+    const i = VD.LEVELS.indexOf(G.levelDef);
+    if (i + 1 >= VD.LEVELS.length) return G.start();
+    selectLevel(VD.LEVELS[i + 1].id);
+    G.start();
+  };
 
   function die() {
     G.state = 'dead';
@@ -273,9 +423,10 @@
     }
     particle({ x: cx, y: cy, life: 0.45, size: 90, color: '#ffffff', ring: true });
     const pct = Math.floor(U.clamp(s.x / G.lvl.finishX, 0, 1) * 100);
-    if (pct > G.best) {
-      G.best = pct;
-      store.set('best', pct);
+    const p = G.progress[G.levelDef.id];
+    if (pct > p.best) {
+      p.best = pct;
+      saveProgress();
     }
   }
 
@@ -284,22 +435,54 @@
     G.winAge = 0;
     G.fwT = 0;
     AU.sfx('win');
-    G.best = 100;
-    G.wins++;
-    store.set('best', 100);
-    store.set('wins', G.wins);
+    const p = G.progress[G.levelDef.id];
+    G.reward = levelReward(G.levelDef, G.deaths, p.wins === 0);
+    G.coinsBefore = G.coins;
+    addCoins(G.reward.total);
+    p.best = 100;
+    p.wins++;
+    if (p.fewest == null || G.deaths < p.fewest) p.fewest = G.deaths;
+    saveProgress();
     G.finalTime = G.runTime;
     G.flash = 0.5;
   }
 
   function showWin() {
     G.state = 'won';
+    const def = G.levelDef, r = G.reward;
     const m = Math.floor(G.finalTime / 60), sec = Math.floor(G.finalTime % 60);
+    $('winTitle').textContent = def.winTitle;
+    $('winSub').textContent = def.winSub;
     $('stats').innerHTML =
       '<div><b>' + G.attempts + '</b><span>attempts</span></div>' +
-      '<div><b>' + G.deaths + '</b><span>crashes</span></div>' +
+      '<div><b>' + G.deaths + '</b><span>' + (G.deaths === 1 ? 'crash' : 'crashes') + '</span></div>' +
       '<div><b>' + m + ':' + ('0' + sec).slice(-2) + '</b><span>time</span></div>';
+    const line = (label, n) => '<div class="rline' + (n ? '' : ' none') + '"><span>' + label + '</span><b>+' + n + '</b></div>';
+    $('reward').innerHTML =
+      line('Level ' + def.num + ' cleared (' + def.diffName + ')', r.base) +
+      line(G.deaths === 0 ? 'No crashes — perfect run!' : 'Crash bonus (' + G.deaths + (G.deaths === 1 ? ' crash' : ' crashes') + ')', r.bonus) +
+      (r.first ? line('First time beating this level!', r.first) : '') +
+      '<div class="rtotal"><i class="coin"></i><b id="rewardTotal">+0</b><span id="rewardNow"></span></div>';
+    const hasNext = VD.LEVELS.indexOf(def) + 1 < VD.LEVELS.length;
+    $('next').classList.toggle('hidden', !hasNext);
+    $('again').classList.toggle('big', !hasNext);
     show('win', true);
+    // count the coins up
+    G.countUp = { shown: 0, t: 0 };
+  }
+  function updateCountUp(dt) {
+    const c = G.countUp;
+    if (!c || !G.reward) return;
+    const total = G.reward.total;
+    c.t += dt;
+    const target = Math.min(total, Math.round(total * U.smooth(Math.min(1, c.t / 1.2))));
+    if (target !== c.shown) {
+      if (Math.floor(target / 10) !== Math.floor(c.shown / 10)) AU.sfx('coin');
+      c.shown = target;
+      $('rewardTotal').textContent = '+' + target;
+      $('rewardNow').textContent = 'you have ' + (G.coinsBefore + target);
+    }
+    if (c.shown >= total) G.countUp = null;
   }
 
   // ------------------------------------------------------------------ simulation
@@ -446,10 +629,12 @@
         G.fwT = 0.35 + Math.random() * 0.4;
       }
       if (G.state === 'winning' && G.winAge > 2.4) showWin();
+      if (G.state === 'won') updateCountUp(dt);
     } else if (G.state === 'menu') {
       G.camX += dt * 5;
       if (G.camX > G.lvl.finishX - 20) G.camX = -4;
-      drawHero();
+      if (G.shopOpen) drawShop();
+      else drawHero();
     }
     if (G.banner) G.banner.t += dt;
     G.flash = Math.max(0, G.flash - dt * 2.5);
@@ -477,7 +662,7 @@
     x.rotate(U.smooth(ph) * Math.PI * 2);
     Art.setDark(0);
     const faces = ['grin', 'o', 'grin', 'tongue'];
-    Art.cube(x, 100, faces[Math.floor(t / 1.54) % faces.length], G.skin, 0);
+    Art.cube(x, 96, faces[Math.floor(t / 1.54) % faces.length], G.skin, 0);
   }
 
   addEventListener('load', () => {

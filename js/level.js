@@ -1,4 +1,4 @@
-// VippeDash — level builder + the Uppland → Uppsala → Storvreta level
+// VippeDash — level builder + the levels (1: Uppland → Uppsala → Storvreta, 2: the wild forest)
 // Units are blocks. 10.4 blocks/s at 156 BPM => 1 beat = 4 blocks, 1 bar = 16 blocks.
 (function () {
   const VD = (window.VD = window.VD || {});
@@ -43,6 +43,10 @@
     water(x, w) {
       return this.add({ t: 'haz', kind: 'water', x, y: 0, w, h: 0.3, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28 });
     }
+    // a crow hovering at (x, y); its hitbox is smaller than the drawing
+    bird(x, y) {
+      return this.add({ t: 'haz', kind: 'bird', x, y, w: 1, h: 1, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.25, hy1: y + 0.7 });
+    }
     pad(x, y = 0, color = 'yellow') {
       return this.add({ t: 'pad', x: x + 0.1, y, w: 0.8, h: 0.25, color });
     }
@@ -77,7 +81,10 @@
   }
 
   class Level {
-    constructor(b) {
+    constructor(b, def) {
+      this.def = def;
+      this.id = def.id;
+      this.theme = def.theme;
       this.objs = b.objs;
       this.checkpoints = b.checkpoints;
       this.decos = b.decos.sort((a, c) => a.x - c.x);
@@ -140,7 +147,10 @@
     }
   }
 
-  function buildLevel() {
+  // ======================================================================
+  // LEVEL 1 — Hem till Storvreta
+  // ======================================================================
+  function buildHome() {
     const b = new Builder();
 
     // ============ AREAS ============
@@ -453,9 +463,387 @@
     b.landmark('villas', 1222, { seed: 8 });
     b.landmark('home', 1248);
 
-    return new Level(b);
+    return b;
   }
 
-  VD.buildLevel = buildLevel;
+  // ======================================================================
+  // LEVEL 2 — Vilda skogen (the wild forest). Harder: triple spikes, birds, orb chains,
+  // a tighter bike ride over the bog and a quicker ball section in the bear cave.
+  // ======================================================================
+  function buildForest() {
+    const b = new Builder();
+
+    // ============ AREAS (each starts on a 4-bar phrase of the music) ============
+    b.area('edge', -60, 'SKOGSBRYNET', 'Into the wild forest');
+    b.area('spruce', 208, 'GRANSKOGEN', 'Squirrels, logs & crows');
+    b.area('bog', 384, 'MYREN', 'Fly low over the bog!');
+    b.area('cave', 576, 'BJÖRNGROTTAN', "Shh… don't wake the bear!");
+    b.area('ravine', 704, 'BÄCKRAVINEN', 'Leap across the brook');
+    b.area('glade', 880, 'GLÄNTAN', 'The sunny clearing');
+
+    // ============ SKOGSBRYNET (0 – 208) ============
+    b.checkpoint(0);
+    b.text(12, 4.6, 'Level 2 · Vilda skogen', 0.55);
+    b.text(12, 3.9, 'Hedgehogs are spiky too!', 0.4);
+    b.spike(24, 0, 'hedgehog');
+    b.spike(32, 0, 'hedgehog');
+    b.spikes(40, 2, 0, 'hedgehog');
+    b.block(48, 0, 3, 1, 'log');
+    b.spikes(51, 3);
+    b.block(54, 0, 3, 1, 'log');
+    // three hedgehogs on the beat: jump, land, jump
+    b.spike(64, 0, 'hedgehog');
+    b.spike(69, 0, 'hedgehog');
+    b.spike(74, 0, 'hedgehog');
+    // stump staircase over the thorns
+    b.block(84, 0, 2, 1, 'stump');
+    b.spikes(86, 2);
+    b.block(88, 0, 2, 2, 'stump');
+    b.spikes(90, 2);
+    b.block(92, 0, 2, 3, 'stump');
+    b.spikes(94, 4);
+    b.spikes(106, 3);
+    // moose crossing
+    b.pad(114);
+    b.block(118, 0, 3, 2.5, 'moose');
+    b.spikes(121, 3);
+
+    b.checkpoint(128);
+    b.spike(140, 0, 'hedgehog');
+    b.text(149, 5.6, 'Stay low under the birds!', 0.45);
+    b.bird(147, 1.35);
+    b.bird(148.5, 1.55);
+    b.bird(150, 1.35);
+    b.spike(158, 0, 'hedgehog');
+    // stepping stones across the forest pool
+    b.block(168, 0, 2, 1, 'rock');
+    b.water(170, 4);
+    b.block(174, 0, 2, 1, 'rock');
+    b.water(176, 4);
+    b.block(180, 0, 2, 2, 'rock');
+    b.water(182, 4);
+    b.block(186, 0, 2, 1, 'rock');
+    b.spikes(196, 2);
+
+    // ============ GRANSKOGEN (208 – 384) ============
+    b.block(206, 0, 5, 1, 'timber');
+    b.spike(209, 1);
+    b.spikes(211, 2);
+    b.spikes(222, 2);
+    b.spike(232, 0, 'hedgehog');
+    b.bird(236, 1.4);
+    b.bird(237.5, 1.4);
+    b.spike(244, 0, 'hedgehog');
+
+    b.checkpoint(256);
+    b.spikes(266, 3);
+    // branch hopping over a floor of thorns
+    b.pad(279);
+    b.spikes(282, 18);
+    b.block(284, 2, 3, 0.5, 'branch');
+    b.block(290, 3, 3, 0.5, 'branch');
+    b.block(296, 2, 3, 0.5, 'branch');
+    // orb chain
+    b.text(314, 5.8, 'Orb chain!', 0.45);
+    b.spikes(310, 13);
+    b.orb(311, 2);
+    b.orb(316, 2);
+    b.orb(321, 2);
+    // timber pile with a spike on it and a crow above: jump early!
+    b.block(332, 0, 9, 1, 'timber');
+    b.spike(338, 1);
+    b.bird(340, 3.3);
+    b.spikes(341, 2);
+    b.spikes(352, 2);
+    b.block(361, 0, 2, 1, 'stump');
+    b.block(365, 0, 2, 2, 'stump');
+    b.spikes(367, 3);
+    b.spike(377, 0, 'hedgehog');
+
+    // ============ MYREN — ship over the bog (384 – 576) ============
+    b.checkpoint(384);
+    b.text(390, 5.4, 'HOLD to fly — dodge the crows!', 0.45);
+    b.portal(396, 'ship', { ceil: 9 });
+    b.corridor(396, 560, 9, 'boughs');
+    b.water(402, 156);
+    b.block(410, 0, 2, 3, 'deadtree');
+    b.block(420, 5, 2, 4, 'boughs');
+    b.bird(428, 3.2);
+    b.block(434, 0, 2, 4, 'deadtree');
+    b.bird(441, 6.4);
+    b.bird(442, 2.2);
+    b.block(448, 5.5, 3, 3.5, 'boughs');
+    b.block(456, 0, 2, 3.5, 'deadtree');
+    b.bird(463, 6.2);
+    b.block(468, 0, 3, 2.5, 'deadtree');
+    b.block(468, 6, 3, 3, 'boughs');
+
+    b.checkpoint(480, 'ship', 4.15, 9);
+    b.block(490, 0, 2, 4, 'deadtree');
+    b.block(490, 7.2, 2, 1.8, 'boughs');
+    b.block(499, 0, 2, 1.8, 'deadtree');
+    b.block(499, 5, 2, 4, 'boughs');
+    b.block(508, 0, 2, 4.4, 'deadtree');
+    b.block(508, 7.6, 2, 1.4, 'boughs');
+    b.bird(516, 2.4);
+    b.bird(516, 6.2);
+    b.block(524, 0, 6, 2, 'deadtree');
+    b.block(524, 5.5, 6, 3.5, 'boughs');
+    b.bird(535, 4.2);
+    b.block(542, 0, 2, 3.8, 'deadtree');
+    b.block(548, 5.2, 2, 3.8, 'boughs');
+    b.portal(560, 'cube', { y: 3 });
+
+    // ============ BJÖRNGROTTAN — ball (576 – 704) ============
+    b.checkpoint(576);
+    b.text(592, 4.3, 'TAP to flip — quietly!', 0.45);
+    b.portal(584, 'ball', { ceil: 6 });
+    b.corridor(584, 697, 6, 'cave');
+    b.spikes(598, 3, 0, 'cave');
+    b.spikesDown(605, 3, 6, 'cave');
+    b.spikes(612, 3, 0, 'cave');
+    b.spikesDown(619, 3, 6, 'cave');
+    b.block(627, 0, 3, 2, 'cave');
+    // faster flips: a spike group every 5 blocks
+    b.spikesDown(634, 3, 6, 'cave');
+    b.spikes(639, 2, 0, 'cave');
+    b.spikesDown(644, 2, 6, 'cave');
+    b.spikes(649, 2, 0, 'cave');
+    b.spikesDown(654, 2, 6, 'cave');
+    b.block(660, 4, 3, 2, 'cave');
+    b.spikes(666, 3, 0, 'cave');
+    b.spikesDown(672, 3, 6, 'cave');
+    b.spikes(678, 3, 0, 'cave');
+    b.spikesDown(684, 3, 6, 'cave');
+    b.portal(696, 'cube', { y: 2 });
+
+    // ============ BÄCKRAVINEN (704 – 880) ============
+    b.checkpoint(704);
+    b.spikes(716, 3);
+    // across the brook: stones, a fox and an orb
+    b.block(724, 0, 2, 1, 'rock');
+    b.water(726, 4);
+    b.block(730, 0, 2, 2, 'rock');
+    b.water(732, 7);
+    b.orb(735, 3.4);
+    b.block(739, 0, 3, 1, 'rock');
+    b.water(742, 4);
+    b.block(746, 0, 3, 1, 'rock');
+    b.spikes(754, 2, 0, 'hedgehog');
+    b.block(760, 0, 2, 1.3, 'fox');
+    b.spikes(762, 2);
+    b.spikes(772, 2);
+    // branches over the rapids
+    b.water(780, 13);
+    b.block(782, 1.5, 3, 0.5, 'branch');
+    b.block(788, 2.5, 3, 0.5, 'branch');
+    b.spike(796, 0, 'hedgehog');
+    b.spike(800, 0, 'hedgehog');
+    b.spike(804, 0, 'hedgehog');
+
+    b.checkpoint(816);
+    b.spikes(826, 2);
+    b.block(834, 0, 3, 1, 'rock');
+    b.block(837, 0, 3, 2, 'rock');
+    b.spikes(840, 5);
+    b.orb(842, 3.2);
+    b.block(845, 0, 3, 2, 'rock');
+    b.spike(846, 2);
+    b.spikes(848, 4);
+    b.spikes(860, 3);
+    b.bird(867, 1.4);
+    b.bird(868.5, 1.4);
+    b.spike(875, 0, 'hedgehog');
+
+    // ============ GLÄNTAN (880 – finish) ============
+    b.checkpoint(880);
+    b.spikes(890, 2);
+    b.pad(898);
+    b.block(902, 0, 3, 2.5, 'moose');
+    b.spikes(905, 3);
+    b.spike(914, 0, 'hedgehog');
+    b.spike(918, 0, 'hedgehog');
+    b.spikes(926, 3);
+    b.block(936, 0, 2, 1.3, 'fox');
+    b.spikes(946, 2);
+    b.spikes(952, 13);
+    b.orb(954, 2);
+    b.orb(959, 2.6);
+    b.orb(964, 2);
+    b.spike(976, 0, 'hedgehog');
+    b.spikes(984, 2);
+    b.finish(1008);
+
+    // ============ NEAR SCENERY ============
+    const forest = (x0, x1, seed) => {
+      // alternate big spruces and tall pines, with ground plants in between
+      const r = VD.U.rng(seed);
+      for (let x = x0; x < x1; x += 7 + Math.floor(r() * 6)) {
+        const k = r();
+        b.deco(k < 0.45 ? 'spruce' : k < 0.85 ? 'pinetree' : 'birch', x);
+        const g = r();
+        if (g < 0.8) b.deco(g < 0.3 ? 'fern' : g < 0.5 ? 'berries' : g < 0.65 ? 'shrooms' : 'fern', x + 3 + Math.floor(r() * 2));
+      }
+    };
+    b.deco('trailsign', 4, { text: 'Vilda skogen' });
+    forest(10, 44, 11);
+    // (big animals stand in the gaps between obstacles so they never look like something to jump over)
+    b.deco('squirrel', 46, { stump: true });
+    b.deco('hare', 60);
+    forest(62, 100, 12);
+    b.deco('anthill', 101);
+    b.deco('moose', 134);
+    forest(140, 166, 13);
+    b.deco('reeds', 171);
+    b.deco('crane', 178);
+    b.deco('reeds', 184);
+    b.deco('woodpecker', 192);
+    b.deco('squirrel', 200, { stump: true });
+    forest(206, 240, 14);
+    b.deco('squirreltree', 241);
+    b.deco('moose', 250, { calf: true });
+    b.deco('foxsit', 261);
+    forest(266, 276, 15);
+    b.deco('owl', 278);
+    forest(286, 330, 16);
+    b.deco('squirrel', 348, { stump: true });
+    forest(352, 372, 17);
+    b.deco('trailsign', 381, { text: 'Myren' });
+    b.deco('reeds', 388);
+    for (let x = 398; x < 556; x += 13) b.deco('reeds', x + (x % 3));
+    for (const x of [408, 446, 482, 520, 546]) b.deco('crane', x);
+    b.deco('cavehill', 552, { w: 50, span: 50, mouth: 20.5 });
+    // inside the bear cave
+    b.deco('glowshrooms', 590, { inside: true });
+    b.deco('crystals', 604, { inside: true });
+    b.deco('bear', 636, { inside: true });
+    b.deco('glowshrooms', 662, { inside: true });
+    b.deco('crystals', 679, { inside: true });
+    b.deco('cavehill', 689, { w: 14, span: 14 });
+    b.deco('foxsit', 712);
+    forest(716, 720, 18);
+    b.deco('reeds', 727);
+    b.deco('reeds', 741);
+    b.deco('deer', 751, { graze: true });
+    forest(756, 790, 19);
+    b.deco('woodpecker', 792);
+    b.deco('hare', 809);
+    forest(812, 836, 20);
+    b.deco('owl', 838);
+    forest(846, 874, 21);
+    b.deco('trailsign', 878, { text: 'Gläntan' });
+    b.deco('lupins', 881);
+    b.deco('birch', 886);
+    b.deco('hare', 910.5);
+    b.deco('birch', 922);
+    b.deco('lupins', 930.5);
+    b.deco('deer', 942);
+    b.deco('birch', 958);
+    b.deco('squirrel', 970, { stump: true });
+    b.deco('lupins', 988);
+    b.deco('camp', 996);
+    b.deco('finish', 1008);
+
+    // ============ MID-LAYER LANDMARKS ============
+    b.landmark('jakttorn', 22);
+    b.landmark('spruces', 64);
+    b.landmark('moosecalf', 104);
+    b.landmark('tarn', 168);
+    b.landmark('spruces', 216);
+    b.landmark('foxrun', 262);
+    b.landmark('spruces', 300);
+    b.landmark('deer', 352);
+    b.landmark('deadtrees', 404);
+    b.landmark('cranes', 446);
+    b.landmark('deadtrees', 492);
+    b.landmark('cranes', 526);
+    b.landmark('rockhill', 566);
+    b.landmark('rockhill', 716);
+    b.landmark('spruces', 764);
+    b.landmark('deer', 806);
+    b.landmark('spruces', 850);
+    b.landmark('firetower', 902);
+    b.landmark('cottage', 940, { color: '#a3322a' });
+    b.landmark('moosecalf', 978);
+    b.landmark('birches', 1010);
+
+    return b;
+  }
+
+  // ======================================================================
+  // THEMES — everything the renderer and the music need to know per level
+  // ======================================================================
+  const HOME_THEME = {
+    // time of day follows the journey: noon in Uppland -> sunset over Fyrisån -> night in Storvreta
+    sky: [
+      { x: -100, top: '#3d9be9', bot: '#c4e8ff', far: '#8cb3b0', dark: 0, sun: 0.1 },
+      { x: 360, top: '#4b98e0', bot: '#fde6b4', far: '#98ad9f', dark: 0.03, sun: 0.28 },
+      { x: 520, top: '#e0885a', bot: '#ffd59a', far: '#b3948a', dark: 0.1, sun: 0.55 },
+      { x: 720, top: '#a9477a', bot: '#ff9e6a', far: '#8e6888', dark: 0.24, sun: 0.82 },
+      { x: 880, top: '#373a7a', bot: '#dd7a78', far: '#58517f', dark: 0.42, sun: 0.99 },
+      { x: 1040, top: '#141a45', bot: '#40397a', far: '#2d2f5c', dark: 0.6, sun: 1.2 },
+      { x: 1320, top: '#070b24', bot: '#22265c', far: '#1c2046', dark: 0.68, sun: 1.3 },
+    ],
+    field: { uppland: 'meadow', gamla: 'golden', uppsala: 'park', fyris: 'river', road: 'farm', hall: 'farm', home: 'lawn' },
+    ground: { uppland: 'grass', gamla: 'golden', uppsala: 'cobble', fyris: 'quay', road: 'asphalt', hall: 'hall', home: 'grass' },
+    glow: { uppland: '#ffffff', gamla: '#fff2c4', uppsala: '#ffe0c0', fyris: '#ffd0e8', road: '#ffffff', hall: '#8ff3ff', home: '#c9d8ff' },
+    far: { uppsala: 'city', fyris: 'city', road: 'pine', home: 'pine', default: 'mixed' },
+    farExtra: [{ x: 640, t: 'spires' }], // twin spires of the cathedral, visible from far away
+    midFill: { hall: null, uppsala: null, fyris: null, uppland: 'mixed', gamla: 'mixed', default: 'pine' },
+    midStep: [4, 6],
+    indoor: { hall: 'hall' },
+    train: [850, 1030], // the regional train racing along the railway towards Storvreta
+    song: 'home',
+  };
+  const FOREST_THEME = {
+    // a whole day in the woods: fresh morning, misty bog, golden afternoon in the clearing
+    sky: [
+      { x: -100, top: '#5aa7d6', bot: '#f3efc8', far: '#557f60', dark: 0, sun: 0.15 },
+      { x: 200, top: '#4b95c8', bot: '#dcefd0', far: '#44705a', dark: 0.05, sun: 0.2 },
+      { x: 380, top: '#8aa6b8', bot: '#dfe6dc', far: '#6f857c', dark: 0.1, sun: 0.3 },
+      { x: 560, top: '#7d93aa', bot: '#e4d8c4', far: '#65786e', dark: 0.14, sun: 0.4 },
+      { x: 720, top: '#4a92d0', bot: '#fbe7b8', far: '#4c7454', dark: 0.05, sun: 0.48 },
+      { x: 900, top: '#5b86c8', bot: '#ffcf96', far: '#6a7a52', dark: 0.1, sun: 0.66 },
+      { x: 1100, top: '#6a6fb2', bot: '#ffb488', far: '#5a5e58', dark: 0.2, sun: 0.82 },
+    ],
+    field: { edge: 'forest', spruce: 'forest', bog: 'bog', cave: 'forest', ravine: 'forest', glade: 'glade' },
+    ground: { edge: 'forest', spruce: 'forest', bog: 'peat', cave: 'cave', ravine: 'forest', glade: 'grass' },
+    glow: { edge: '#fff4d6', spruce: '#e6ffd8', bog: '#eaf2ff', cave: '#8ff3ff', ravine: '#ffffff', glade: '#fff2c4' },
+    far: { bog: 'sparse', default: 'forest' },
+    farExtra: [],
+    midFill: { cave: null, bog: 'dead', glade: 'mixed', edge: 'mixed', default: 'spruce' },
+    midStep: [2.5, 3.5],
+    indoor: { cave: 'cave' },
+    canopy: ['spruce', 'ravine'], // branches hanging over the top of the screen
+    beams: ['edge', 'spruce', 'ravine'], // sunbeams slanting through the trees
+    mist: ['bog'],
+    flocks: true, // flocks of birds crossing the sky
+    song: 'forest',
+  };
+
+  // ======================================================================
+  // LEVEL LIST — difficulty sets the coin reward (see game.js)
+  // ======================================================================
+  const LEVELS = [
+    {
+      id: 'home', num: 1, name: 'Hem till Storvreta', route: 'Uppland › Uppsala › Storvreta',
+      difficulty: 1, diffName: 'Easy', reward: 50,
+      winTitle: 'Välkommen hem, Vippe!', winSub: 'From the fields of Uppland, over the rooftops of Uppsala, all the way home to Storvreta.',
+      build: buildHome, theme: HOME_THEME,
+    },
+    {
+      id: 'forest', num: 2, name: 'Vilda skogen', route: 'Skogsbrynet › Myren › Björngrottan › Gläntan',
+      difficulty: 2, diffName: 'Medium', reward: 100,
+      winTitle: 'Skogens hjälte!', winSub: 'Past the hedgehogs, over the bog, through the bear cave and out into the sunny clearing.',
+      build: buildForest, theme: FOREST_THEME,
+    },
+  ];
+
+  VD.LEVELS = LEVELS;
+  VD.levelDef = (id) => LEVELS.find((l) => l.id === id) || LEVELS[0];
+  VD.buildLevel = function (id) {
+    const def = VD.levelDef(id);
+    return new Level(def.build(), def);
+  };
   VD.Level = Level;
 })();

@@ -19,12 +19,32 @@
     <div id="menu" class="overlay">
       <div class="panel">
         <h1 class="logo"><span class="a">Vippe</span><span class="b">Dash</span></h1>
-        <p class="tag">Uppland <i>›</i> Uppsala <i>›</i> Storvreta</p>
-        <canvas id="hero" width="240" height="220"></canvas>
-        <div id="skins" class="skins"></div>
+        <div class="menubody">
+          <div class="herobox">
+            <canvas id="hero" width="240" height="260"></canvas>
+            <p id="skinName" class="skinname"></p>
+            <button id="shopBtn" class="btn shopbtn">🛒&nbsp; Shop</button>
+          </div>
+          <div class="levelbox">
+            <p class="pick">Choose a level</p>
+            <div id="levels" class="levels"></div>
+          </div>
+        </div>
         <button id="play" class="btn big">▶&nbsp; PLAY</button>
-        <p id="best" class="best"></p>
         <p class="help">Jump / fly / flip: <b>Space</b>, <b>↑</b>, <b>click</b> or <b>tap</b> &nbsp;·&nbsp; Pause: <b>Esc</b> &nbsp;·&nbsp; Mute: <b>M</b></p>
+      </div>
+      <div class="wallet corner" title="Your coins"><i class="coin"></i><span id="coinsMenu">0</span></div>
+    </div>
+
+    <div id="shop" class="overlay hidden">
+      <div class="panel shoppanel">
+        <div class="shophead">
+          <h2>Shop</h2>
+          <div class="wallet" title="Your coins"><i class="coin"></i><span id="coinsShop">0</span></div>
+        </div>
+        <p class="sub">Win coins by finishing levels. Harder levels and fewer crashes give more coins!</p>
+        <div id="shopGrid" class="shopgrid"></div>
+        <button id="shopBack" class="btn">←&nbsp; Back</button>
       </div>
     </div>
 
@@ -39,10 +59,12 @@
 
     <div id="win" class="overlay hidden">
       <div class="panel">
-        <h2 class="wintitle">Välkommen hem, Vippe!</h2>
-        <p class="sub">From the fields of Uppland, over the rooftops of Uppsala, all the way home to Storvreta.</p>
+        <h2 id="winTitle" class="wintitle"></h2>
+        <p id="winSub" class="sub"></p>
         <div id="stats" class="stats"></div>
-        <button id="again" class="btn big">↺&nbsp; Play again</button>
+        <div id="reward" class="reward"></div>
+        <button id="next" class="btn big">▶&nbsp; Next level</button>
+        <button id="again" class="btn">↺&nbsp; Play again</button>
         <button id="winMenu" class="btn">Main menu</button>
       </div>
     </div>
