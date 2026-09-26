@@ -5,6 +5,9 @@
 Vincent/
 Alfred/
 
+# Built single-file game (python tools/build_single.py)
+dist/
+
 # Local Claude Code settings
 .claude/settings.local.json
 

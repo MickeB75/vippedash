@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VippeDash icons</title>
+<style>
+  body { margin: 20px; background: #333; color: #eee; font: 14px system-ui, sans-serif; }
+  canvas { margin: 0 12px 12px 0; background: repeating-conic-gradient(#555 0 25%, #444 0 50%) 0 0 / 20px 20px; vertical-align: top; }
+</style>
+</head>
+<body>
+<p>App icons for <code>manifest.json</code>. Right-click a canvas and save it as the file named in its title, or let headless Chrome save one
+  (<code>?only=</code> shows just that icon at 0,0 on a transparent page):</p>
+<pre>chrome --headless --hide-scrollbars --default-background-color=00000000 --window-size=512,512 --screenshot=icons/icon-512.png "http://localhost:8765/tools/icons.html?only=icon-512.png"</pre>
+<script src="../js/util.js"></script>
+<script src="../js/art.js"></script>
+<script>
+  // Vippe's cube on a night-blue tile. "maskable" fills the whole square and keeps Vippe inside the
+  // middle 80 % circle, because Android crops maskable icons to its own shape.
+  const ICONS = (window.ICONS = {});
+  function icon(name, size, maskable) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    c.title = name;
+    const x = c.getContext('2d'), k = size / 512;
+    const bg = x.createRadialGradient(256 * k, 200 * k, 40 * k, 256 * k, 256 * k, 380 * k);
+    bg.addColorStop(0, '#3a57b8');
+    bg.addColorStop(1, '#0c1024');
+    x.fillStyle = bg;
+    x.beginPath();
+    if (maskable) x.rect(0, 0, size, size);
+    else x.roundRect(0, 0, size, size, 96 * k);
+    x.fill();
+    // ground stripe
+    x.fillStyle = 'rgba(92, 200, 255, 0.18)';
+    x.fillRect(0, (maskable ? 400 : 420) * k, size, size);
+    const s = (maskable ? 230 : 300) * k;
+    x.translate(256 * k, (maskable ? 280 : 290) * k);
+    x.rotate(-0.12);
+    VD.Art.setDark(0);
+    VD.Art.cube(x, s, 'grin', 'red', 0);
+    document.body.appendChild(c);
+    ICONS[name] = c.toDataURL('image/png');
+  }
+  icon('icon-512.png', 512, false);
+  icon('icon-192.png', 192, false);
+  icon('icon-maskable-512.png', 512, true);
+  const only = new URLSearchParams(location.search).get('only');
+  if (only) {
+    document.body.style.cssText = 'margin:0;background:transparent';
+    for (const el of document.body.children) el.style.display = 'none';
+    const c = [...document.querySelectorAll('canvas')].find((c) => c.title === only);
+    c.style.cssText = 'display:block;margin:0;background:none';
+  }
+</script>
+</body>
+</html>

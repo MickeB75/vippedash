@@ -24,6 +24,38 @@ Then open <http://localhost:8765>.
 | Open the shop | **Shop** button or **S** |
 | Switch between Vippe and Affelito in the shop | click the tab, or **←** / **→** |
 
+## Play on Android
+
+There are two ways, and neither needs web hosting or Android Studio. On a phone, **PLAY** switches to fullscreen and landscape. If you turn the phone upright, the game pauses and shows a "Vänd mobilen!" hint. The back button or back swipe pauses the run, and a second back goes to the main menu.
+
+### A. E-mail yourself one file (quick)
+
+```bash
+python tools/build_single.py
+```
+
+This builds `dist/VippeDash.html`, the whole game in one file of about 450 KB with the code, CSS and font inside, so it plays offline. E-mail it to yourself (or copy it to the phone's `Download` folder over USB).
+
+On the phone, download the attachment and open it with **Chrome**. Don't open it with the built-in "HTML Viewer": JavaScript is turned off there, so the game won't start. You won't get an app icon, and coins and progress may not be saved between times when the game is opened from a file.
+
+Run the build again whenever the game changes. Gmail won't send `.apk` files, but `.html` is fine.
+
+### B. Install it as an app over USB (best)
+
+This installs VippeDash as an app with its own icon. It runs in fullscreen landscape, works offline and saves coins and progress. You only need the cable to install or update it.
+
+1. **On the phone:** go to Settings → About phone and tap **Build number** 7 times. Then go to Developer options and turn on **USB debugging**.
+2. **On the PC:** start the server, `python -m http.server 8765 --bind 127.0.0.1`.
+3. **Connect the phone** with a USB cable and open `chrome://inspect/#devices` in Chrome on the PC. Allow USB debugging on the phone when it asks. Click **Port forwarding…**, add port `8765` → `localhost:8765`, and tick **Enable port forwarding**.
+4. **In Chrome on the phone**, open <http://localhost:8765> and choose **⋮ → Install app** (or **Add to home screen**). Start the app once while the cable is still connected, so everything gets saved on the phone.
+5. **Unplug the cable.** The app now works on its own, even in airplane mode.
+
+To **update** the app, do steps 2–3 again and open the app while the cable is connected. It fetches the new files by itself. Close the app and open it again to play the new version.
+
+This works because the app is a PWA: `manifest.json` names the app and its icons, and `sw.js` (a service worker) keeps a copy of every file on the phone. **When you add a file that the game loads, add it to `FILES` in `sw.js`**, or the installed app won't have it offline.
+
+The installed app, the e-mailed file and the browser each keep their own coins and progress.
+
 ## Coins and the shop
 
 You win coins every time you finish a level:
@@ -109,7 +141,7 @@ Level 3 has its own soundtrack in E minor: a train rhythm on the tracks, a drum 
 
 ## How it's built
 
-Everything is vanilla JavaScript with Canvas 2D and WebAudio. There are **no image or audio files**: Vippe, the scenery and the soundtrack are all drawn and synthesised in code. The music is generated live at 156 BPM, which is exactly 4 blocks per beat, so obstacles land on the beat. When you respawn, the music restarts from the checkpoint.
+Everything is vanilla JavaScript with Canvas 2D and WebAudio. The game has **no image or audio files**: Vippe, the scenery and the soundtrack are all drawn and synthesised in code. The PNGs in `icons/` are only the app icon, drawn by `tools/icons.html`. The music is generated live at 156 BPM, which is exactly 4 blocks per beat, so obstacles land on the beat. When you respawn, the music restarts from the checkpoint.
 
 ```
 index.html        page + menus (level select, shop, level-complete screen)
@@ -122,7 +154,14 @@ js/audio.js       procedural chiptune (one song per level) + sound effects
 js/art.js         all drawing: Vippe, Affelito and their skins, obstacles, animals, landmarks
 js/render.js      parallax scene, camera (incl. following you down a hole), HUD
 js/game.js        game loop, input, checkpoints, menus, coins and the shop
+js/mobile.js      phone extras: fullscreen + landscape, portrait pause, back button
+fonts/            Lilita One (SIL Open Font License, see fonts/OFL.txt)
+manifest.json     app name, icons and landscape/fullscreen for the installed app
+sw.js             service worker: offline copy of every file for the installed app
+icons/            app icons
 tools/verify.html level verifier
+tools/icons.html  draws the app icons
+tools/build_single.py  builds dist/VippeDash.html, the one-file version
 ```
 
 ### Editing a level

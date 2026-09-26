@@ -1,3 +1,8 @@
+@font-face {
+  font-family: "Lilita One";
+  src: url("../fonts/LilitaOne-Regular.ttf") format("truetype");
+  font-display: swap;
+}
 :root {
   --u: 1; /* logical px -> css px, set from JS so the UI scales with the canvas */
   --font: "Lilita One", "Arial Black", Impact, sans-serif;
@@ -284,3 +289,27 @@ h2 { margin: 0 0 calc(var(--u) * 6px); font-weight: normal; font-size: calc(var(
   cursor: pointer;
   line-height: 1;
 }
+
+/* ---------- phones: "turn your phone" hint in portrait (js/mobile.js pauses the run) ---------- */
+#rotate { display: none; }
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: #05070f;
+    color: #fff;
+    font-family: var(--font);
+    font-size: 34px;
+    text-align: center;
+  }
+  #rotate p { margin: 0; }
+  #rotate .phone { font-size: 72px; animation: turn 2.2s ease-in-out infinite; }
+  #rotate .sub { font-size: 16px; color: #aab6d8; }
+}
+@keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
