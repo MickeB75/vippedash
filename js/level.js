@@ -1,4 +1,4 @@
-// VippeDash — level builder + the levels (1: Uppland → Uppsala → Storvreta, 2: the wild forest)
+// VippeDash — level builder + the levels (1: Uppland → Uppsala → Storvreta, 2: the wild forest, 3: the subway)
 // Units are blocks. 10.4 blocks/s at 156 BPM => 1 beat = 4 blocks, 1 bar = 16 blocks.
 (function () {
   const VD = (window.VD = window.VD || {});
@@ -12,6 +12,7 @@
       this.corridors = [];
       this.areas = [];
       this.texts = [];
+      this.drops = [];
       this.nextId = 1;
       this.finishX = 0;
     }
@@ -27,7 +28,7 @@
     // drawn like a block, but it's jagged (a snapped-off dead tree, a clump of spruce boughs), so it
     // kills on touch instead of letting you slide along it; the hitbox leaves out the jagged edge
     thorny(x, y, w, h, style) {
-      const top = style === 'deadtree'; // dead trees are jagged on top, boughs hang down with jagged tips
+      const top = y === 0; // things standing on the ground are jagged on top, things hanging down at the bottom
       return this.add({ t: 'haz', kind: 'thorny', x, y, w, h, style, hx0: x + 0.1, hx1: x + w - 0.1, hy0: top ? y : y + 0.15, hy1: top ? y + h - 0.15 : y + h });
     }
     spike(x, y = 0, style) {
@@ -49,9 +50,34 @@
     water(x, w) {
       return this.add({ t: 'haz', kind: 'water', x, y: 0, w, h: 0.3, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28 });
     }
-    // a crow hovering at (x, y); its hitbox is smaller than the drawing
-    bird(x, y) {
-      return this.add({ t: 'haz', kind: 'bird', x, y, w: 1, h: 1, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.25, hy1: y + 0.7 });
+    // a crow (or a pigeon, a gull) hovering at (x, y); its hitbox is smaller than the drawing
+    bird(x, y, style) {
+      return this.add({ t: 'haz', kind: 'bird', x, y, w: 1, h: 1, style, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.25, hy1: y + 0.7 });
+    }
+    // ---- level 3: the subway and the sewers ----
+    // a stretch of live third rail: touch it and you're out (like water)
+    rail(x, w) {
+      return this.add({ t: 'haz', kind: 'rail', x, y: 0, w, h: 0.3, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28 });
+    }
+    // a parked metro train: too tall to jump onto from the ground, so use a pad or a step
+    train(x, w) {
+      return this.block(x, 0, w, 2.5, 'train');
+    }
+    // a crocodile lying in the sewer water. Its back is a platform, its snapping jaws are not.
+    // dir 'left': the jaws face you (jump over them onto its back); 'right': land on the tail, jump off before the jaws
+    croc(x, w, dir = 'left') {
+      const left = dir === 'left', hx = left ? x : x + w - CROC_HEAD;
+      this.block(left ? x + CROC_HEAD - 0.1 : x, 0, w - CROC_HEAD + 0.1, CROC_BACK, left ? 'crocL' : 'crocR');
+      return this.add({ t: 'haz', kind: 'croc', dir, x: hx, y: 0, w: CROC_HEAD, h: 1.2, hx0: hx + (left ? 0.1 : 0.25), hx1: hx + CROC_HEAD - (left ? 0.25 : 0.1), hy0: 0, hy1: 0.95 });
+    }
+    // a crocodile head sticking straight up out of the water with its jaws wide open
+    snapper(x) {
+      return this.add({ t: 'haz', kind: 'snapper', x, y: 0, w: 1, h: 1.6, hx0: x + 0.25, hx1: x + 0.75, hy0: 0, hy1: 1.25 });
+    }
+    // a hole in the floor. Fall into it and you come out of the roof of the layer below, which is `shift`
+    // blocks further down (15 = exactly one screen, so the two layers sit right on top of each other)
+    hole(x, w, shift = 15) {
+      this.drops.push({ x0: x, x1: x + w, shift, depth: 1.5 });
     }
     pad(x, y = 0, color = 'yellow') {
       return this.add({ t: 'pad', x: x + 0.1, y, w: 0.8, h: 0.25, color });
@@ -86,6 +112,8 @@
     }
   }
 
+  const CROC_HEAD = 1.4, CROC_BACK = 0.75;
+
   class Level {
     constructor(b, def) {
       this.def = def;
@@ -104,6 +132,11 @@
         this.areas[i].index = i;
         this.areas[i].x1 = i + 1 < this.areas.length ? this.areas[i + 1].x0 : this.length + 60;
       }
+      // holes in the floor split the level into layers: everything past a hole is on the layer below it
+      this.drops = b.drops.sort((a, c) => a.x0 - c.x0);
+      this.drops.forEach((d, i) => (d.layer = i));
+      for (const list of [this.objs, this.checkpoints, this.decos, this.texts]) for (const o of list) if (o.layer == null) o.layer = this.layerAt(o.x);
+      for (const list of [this.corridors, this.areas]) for (const o of list) o.layer = this.layerAt(o.x0);
       this.margin = 0;
       this.cols = [];
       for (const o of this.objs) {
@@ -140,6 +173,17 @@
     }
     visible(x0, x1) {
       return this._collect(Math.floor(x0) - 1, Math.floor(x1) + 1, this._vis);
+    }
+    layerAt(x) {
+      let n = 0;
+      for (const d of this.drops) if (x >= d.x0) n++;
+      return n;
+    }
+    // how far below the top floor the floor of `layer` is (in blocks)
+    depthOf(layer) {
+      let y = 0;
+      for (let i = 0; i < layer && i < this.drops.length; i++) y += this.drops[i].shift;
+      return y;
     }
     areaAt(x) {
       const a = this.areas;
@@ -778,6 +822,266 @@
   }
 
   // ======================================================================
+  // LEVEL 3 — Tunnelbanan (the Stockholm subway). A little shorter than level 2 but harder: surf the
+  // parked trains over the live rail, fly through the tunnel, and halfway through the floor caves in and
+  // you drop into the sewers, where crocodiles lurk in the dirty water.
+  // ======================================================================
+  function buildMetro() {
+    const b = new Builder();
+
+    // ============ AREAS (each starts on a bar of the music) ============
+    b.area('street', -60, 'SERGELS TORG', 'Down into the subway!');
+    b.area('station', 48, 'T-CENTRALEN', 'Mind the gap!');
+    b.area('tracks', 208, 'SPÅREN', 'Surf the trains!');
+    b.area('tunnel', 352, 'TUNNELN', 'Fly through the dark');
+    b.area('sewer', 464, 'KLOAKERNA', 'Crocodiles in the sewer?!');
+    b.area('pipe', 656, 'AVLOPPSRÖRET', 'Tap to flip — mind the slime!');
+    b.area('outlet', 768, 'UTLOPPET', 'Follow the light…');
+    b.area('harbor', 864, 'RIDDARFJÄRDEN', 'Out into the sunshine!');
+
+    // ============ SERGELS TORG (0 – 48) ============
+    b.checkpoint(0);
+    b.text(12, 4.6, 'Level 3 · Tunnelbanan', 0.55);
+    b.text(12, 3.9, 'Jump up onto the trains!', 0.4);
+    b.spike(24, 0, 'cone');
+    b.spikes(30, 2, 0, 'cone');
+    b.block(38, 0, 2, 1, 'barrier');
+    b.spike(40, 0, 'cone');
+    b.block(41, 0, 2, 1, 'barrier');
+
+    // ============ T-CENTRALEN (48 – 208) ============
+    // the ticket gates: hop from gate to gate, the rats scurry about underneath
+    b.block(58, 0, 1, 1, 'gate');
+    b.spike(60.2, 0, 'rat');
+    b.block(62.5, 0, 1, 1, 'gate');
+    b.spike(64.7, 0, 'rat');
+    b.block(67, 0, 1, 1, 'gate');
+    b.spikes(69, 2, 0, 'rat');
+    // somebody's luggage, piled up higher and higher
+    b.block(78, 0, 1, 1, 'luggage');
+    b.block(82, 0, 1, 2, 'luggage');
+    b.block(86, 0, 1, 3, 'luggage');
+    b.spikes(89, 2, 0, 'rat');
+    // pigeons at head height: stay on the ground under them
+    b.text(99, 5.4, 'Stay low under the pigeons!', 0.45);
+    b.bird(97, 1.35, 'pigeon');
+    b.bird(98.5, 1.55, 'pigeon');
+    b.bird(100, 1.35, 'pigeon');
+    b.spike(108, 0, 'rat');
+
+    b.checkpoint(112);
+    // the first train: a pad up onto the roof, over the air vent, and off the far end over the rats
+    b.pad(120);
+    b.train(123, 14);
+    b.block(129, 2.5, 2, 0.5, 'vent');
+    b.spikes(138, 2, 0, 'rat');
+    b.spikes(148, 2, 0, 'rat');
+    b.spike(154, 0, 'rat');
+    b.spikes(159, 2, 0, 'rat');
+    // mind the gap: the live rail shows through a gap in the platform
+    b.text(170, 5.2, 'Mind the gap!', 0.45);
+    b.rail(168, 2.5);
+    b.spike(176, 0, 'rat');
+    // a barrier to step up from, then the second train
+    b.block(184, 0, 2, 1, 'barrier');
+    b.train(188, 12);
+    b.spikes(201, 2, 0, 'rat');
+
+    // ============ SPÅREN (208 – 352) ============
+    b.checkpoint(208);
+    b.block(216, 0, 1, 1, 'barrier');
+    b.rail(222, 2.9);
+    // two trains in a row: jump the gap between them (the live rail is right underneath)
+    b.pad(230);
+    b.train(233, 12);
+    b.rail(245, 3);
+    b.train(248, 12);
+    b.block(254, 2.5, 1, 0.5, 'vent');
+    b.spikes(261, 2, 0, 'rat');
+    b.spikes(272, 2, 0, 'rat');
+    b.spikes(280, 3, 0, 'rat');
+    // barriers over the live rail: hop from barrier to barrier
+    b.block(296, 0, 2, 1, 'barrier');
+    b.rail(298, 3);
+    b.block(301, 0, 2, 1, 'barrier');
+    b.rail(303, 3);
+    b.block(306, 0, 2, 1, 'barrier');
+    b.rail(308, 3);
+    // a gap too wide to jump: tap the orb in mid-air
+    b.block(316, 0, 2, 1, 'barrier');
+    b.train(320, 10);
+    b.rail(330, 6);
+    b.orb(332.5, 4);
+    b.train(336, 10);
+    b.spikes(347, 2, 0, 'rat');
+
+    // ============ TUNNELN — ship (352 – 464) ============
+    b.checkpoint(352);
+    b.text(356, 5.4, 'HOLD to fly through the tunnel!', 0.45);
+    b.portal(360, 'ship', { ceil: 9 });
+    b.corridor(360, 432, 9, 'tunnel');
+    b.rail(364, 68); // the whole tunnel floor is live
+    b.train(368, 16);
+    b.thorny(374, 5.4, 2, 3.6, 'signal');
+    b.block(390, 4.2, 2, 4.8, 'beam');
+    b.thorny(398, 0, 1, 5, 'signalpost');
+    b.train(405, 16);
+    b.thorny(409, 6, 2, 3, 'signal');
+    b.thorny(416, 5, 2, 4, 'signal');
+    b.thorny(425, 0, 1, 4.2, 'signalpost');
+    b.portal(432, 'cube', { y: 4 });
+    // the end of the line... and the floor is caving in
+    b.text(444, 5.4, 'Uh-oh… the floor is cracking!', 0.45);
+    b.spike(443, 0, 'rat');
+    b.hole(454, 7);
+
+    // ============ KLOAKERNA (454 / 464 – 656), one layer down ============
+    b.checkpoint(472);
+    b.spike(480, 0, 'rat');
+    // the first crocodile faces you: jump over its jaws onto its back
+    b.text(492, 5.4, 'Land on their backs — not their jaws!', 0.45);
+    b.water(488, 8);
+    b.croc(488, 6);
+    // this one faces away: land on its tail and jump off before you reach the jaws
+    b.water(504, 7);
+    b.croc(505, 6, 'right');
+    b.block(520, 0, 3, 1, 'pipe');
+    b.spikes(523, 2, 0, 'rat');
+    b.block(525, 0, 3, 1, 'pipe');
+    // crocodiles popping up out of the sludge
+    b.water(536, 2.8);
+    b.snapper(536.9);
+    b.water(544, 2.8);
+    b.snapper(544.9);
+    b.spike(556, 0, 'rat');
+
+    b.checkpoint(568);
+    // floating barrels and a crocodile: stepping stones across the channel
+    b.water(576, 16);
+    b.block(579, 0, 2, 1, 'barrel');
+    b.croc(582.5, 5);
+    b.block(589.5, 0, 2, 1, 'barrel');
+    b.spike(598, 0, 'rat');
+    // two crocodiles in a row
+    b.water(606, 15);
+    b.croc(606, 6);
+    b.croc(614, 6);
+    b.spikes(626, 2, 0, 'rat');
+    // an orb over the wide channel
+    b.water(634, 7);
+    b.orb(636, 2);
+    b.snapper(638);
+    b.spike(648, 0, 'rat');
+
+    // ============ AVLOPPSRÖRET — ball (656 – 768) ============
+    b.checkpoint(656);
+    b.text(668, 4.3, 'TAP to flip — mind the slime!', 0.45);
+    b.portal(664, 'ball', { ceil: 6 });
+    b.corridor(664, 761, 6, 'pipe');
+    b.spikes(676, 3, 0, 'slime');
+    b.spikesDown(683, 3, 6, 'slime');
+    b.spikes(690, 3, 0, 'slime');
+    b.block(697, 4, 3, 2, 'grate');
+    b.spikes(701, 2, 0, 'slime');
+    b.spikesDown(706, 2, 6, 'slime');
+    b.spikes(711, 2, 0, 'slime');
+    b.spikesDown(716, 2, 6, 'slime');
+    b.block(722, 0, 3, 2, 'grate');
+    b.spikesDown(726, 3, 6, 'slime');
+    b.spikes(731, 3, 0, 'slime');
+    b.spikesDown(736, 2, 6, 'slime');
+    b.spikes(740, 2, 0, 'slime');
+    b.spikesDown(744, 2, 6, 'slime');
+    b.spikes(749, 3, 0, 'slime');
+    b.portal(760, 'cube', { y: 2 });
+
+    // ============ UTLOPPET (768 – 864) ============
+    b.checkpoint(768);
+    b.spike(778, 0, 'rat');
+    b.water(786, 7);
+    b.croc(787, 6, 'right');
+    b.block(800, 0, 3, 1, 'pipe');
+    b.block(803, 0, 3, 2, 'pipe');
+    b.spikes(806, 3, 0, 'rat');
+    // two snapping heads: tap the orb between them
+    b.water(816, 6);
+    b.snapper(817);
+    b.orb(818, 2);
+    b.snapper(820);
+    b.water(828, 14);
+    b.croc(828, 6);
+    b.block(836.5, 0, 2, 1, 'barrel');
+    b.spike(846, 0, 'rat');
+    b.spike(851, 0, 'rat');
+
+    // ============ RIDDARFJÄRDEN (864 – finish) ============
+    b.spikes(874, 2, 0, 'cone');
+    b.bird(883, 1.35, 'gull');
+    b.bird(884.5, 1.55, 'gull');
+    b.spike(892, 0, 'cone');
+    b.block(900, 0, 2, 1, 'barrier');
+    b.spike(902, 0, 'cone');
+    b.block(903, 0, 2, 1, 'barrier');
+    b.spikes(914, 2, 0, 'cone');
+    b.finish(928);
+
+    // ============ SCENERY ============
+    b.deco('tsign', 6);
+    b.deco('lamp', 16);
+    b.deco('bike', 20, { color: '#2a7bd1' });
+    b.deco('bench', 34);
+    b.deco('tbana', 46);
+    // T-Centralen: blue cave walls, signs, clocks and the next-train display
+    b.deco('stationsign', 56, { inside: true, text: 'T-CENTRALEN' });
+    b.deco('display', 74, { inside: true });
+    b.deco('stationsign', 104, { inside: true, text: 'T-CENTRALEN' });
+    b.deco('clock', 116, { inside: true });
+    b.deco('poster', 142, { inside: true, seed: 1 });
+    b.deco('stationsign', 162, { inside: true, text: 'T-CENTRALEN' });
+    b.deco('poster', 180, { inside: true, seed: 2 });
+    b.deco('exit', 196, { inside: true });
+    // out along the tracks and into the tunnel
+    b.deco('voltage', 224, { inside: true });
+    b.deco('signallamp', 266, { inside: true });
+    b.deco('nodutgang', 282, { inside: true });
+    b.deco('voltage', 300, { inside: true });
+    b.deco('signallamp', 314, { inside: true });
+    b.deco('nodutgang', 350, { inside: true });
+    b.deco('rasrisk', 438, { inside: true });
+    b.deco('bufferstop', 470, { inside: true, layer: 0 });
+    // the sewer, one layer down (the hole in the floor starts at 454)
+    b.deco('rubble', 456, { inside: true });
+    b.deco('ladder', 478, { inside: true });
+    b.deco('outfall', 500, { inside: true });
+    b.deco('grate', 530, { inside: true });
+    b.deco('ladder', 560, { inside: true });
+    b.deco('outfall', 596, { inside: true });
+    b.deco('grate', 628, { inside: true });
+    b.deco('outfall', 652, { inside: true });
+    b.deco('grate', 776, { inside: true });
+    b.deco('outfall', 812, { inside: true });
+    b.deco('ladder', 822, { inside: true });
+    b.deco('grate', 846, { inside: true });
+    b.deco('culvert', 848, { w: 14, span: 14 });
+    // Riddarfjärden in the evening sun
+    b.deco('lamp', 870);
+    b.deco('bollard', 880);
+    b.deco('bollard', 896);
+    b.deco('lamp', 908);
+    b.deco('bench', 920);
+    b.deco('finish', 928);
+
+    // ============ MID-LAYER LANDMARKS ============
+    b.landmark('cityrow', 10, { seed: 31 });
+    b.landmark('obelisk', 36);
+    b.landmark('cityrow', 880, { seed: 17 });
+    b.landmark('stadshuset', 916);
+    b.landmark('cityrow', 960, { seed: 23 });
+
+    return b;
+  }
+
+  // ======================================================================
   // THEMES — everything the renderer and the music need to know per level
   // ======================================================================
   const HOME_THEME = {
@@ -827,6 +1131,25 @@
     flocks: true, // flocks of birds crossing the sky
     song: 'forest',
   };
+  const METRO_THEME = {
+    // you only see the sky at the start (Sergels torg in the afternoon) and at the end (Riddarfjärden at sunset)
+    sky: [
+      { x: -100, top: '#3f93dc', bot: '#d6ebff', far: '#8a9aa8', dark: 0, sun: 0.3 },
+      { x: 60, top: '#4a95d8', bot: '#e2eaf0', far: '#8e9aa4', dark: 0, sun: 0.35 },
+      { x: 820, top: '#6a64b0', bot: '#ffc07a', far: '#7c6f86', dark: 0.06, sun: 0.74 },
+      { x: 900, top: '#5a58a6', bot: '#ffa874', far: '#6c6080', dark: 0.12, sun: 0.82 },
+      { x: 1040, top: '#34397e', bot: '#ff8c6a', far: '#544a6c', dark: 0.24, sun: 0.94 },
+    ],
+    field: { street: 'plaza', station: 'plaza', tracks: 'plaza', tunnel: 'plaza', default: 'river' },
+    ground: { street: 'plattan', station: 'platform', tracks: 'track', tunnel: 'track', sewer: 'sewer', pipe: 'pipe', outlet: 'sewer', harbor: 'quay' },
+    glow: { street: '#ffffff', station: '#0f2a52', tracks: '#ffe680', tunnel: '#ffcf70', sewer: '#c8ff7a', pipe: '#c8ff7a', outlet: '#c8ff7a', harbor: '#fff2c4' },
+    far: { default: 'city' },
+    farExtra: [],
+    midFill: { default: null },
+    midStep: [4, 6],
+    indoor: { station: 'metro', tracks: 'metro', tunnel: 'metro', sewer: 'sewer', pipe: 'sewer', outlet: 'sewer' },
+    song: 'metro',
+  };
 
   // ======================================================================
   // LEVEL LIST — difficulty sets the coin reward (see game.js)
@@ -843,6 +1166,12 @@
       difficulty: 2, diffName: 'Medium', reward: 100,
       winTitle: 'Skogens hjälte!', winSub: 'Past the hedgehogs, over the bog, through the bear cave and out into the sunny clearing.',
       build: buildForest, theme: FOREST_THEME,
+    },
+    {
+      id: 'metro', num: 3, name: 'Tunnelbanan', route: 'T-Centralen › Tunneln › Kloakerna',
+      difficulty: 3, diffName: 'Hard', reward: 150,
+      winTitle: 'Ur kloaken!', winSub: 'Over the trains, through the tunnel, down the hole, past the crocodiles and out into the sunshine.',
+      build: buildMetro, theme: METRO_THEME,
     },
   ];
 

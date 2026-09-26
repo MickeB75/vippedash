@@ -43,6 +43,7 @@
       lastOrb: -1,
       lastPad: -1,
       lastPortal: -1,
+      layer: cp.layer || 0, // 0 = the normal floor; +1 for every hole you've fallen through (level 3)
       dead: false,
       cause: null,
     };
@@ -52,7 +53,7 @@
     return {
       x: s.x, y: s.y, vy: s.vy, mode: s.mode, gdir: s.gdir, ceil: s.ceil, grounded: s.grounded,
       held: s.held, pressAge: s.pressAge, lastOrb: s.lastOrb, lastPad: s.lastPad,
-      lastPortal: s.lastPortal, dead: s.dead, cause: s.cause,
+      lastPortal: s.lastPortal, layer: s.layer, dead: s.dead, cause: s.cause,
     };
   }
 
@@ -68,6 +69,13 @@
     if (portal.mode === 'ship') s.vy *= 0.4;
     else s.vy *= 0.5;
     if (s.ceil != null && s.y + newH > s.ceil) s.y = s.ceil - newH;
+  }
+
+  // the hole (if any) under the middle of the player, on the layer the player is on
+  function holeAt(lvl, s) {
+    const cx = s.x + 0.5;
+    for (const d of lvl.drops) if (d.layer === s.layer && cx >= d.x0 && cx < d.x1) return d;
+    return null;
   }
 
   // Advance one fixed step. `held` = is the jump input down. `ev` (optional) receives event names.
@@ -115,7 +123,16 @@
     s.y += s.vy * dt;
     s.grounded = false;
 
-    if (s.y < 0) {
+    // a hole in the floor: no ground under you, and once you've fallen deep enough you come out of the
+    // roof of the layer below (same x, y shifted up so the fall is continuous)
+    const hole = lvl.drops.length ? holeAt(lvl, s) : null;
+    if (hole) {
+      if (s.y < -hole.depth) {
+        s.y += hole.shift;
+        s.layer++;
+        if (ev) ev.push('drop');
+      }
+    } else if (s.y < 0) {
       s.y = 0;
       if (s.vy < 0) s.vy = 0;
       if (s.gdir < 0) s.grounded = true;

@@ -109,12 +109,14 @@ html, body {
   box-shadow: inset 0 calc(var(--u) * -4px) 0 rgba(0, 0, 0, 0.25);
 }
 .lvl.d2 .lnum { background: #2ea84a; }
+.lvl.d3 .lnum { background: #d2412f; }
 .linfo { flex: 1; display: flex; flex-direction: column; gap: calc(var(--u) * 2px); }
 .linfo b { font-weight: normal; font-size: calc(var(--u) * 28px); line-height: 1; }
 .linfo small { font-family: system-ui, sans-serif; font-size: calc(var(--u) * 14px); color: #cfd8f0; }
 .lmeta { display: flex; gap: calc(var(--u) * 14px); font-size: calc(var(--u) * 17px); }
 .diff { color: #7dff9a; }
 .diff.d2 { color: #ffb347; }
+.diff.d3 { color: #ff6b5e; }
 .lcoins { color: #ffd634; display: inline-flex; align-items: center; gap: calc(var(--u) * 5px); }
 .lprog { flex: none; display: flex; flex-direction: column; align-items: center; min-width: calc(var(--u) * 70px); }
 .lprog b { font-weight: normal; font-size: calc(var(--u) * 26px); color: #5cc8ff; }

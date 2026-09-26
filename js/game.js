@@ -51,6 +51,7 @@
     AU.setSong(G.lvl.theme.song);
     store.set('level', G.levelDef.id);
     G.camX = -4;
+    G.camV = G.camVT = 0;
   }
   // { levelId: { best: %, wins, fewest: crashes } }. Older saves only had one level's best/wins.
   function loadProgress() {
@@ -403,7 +404,8 @@
     const cp = G.lvl.checkpoints[G.cpIndex];
     G.s = Ph.spawn(cp);
     G.attempts++;
-    G.attemptText = { x: cp.x, n: G.attempts };
+    G.attemptText = { x: cp.x, n: G.attempts, layer: cp.layer };
+    G.camV = G.camVT = G.lvl.depthOf(G.s.layer);
     G.vis = { rot: 0, wheel: 0, oT: 0 };
     G.state = 'play';
     G.acc = 0;
@@ -439,6 +441,7 @@
     show('menu', true);
     G.state = 'menu';
     G.camX = -4;
+    G.camV = G.camVT = 0;
     G.s = null;
     refreshMenu();
   };
@@ -542,6 +545,7 @@
     for (const e of G.ev) onEvent(e);
     if (s.mode !== prevMode) G.vis.rot = 0;
     visuals(s, wasGrounded);
+    followDown(s);
     if (s.dead) return die();
     const cps = G.lvl.checkpoints;
     while (G.cpIndex + 1 < cps.length && s.x >= cps[G.cpIndex + 1].x) {
@@ -560,6 +564,17 @@
     if (s.x >= G.lvl.finishX) win();
   }
 
+  // G.camV = how far (in blocks) the camera looks below the top floor. When you fall through a hole you come
+  // out of the roof of the layer below: the camera dives after you and settles once you're near its floor.
+  function followDown(s) {
+    const lv = G.lvl;
+    if (!lv.drops.length) return;
+    const floor = lv.depthOf(s.layer);
+    const want = floor - Math.max(0, s.y - 3);
+    if (s.layer > 0 && want > G.camVT) G.camVT = want;
+    G.camV += (G.camVT - G.camV) * 0.06;
+  }
+
   function onEvent(e) {
     const s = G.s, ph = Ph.boxH(s);
     if (e === 'pad' || e === 'orb') {
@@ -573,6 +588,13 @@
         const a = (i / 16) * Math.PI * 2;
         particle({ x: s.x + 0.5, y: s.y + ph / 2, vx: Math.cos(a) * 6, vy: Math.sin(a) * 6, life: 0.5, size: 6, color: s.mode === 'ship' ? '#ff4fd8' : s.mode === 'ball' ? '#ff8a1f' : '#3cff78' });
       }
+    } else if (e === 'drop') {
+      // the floor gives way: rubble tumbles down the hole with you
+      AU.sfx('drop');
+      G.shake = 0.35;
+      for (let i = 0; i < 22; i++) {
+        particle({ x: s.x - 1 + Math.random() * 4, y: s.y + 0.5 + Math.random() * 2, vx: (Math.random() - 0.3) * 4, vy: -2 - Math.random() * 5, life: 0.8 + Math.random() * 0.5, size: 5 + Math.random() * 9, color: i % 3 ? '#6b625a' : '#9a9088', grav: 30 });
+      }
     } else if (e === 'flip') {
       for (let i = 0; i < 5; i++) particle({ x: s.x + 0.5, y: s.gdir > 0 ? s.y : s.y + 1, vx: -3 - Math.random() * 3, vy: (Math.random() - 0.5) * 3, life: 0.3, size: 5, color: '#ffffff' });
     }
@@ -581,7 +603,7 @@
   function onCheckpoint(cp) {
     AU.sfx('checkpoint');
     for (let i = 0; i < 18; i++) {
-      particle({ x: cp.x + 0.5, y: 2.3, vx: (Math.random() - 0.5) * 8, vy: 3 + Math.random() * 6, life: 0.9, size: 7, color: i % 2 ? '#006aa7' : '#fecc00', grav: 14 });
+      particle({ x: cp.x + 0.5, y: 2.3, vx: (Math.random() - 0.5) * 8, vy: 3 + Math.random() * 6, life: 0.9, size: 7, color: i % 2 ? '#006aa7' : '#fecc00', grav: 14, layer: cp.layer });
     }
   }
 
@@ -611,6 +633,7 @@
     p.vx = p.vx || 0;
     p.vy = p.vy || 0;
     p.max = p.life;
+    if (p.layer == null) p.layer = G.s ? G.s.layer : 0; // which floor it's drawn on (level 3 has two)
     if (G.particles.length < 400) G.particles.push(p);
   }
   function updateParticles(dt) {
@@ -676,6 +699,9 @@
     } else if (G.state === 'menu') {
       G.camX += dt * 5;
       if (G.camX > G.lvl.finishX - 20) G.camX = -4;
+      // the attract-mode camera drops through the hole too
+      const want = G.lvl.depthOf(G.lvl.layerAt(G.camX + R.PX + 2));
+      G.camV = want < G.camV ? want : G.camV + (want - G.camV) * (1 - Math.exp(-dt * 4));
       if (G.shopOpen) drawShop();
       else drawHero();
     }

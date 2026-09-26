@@ -8,7 +8,7 @@
   function key(s, n) {
     return (
       n + '|' + Math.round(s.y * 64) + '|' + Math.round(s.vy * 8) + '|' + s.mode + s.gdir + (s.grounded ? 1 : 0) +
-      (s.held ? 1 : 0) + (s.pressAge <= P.BUFFER ? 1 : 0) + '|' + s.lastOrb + '|' + s.lastPad + '|' + s.lastPortal
+      (s.held ? 1 : 0) + (s.pressAge <= P.BUFFER ? 1 : 0) + '|' + s.lastOrb + '|' + s.lastPad + '|' + s.lastPortal + '|' + s.layer
     );
   }
 

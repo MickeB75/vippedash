@@ -47,12 +47,21 @@
     F4: parseMelody('D5 D5 . D5 F5 . D5 . | A#4 A#4 . A#4 D5 . A#4 . | G4 G4 . A#4 D5 . G5 . | A4 A4 . C#5 E5 . A5 .'),
     F5: parseMelody('A5 G5 F5 E5 D5 E5 F5 A5 | G5 F5 E5 D5 C5 D5 E5 G5 | F5 E5 D5 C5 A#4 C5 D5 F5 | E5 - A5 - C#6 - E6 -'),
     F6: parseMelody('A5 - G5 F5 - C5 F5 - | G5 - E5 C5 - G4 C5 - | F5 - A5 D6 - C6 A5 - | A#5 - A5 G5 - F5 D5 -'),
+    // the subway song (level 3), E minor: city groove, train rhythm, a sneaky sewer tune, and G major in the sunshine
+    M1: parseMelody('E5 - G5 E5 - B4 D5 E5 | C5 - E5 C5 - G4 B4 C5 | D5 - G5 D5 - B4 D5 G5 | F#5 - D5 A4 - D5 F#5 A5'),
+    M2: parseMelody('B5 A5 G5 E5 . E5 G5 A5 | A5 F#5 D5 F#5 . D5 F#5 A5 | G5 E5 C5 E5 . C5 E5 G5 | F#5 - D#5 - B4 - D#5 F#5'),
+    M3: parseMelody('E5 - - - G5 - - - | B5 - - - A5 - G5 - | C6 - - - B5 - G5 - | F#5 - - - D#5 - - -'),
+    M5: parseMelody('E4 . G4 . B4 . A#4 B4 | A4 . C5 . E5 . D#5 E5 | E4 . G4 . B4 . G4 E4 | D#4 . F#4 . A4 . B4 .'),
+    M6: parseMelody('A5 E5 C5 E5 A5 E5 C5 E5 | G5 E5 B4 E5 G5 E5 B4 E5 | G5 E5 C5 E5 G5 E5 C5 E5 | F#5 D#5 B4 D#5 F#5 D#5 B4 D#5'),
+    M7: parseMelody('E5 - B4 E5 G5 - F#5 E5 | C5 - G4 C5 E5 - D5 C5 | D5 - B4 D5 G5 - A5 B5 | A5 - F#5 - D5 - F#5 A5'),
+    M8: parseMelody('B5 - A5 G5 - D5 G5 - | A5 - F#5 D5 - A4 D5 - | G5 - E5 B4 - E5 G5 B5 | C6 - B5 A5 - G5 E5 -'),
   };
   // chords: [bass root midi, triad midis]
   const CH = {
     Am: [45, [57, 60, 64]], F: [41, [57, 60, 65]], C: [48, [55, 60, 64]], G: [43, [55, 59, 62]],
     E: [40, [56, 59, 64]], Em: [40, [55, 59, 64]], Dm: [38, [57, 62, 65]],
     Bb: [46, [58, 62, 65]], Gm: [43, [55, 58, 62]], A: [45, [57, 61, 64]],
+    D: [38, [54, 57, 62]], B: [47, [54, 59, 63]],
   };
   const PROG = {
     main: ['Am', 'F', 'C', 'G'],
@@ -64,6 +73,12 @@
     bog: ['Dm', 'Gm', 'Dm', 'A'],
     cave: ['Dm', 'Bb', 'Gm', 'A'],
     glade: ['F', 'C', 'Dm', 'Bb'],
+    metro: ['Em', 'C', 'G', 'D'],
+    metro2: ['Em', 'D', 'C', 'B'],
+    tunnel: ['Em', 'Em', 'C', 'B'],
+    sewer: ['Em', 'Am', 'Em', 'B'],
+    pipe: ['Am', 'Em', 'C', 'B'],
+    harbor: ['G', 'D', 'Em', 'C'],
   };
   // each song: [fromBar, toBar, settings]. `phrase: 'section'` starts the 4-bar phrases at the section start.
   const SONGS = {
@@ -96,6 +111,24 @@
         [44, 55, { prog: 'forest2', drums: 'train', bass: 'eighth', arp: 'fast', lead: 'F5' }],
         [55, 63, { prog: 'glade', drums: 'drop', bass: 'octave', arp: 'up', lead: 'F6', tone: 'flute' }],
         [63, 65, { end: true }],
+      ],
+    },
+    // level 3: the street 0, T-Centralen 3, the tracks 13, the tunnel 22, the floor caves in during bar 28,
+    // the sewer 29, the pipe 41, the outlet 48, out in the sunshine 54; the finish is bar 58
+    metro: {
+      endChord: 'G',
+      phrase: 'section',
+      sections: [
+        [0, 3, { prog: 'metro', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true }],
+        [3, 13, { prog: 'metro', drums: 'main', bass: 'eighth', arp: 'up', lead: 'M1' }],
+        [13, 22, { prog: 'metro2', drums: 'train', bass: 'octave', arp: 'fast', lead: 'M2' }],
+        [22, 28, { prog: 'tunnel', drums: 'half', bass: 'long', arp: 'wave', lead: 'M3', pad: true }],
+        [28, 29, { prog: 'tunnel', drums: 'roll', bass: null, arp: null, lead: null }],
+        [29, 41, { prog: 'sewer', drums: 'half', bass: 'long', arp: 'wave', lead: 'M5', pad: true, tone: 'pluck', drips: true }],
+        [41, 48, { prog: 'pipe', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'M6', drips: true }],
+        [48, 54, { prog: 'metro', drums: 'train', bass: 'eighth', arp: 'up', lead: 'M7' }],
+        [54, 58, { prog: 'harbor', drums: 'drop', bass: 'octave', arp: 'up', lead: 'M8', tone: 'flute' }],
+        [58, 60, { end: true }],
       ],
     },
   };
@@ -283,7 +316,7 @@
     if (d === 'intro') {
       if (s16 === 0) kick(t, 0.8);
       if (bar >= 2 && s16 % 4 === 2) hat(t, 0.8);
-      if (bar === 3 && s16 >= 12) snare(t, 0.3 + (s16 - 12) * 0.15);
+      if (bar === sec[1] - 1 && s16 >= 12) snare(t, 0.3 + (s16 - 12) * 0.15);
     } else if (d === 'main' || d === 'build' || d === 'drop' || d === 'train') {
       if (beat) kick(t);
       if (s16 === 4 || s16 === 12) snare(t);
@@ -300,6 +333,16 @@
       if (s16 === 0 || s16 === 10) kick(t);
       if (s16 === 8) snare(t);
       if (s16 % 2 === 0) hat(t, 0.6);
+    } else if (d === 'roll') {
+      // a snare roll building up (the floor is caving in!)
+      snare(t, 0.15 + s16 * 0.05);
+      if (s16 % 4 === 0) kick(t, 0.6);
+    }
+    // water dripping in the sewer, with an echo
+    if (cfg.drips && s16 % 2 === 1 && ((step * 2654435761) >>> 0) % 7 === 0) {
+      const f = 1500 + ((step * 97) % 5) * 180;
+      voice('sine', f, t, 0.09, 0.07, { slide: f * 0.45 });
+      voice('sine', f, t + STEP * 3, 0.09, 0.025, { slide: f * 0.45 });
     }
 
     // ---- bass ----
@@ -334,7 +377,11 @@
       for (const n of notes) {
         if (n.slot !== slot) continue;
         const dur = n.len * STEP * 2 * 0.95;
-        if (cfg.tone === 'flute') {
+        if (cfg.tone === 'pluck') {
+          // a dark, plucked sound for sneaking through the sewer
+          voice('square', mtof(n.midi), t, Math.min(dur, STEP * 1.6), 0.06, { lp: 1800, lpEnd: 450, hold: 0.25 });
+          voice('triangle', mtof(n.midi - 12), t, Math.min(dur, STEP * 1.6), 0.11, { hold: 0.3 });
+        } else if (cfg.tone === 'flute') {
           // soft woody flute: triangle with a breathy attack and a quiet octave on top
           voice('triangle', mtof(n.midi), t, dur, 0.16, { attack: 0.02, hold: 0.75, detune: -3 });
           voice('sine', mtof(n.midi + 12), t, dur, 0.03, { attack: 0.03, hold: 0.6 });
@@ -389,6 +436,12 @@
       case 'buy':
         [76, 79, 84, 88, 91].forEach((m, i) => voice('square', mtof(m), t + i * 0.06, 0.2, 0.06, { dest, lp: 4500 }));
         voice('triangle', mtof(96), t + 0.3, 0.4, 0.1, { dest });
+        break;
+      case 'drop':
+        // falling down the hole: a whistle sliding down, and the rumble of the floor giving way
+        voice('sine', 1400, t, 0.7, 0.14, { slide: 170, dest, hold: 0.8 });
+        noise(t, 0.9, 0.5, 'lowpass', 500, dest);
+        voice('square', 90, t, 0.5, 0.1, { slide: 40, dest, lp: 400 });
         break;
       case 'nope':
         voice('square', 180, t, 0.12, 0.08, { dest, lp: 1200 });

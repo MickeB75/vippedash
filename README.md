@@ -1,6 +1,6 @@
 # VippeDash
 
-A Geometry Dash–style runner starring **Vippe** (Vincent). There are two levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, and **2 · Vilda skogen** (medium, about 1:37) runs through the wild forest. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
+A Geometry Dash–style runner starring **Vippe** (Vincent). There are three levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Vilda skogen** (medium, about 1:37) runs through the wild forest, and **3 · Tunnelbanan** (hard, about 1:29) runs through the Stockholm subway and down into the sewers. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
 
 ## Play
 
@@ -20,7 +20,7 @@ Then open <http://localhost:8765>.
 | Hold to keep jumping or keep flying | hold any of the above |
 | Pause | **Esc** / **P** / ⏸ button |
 | Mute | **M** / 🔊 button |
-| Pick a level in the menu | click it, or **1** / **2** |
+| Pick a level in the menu | click it, or **1** / **2** / **3** |
 | Open the shop | **Shop** button or **S** |
 | Switch between Vippe and Affelito in the shop | click the tab, or **←** / **→** |
 
@@ -28,11 +28,11 @@ Then open <http://localhost:8765>.
 
 You win coins every time you finish a level:
 
-| | Level 1 (easy) | Level 2 (medium) |
-| --- | --- | --- |
-| Level cleared | 50 | 100 |
-| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 50 | up to 100 |
-| First time you beat the level | 50 | 100 |
+| | Level 1 (easy) | Level 2 (medium) | Level 3 (hard) |
+| --- | --- | --- | --- |
+| Level cleared | 50 | 100 | 150 |
+| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 50 | up to 100 | up to 150 |
+| First time you beat the level | 50 | 100 | 150 |
 
 So a harder level and fewer crashes give more coins. The coin total is shown at the top right of the menu.
 
@@ -90,6 +90,23 @@ Shorter than level 1 but harder, with fewer checkpoints. New things: triple spik
 
 Level 2 has its own folk-style soundtrack in D minor that ends in a major key when you reach the clearing.
 
+## Level 3: Tunnelbanan (≈ 1:29, 8 checkpoints)
+
+A little shorter than level 2 but harder, with fewer checkpoints and the tightest jumps about as tight as level 2's triple spikes. It's like Subway Surfers: you jump up onto parked metro trains and run along their roofs. Halfway through, the tunnel floor caves in and you fall through a hole into the sewers, where crocodiles lie in the dirty water. The camera follows you down the hole, so you see the tunnel above and the sewer below.
+
+| Section | Where | What happens |
+| --- | --- | --- |
+| **Sergels torg** | Stockholm: the black-and-white "Plattan", the glass obelisk, a T sign | Cones and barriers, then in through the subway entrance and down the escalators. |
+| **T-Centralen** | the blue-line station: blue vines painted on the bedrock, a next-train display ("13 Storvreta, 1 min") | Hop across the ticket gates over the rats, climb a pile of suitcases, stay low under the pigeons, and take a jump pad up onto the roof of a train. Mind the gap: the live rail shows through the platform. |
+| **Spåren** | the tracks, trains on them | Surf the trains: jump from roof to roof over the live rail (touching it crashes you), hop along barriers, and tap the orb over a gap that's too wide to jump. |
+| **Tunneln** | the dark tunnel, a train rushing past on the other track | **Flying-bike mode** over the parked trains, between hanging signal boxes, a concrete beam and signal posts. The whole floor is live. Then the floor cracks... and caves in. |
+| **Kloakerna** | the sewer: brick vaults, rusty pipes, dirty water, eyes watching from the side tunnels | Crocodiles: jump over the jaws of the ones facing you and land on their backs, and jump off the ones facing away before you reach their jaws. Crocodile heads snap up out of the sludge. Floating barrels. |
+| **Avloppsröret** | inside the big sewer pipe | **Floorball mode** between blobs of green slime. |
+| **Utloppet** | the last of the sewer | More crocodiles, two snapping heads with an orb between them, and out through the outlet... |
+| **Riddarfjärden** | the waterfront at sunset: Gamla stan and Stadshuset with its three crowns | Gulls, cones and barriers, and the finish. |
+
+Level 3 has its own soundtrack in E minor: a train rhythm on the tracks, a drum roll as the floor gives way, dripping water in the sewer, and G major when you come out into the sunshine.
+
 ## How it's built
 
 Everything is vanilla JavaScript with Canvas 2D and WebAudio. There are **no image or audio files**: Vippe, the scenery and the soundtrack are all drawn and synthesised in code. The music is generated live at 156 BPM, which is exactly 4 blocks per beat, so obstacles land on the beat. When you respawn, the music restarts from the checkpoint.
@@ -98,19 +115,19 @@ Everything is vanilla JavaScript with Canvas 2D and WebAudio. There are **no ima
 index.html        page + menus (level select, shop, level-complete screen)
 css/style.css     menu styling
 js/util.js        colour/random helpers
-js/physics.js     deterministic fixed-step physics (240 Hz): cube, ship, ball, pads, orbs, portals
-js/level.js       level builder, both level layouts, their themes and the level list
+js/physics.js     deterministic fixed-step physics (240 Hz): cube, ship, ball, pads, orbs, portals, holes
+js/level.js       level builder, the level layouts, their themes and the level list
 js/solver.js      search bot that proves the levels are beatable
 js/audio.js       procedural chiptune (one song per level) + sound effects
 js/art.js         all drawing: Vippe, Affelito and their skins, obstacles, animals, landmarks
-js/render.js      parallax scene, camera, HUD
+js/render.js      parallax scene, camera (incl. following you down a hole), HUD
 js/game.js        game loop, input, checkpoints, menus, coins and the shop
 tools/verify.html level verifier
 ```
 
 ### Editing a level
 
-Each level is a build function in `js/level.js` (`buildHome()` and `buildForest()`), listed in `LEVELS` together with its theme (sky colours, ground, music) and coin reward. Units are blocks, and the player moves 10.4 blocks/s. For example:
+Each level is a build function in `js/level.js` (`buildHome()`, `buildForest()` and `buildMetro()`), listed in `LEVELS` together with its theme (sky colours, ground, music) and coin reward. Units are blocks, and the player moves 10.4 blocks/s. For example:
 
 ```js
 b.spike(26);                 // spike on the ground at x = 26
@@ -119,13 +136,27 @@ b.spike(24, 0, 'hedgehog');  // a hedgehog is a spike with a different look
 b.block(80, 0, 3, 1, 'stone'); // solid block: x, y, width, height, style
 b.thorny(410, 0, 2, 3, 'deadtree'); // looks like a block, but crashes you on touch (no sliding along it)
 b.bird(147, 1.35);           // a crow hovering at x, y (a hazard)
+b.bird(97, 1.35, 'pigeon');  // ...or a pigeon, or a 'gull'
 b.pad(128);                  // yellow jump pad
 b.orb(154, 2);               // yellow orb (tap in mid-air)
 b.portal(712, 'ship', { ceil: 10 });
 b.checkpoint(96);
 ```
 
-After changing a level, open `tools/verify.html` through the local server. It runs the search bot from every checkpoint to the next one using the real game physics, and reports any segment that can't be beaten. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2 is harder: its triple spikes have about 80 ms, and everything else has more.
+Level 3 adds:
+
+```js
+b.train(233, 12);            // a parked metro train, 2.5 blocks tall: too tall to jump onto, so use a pad or a step
+b.rail(245, 3);              // live third rail (like water: touch it and you crash)
+b.croc(488, 6);              // crocodile in the water: its back is a platform, its jaws (facing you) are a hazard
+b.croc(505, 6, 'right');     // ...facing away: land on the tail, jump off before the jaws
+b.snapper(537);              // a crocodile head snapping up out of the water
+b.hole(454, 7);              // a hole in the floor: fall through it to the layer below
+```
+
+`b.hole()` splits the level into two floors, one above the other. Everything placed after the hole is on the lower floor. When you fall in, the physics moves you up by one screen (15 blocks) and onto the lower floor, so the fall looks continuous and the camera follows you down.
+
+After changing a level, open `tools/verify.html` through the local server. It runs the search bot from every checkpoint to the next one using the real game physics, and reports any segment that can't be beaten. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2 is harder: its triple spikes have about 80 ms, and everything else has more. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms too, but there are more of them and fewer checkpoints.
 
 ### Debug mode
 

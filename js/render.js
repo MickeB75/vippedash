@@ -116,8 +116,28 @@
     mid.sort((a, b) => a.u - b.u);
     this.mid = mid;
     // field bands in mid-layer space
-    this.fields = lvl.areas.map((ar) => ({ u0: (ar.x0 - PX) * pM + HALF, u1: (ar.x1 - PX) * pM + HALF, style: th.field[ar.id] }));
-    this.indoors = lvl.areas.filter((a) => th.indoor && th.indoor[a.id]).map((a) => ({ x0: a.x0, x1: a.x1, kind: th.indoor[a.id] }));
+    this.fields = lvl.areas.map((ar) => ({ u0: (ar.x0 - PX) * pM + HALF, u1: (ar.x1 - PX) * pM + HALF, style: pick(th.field, ar.id) }));
+    // Each layer (floor) is drawn as its own scene. A layer's first area reaches back and its last area
+    // reaches forward forever, so the sewer is drawn under the whole screen even before the hole.
+    const nL = lvl.drops.length + 1;
+    this.layers = [];
+    for (let L = 0; L < nL; L++) {
+      const areas = lvl.areas.filter((a) => a.layer === L).map((a) => ({ id: a.id, x0: a.x0, x1: a.x1 }));
+      if (nL > 1) {
+        if (L > 0) areas[0].x0 = -Infinity;
+        if (L < nL - 1) areas[areas.length - 1].x1 = Infinity;
+      }
+      // indoor stretches (floorball hall, bear cave, subway, sewer); neighbouring areas of the same kind merge
+      const indoors = [];
+      for (const a of areas) {
+        const kind = th.indoor && th.indoor[a.id];
+        if (!kind) continue;
+        const last = indoors[indoors.length - 1];
+        if (last && last.kind === kind && last.x1 === a.x0) last.x1 = a.x1;
+        else indoors.push({ x0: a.x0, x1: a.x1, kind });
+      }
+      this.layers.push({ areas, indoors });
+    }
     // flocks of birds for the forest sky: [start offset, height, size, count]
     this.flocks = [];
     if (th.flocks) for (let i = 0; i < 4; i++) this.flocks.push({ o: i * 0.27 + rnd() * 0.1, y: 70 + rnd() * 150, s: 0.7 + rnd() * 0.5, n: 3 + Math.floor(rnd() * 5), sp: 0.035 + rnd() * 0.02 });
@@ -146,49 +166,85 @@
     const shake = G.shake > 0 ? G.shake : 0;
     ctx.save();
     if (shake) ctx.translate((Math.random() - 0.5) * shake * 14, (Math.random() - 0.5) * shake * 14);
-    const center = camX + HALF;
-    const sky = skyAt(this.sky, center);
-    Art.setDark(sky.dark);
-    const px = G.s ? G.s.x : center - HALF + PX;
-    // indoor areas (floorball hall, bear cave) fade in as you run through the door
-    let inT = 0, inKind = null;
-    for (const r of this.indoors) {
-      const k = U.smooth(U.clamp((px - r.x0) / 6, 0, 1)) * (1 - U.smooth(U.clamp((px - (r.x1 - 8)) / 6, 0, 1)));
-      if (k > inT) (inT = k), (inKind = r.kind);
-    }
-
-    if (inT < 1) {
-      this.drawOutdoor(ctx, camX, sky, t, center);
-      this.drawNear(ctx, camX, t, false);
-      if (this.theme.canopy) this.drawCanopy(ctx, camX, t, areaWeight(this.lvl, this.theme.canopy, center));
-    }
-    if (inT > 0) {
-      ctx.globalAlpha = inT;
-      if (inKind === 'cave') {
-        this.drawCave(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true);
-        // a dark veil pushes the bear and the crystals behind the (brightly outlined) hazards
-        ctx.fillStyle = 'rgba(16,12,24,0.45)';
-        ctx.fillRect(0, 0, W, GY);
-      } else {
-        this.drawHall(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true);
+    const drops = this.lvl.drops;
+    if (!drops.length) this.drawScene(ctx, camX, t, G, 0);
+    else {
+      // Level 3 has one floor on top of another (you fall through a hole into the sewer). Each floor is a
+      // whole scene, stacked shift blocks apart, and the camera looks G.camV blocks down from the top one.
+      const camV = G.camV || 0;
+      let top = 0;
+      for (let L = 0; L <= drops.length; L++) {
+        const off = (top - camV) * BS;
+        if (off > -H && off < H) {
+          ctx.save();
+          ctx.translate(0, off);
+          this.drawScene(ctx, camX, t, G, L);
+          ctx.restore();
+        }
+        if (L < drops.length) top += drops[L].shift;
       }
-      ctx.globalAlpha = 1;
     }
-    this.drawGround(ctx, camX, t, inT);
-    this.drawCorridors(ctx, camX, t);
-    this.drawObjects(ctx, camX, t, G);
-    this.drawTexts(ctx, camX, G);
-    if (G.s && G.state !== 'menu') this.drawPlayer(ctx, camX, G, t);
-    this.drawParticles(ctx, camX, G);
-    if (G.debug) this.drawDebug(ctx, camX, G);
     ctx.restore();
     if (G.flash > 0) {
       ctx.fillStyle = 'rgba(255,255,255,' + Math.min(0.6, G.flash) + ')';
       ctx.fillRect(0, 0, W, H);
     }
     if (G.state !== 'menu') this.drawHUD(ctx, G, t);
+  };
+
+  // one floor of the level: background, scenery, ground, obstacles, and the player if they're on it
+  R.drawScene = function (ctx, camX, t, G, L) {
+    const center = camX + HALF;
+    const sky = skyAt(this.sky, center);
+    Art.setDark(sky.dark);
+    const px = G.s ? G.s.x : center - HALF + PX;
+    // indoor areas (floorball hall, bear cave, subway, sewer) fade in as you run through the door
+    let inT = 0, inKind = null;
+    for (const r of this.layers[L].indoors) {
+      const k = U.smooth(U.clamp((px - r.x0) / 6, 0, 1)) * (1 - U.smooth(U.clamp((px - (r.x1 - 8)) / 6, 0, 1)));
+      if (k > inT) (inT = k), (inKind = r.kind);
+    }
+
+    if (inT < 1) {
+      this.drawOutdoor(ctx, camX, sky, t, center);
+      this.drawNear(ctx, camX, t, false, L);
+      if (this.theme.canopy) this.drawCanopy(ctx, camX, t, areaWeight(this.lvl, this.theme.canopy, center));
+    }
+    if (inT > 0) {
+      ctx.globalAlpha = inT;
+      if (inKind === 'cave') {
+        this.drawCave(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true, L);
+        // a dark veil pushes the bear and the crystals behind the (brightly outlined) hazards
+        ctx.fillStyle = 'rgba(16,12,24,0.45)';
+        ctx.fillRect(0, 0, W, GY);
+      } else if (inKind === 'metro') {
+        this.drawMetro(ctx, camX, t, center);
+        this.drawNear(ctx, camX, t, true, L);
+      } else if (inKind === 'sewer') {
+        this.drawSewer(ctx, camX, t, center);
+        this.drawNear(ctx, camX, t, true, L);
+      } else {
+        this.drawHall(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true, L);
+      }
+      ctx.globalAlpha = 1;
+    }
+    this.drawGround(ctx, camX, t, inT, L);
+    this.drawCorridors(ctx, camX, t, L);
+    if (this.lvl.drops.length) this.drawHoles(ctx, camX, t, L);
+    this.drawObjects(ctx, camX, t, G, L);
+    this.drawTexts(ctx, camX, G, L);
+    const here = G.s && (G.s.layer || 0) === L;
+    if (here && G.state !== 'menu') this.drawPlayer(ctx, camX, G, t);
+    this.drawParticles(ctx, camX, G, L);
+    if (G.debug && here) this.drawDebug(ctx, camX, G);
+  };
+  // the area at x on layer L
+  R.areaIn = function (L, x) {
+    const a = this.layers[L].areas;
+    for (let i = a.length - 1; i >= 0; i--) if (x >= a[i].x0) return a[i];
+    return a[0];
   };
 
   // ------------------------------------------------------------------ sky + parallax
@@ -467,7 +523,7 @@
       }
       return;
     }
-    const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a' }[style] || '#7dbb4e';
+    const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93' }[style] || '#7dbb4e';
     ctx.fillStyle = T(base);
     ctx.fillRect(x0, mb - 6, w, GY - mb + 10);
     if (style === 'forest') {
@@ -697,23 +753,397 @@
     }
   };
 
+  // ------------------------------------------------------------------ the subway (level 3)
+  R.drawMetro = function (ctx, camX, t, center) {
+    this.drawTunnelWall(ctx, camX, t);
+    // T-Centralen's painted cave fades into the plain tunnel as you run out along the tracks
+    const st = areaWeight(this.lvl, ['station'], center, 24);
+    if (st > 0) {
+      const a0 = ctx.globalAlpha;
+      ctx.globalAlpha = a0 * st;
+      this.drawStation(ctx, camX, t);
+      ctx.globalAlpha = a0;
+    }
+  };
+
+  R.drawTunnelWall = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#0e1013');
+    g.addColorStop(0.55, '#22262d');
+    g.addColorStop(1, '#2d323a');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    // concrete segments of the far wall
+    const off = camX * BS * 0.45;
+    for (let x = -(((off % 150) + 150) % 150); x < W; x += 150) {
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(x, 40, 6, GY - 40);
+      ctx.fillStyle = 'rgba(255,255,255,0.035)';
+      ctx.fillRect(x + 6, 40, 3, GY - 40);
+    }
+    this.drawPassingTrain(ctx, camX, t);
+    // cable trays and lamps along the near wall
+    const offN = camX * BS * 0.8;
+    ctx.strokeStyle = '#08090b';
+    ctx.lineWidth = 3;
+    for (const cy of [112, 134, 150]) {
+      ctx.beginPath();
+      for (let x = -(((offN % 150) + 150) % 150) - 150; x < W + 150; x += 150) {
+        ctx.moveTo(x, cy);
+        ctx.quadraticCurveTo(x + 75, cy + 10, x + 150, cy);
+      }
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#3a3f47';
+    for (let x = -(((offN % 150) + 150) % 150); x < W + 10; x += 150) ctx.fillRect(x - 3, 104, 6, 52);
+    for (let x = -(((offN % 450) + 450) % 450) + 200; x < W + 100; x += 450) {
+      const gl = ctx.createRadialGradient(x, 80, 3, x, 80, 110);
+      gl.addColorStop(0, 'rgba(255,214,150,0.4)');
+      gl.addColorStop(1, 'rgba(255,214,150,0)');
+      ctx.fillStyle = gl;
+      ctx.fillRect(x - 110, -30, 220, 220);
+      ctx.fillStyle = '#1b1d22';
+      Art.rr(ctx, x - 16, 70, 32, 18, 6);
+      ctx.fill();
+      ctx.fillStyle = '#ffe3aa';
+      Art.rr(ctx, x - 11, 74, 22, 10, 4);
+      ctx.fill();
+    }
+    // the dark foot of the wall
+    const fg = ctx.createLinearGradient(0, GY - 90, 0, GY);
+    fg.addColorStop(0, 'rgba(8,9,11,0)');
+    fg.addColorStop(1, 'rgba(8,9,11,0.7)');
+    ctx.fillStyle = fg;
+    ctx.fillRect(0, GY - 90, W, 94);
+  };
+
+  // every now and then a train on the next track rushes past the other way
+  R.drawPassingTrain = function (ctx, camX, t) {
+    const u = (t / 9) % 1;
+    if (u > 0.34) return;
+    const len = 2600, top = GY - 230, bot = GY - 70;
+    const x = W + 160 - (u / 0.34) * (W + len + 600);
+    // headlight beams ahead of it
+    const gl = ctx.createLinearGradient(x - 360, 0, x, 0);
+    gl.addColorStop(0, 'rgba(255,250,220,0)');
+    gl.addColorStop(1, 'rgba(255,250,220,0.35)');
+    ctx.fillStyle = gl;
+    ctx.beginPath();
+    ctx.moveTo(x, bot - 30);
+    ctx.lineTo(x - 360, bot - 80);
+    ctx.lineTo(x - 360, bot + 30);
+    ctx.lineTo(x, bot - 10);
+    ctx.fill();
+    ctx.save();
+    ctx.globalAlpha *= 0.8;
+    ctx.fillStyle = '#8f98a4';
+    Art.rr(ctx, x, top, len, bot - top, 26);
+    ctx.fill();
+    ctx.fillStyle = '#1f5fb4';
+    ctx.fillRect(x + 10, bot - 42, len - 20, 12);
+    // a blur of lit windows
+    ctx.fillStyle = '#ffeebd';
+    for (let wx = x + 60; wx < x + len - 40; wx += 64) ctx.fillRect(wx, top + 34, 44, 48);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    for (let k = 0; k < 5; k++) ctx.fillRect(x + 30, top + 20 + k * 26, len - 60, 2);
+    ctx.fillStyle = '#fffbe0';
+    ctx.beginPath();
+    ctx.arc(x + 14, bot - 22, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  // T-Centralen (blue line): a cave blasted out of the bedrock, painted white with climbing blue vines
+  R.drawStation = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#9cbde2');
+    g.addColorStop(0.35, '#dbe7f5');
+    g.addColorStop(1, '#eef3f9');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const off = camX * BS * 0.55;
+    // bumpy bedrock
+    for (let i = Math.floor(off / 170) - 1; i <= Math.floor((off + W) / 170) + 1; i++) {
+      const x = i * 170 - off;
+      ctx.fillStyle = 'rgba(50,90,150,0.09)';
+      ctx.beginPath();
+      ctx.ellipse(x + U.hash(i) * 80, 160 + U.hash(i * 3.1) * 300, 90 + U.hash(i * 1.7) * 60, 50 + U.hash(i * 2.3) * 40, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // blue vines with leaves climbing the rock
+    const tile = 520, leaves = [];
+    ctx.strokeStyle = '#2d63b8';
+    ctx.fillStyle = '#2d63b8';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (let k = Math.floor(off / tile) - 1; k <= Math.floor((off + W) / tile) + 1; k++) {
+      const bx = k * tile - off;
+      const r = U.rng(k * 7 + 3);
+      for (let v = 0; v < 3; v++) {
+        let x = bx + r() * tile, y = GY - 30 - r() * 50;
+        ctx.moveTo(x, y);
+        for (let sgm = 0; sgm < 6; sgm++) {
+          const nx = x + (r() - 0.35) * 90, ny = y - 48 - r() * 36;
+          ctx.quadraticCurveTo((x + nx) / 2 + (r() - 0.5) * 70, (y + ny) / 2, nx, ny);
+          leaves.push(nx, ny, r());
+          x = nx;
+          y = ny;
+        }
+      }
+    }
+    ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i < leaves.length; i += 3) {
+      for (const side of [-1, 1]) {
+        const a = side * (0.6 + leaves[i + 2] * 0.5), cx = leaves[i] + Math.cos(a) * side * 15, cy = leaves[i + 1] + Math.sin(a) * side * 15;
+        ctx.moveTo(cx + Math.cos(a) * 15, cy + Math.sin(a) * 15);
+        ctx.ellipse(cx, cy, 15, 6, a, 0, Math.PI * 2);
+      }
+    }
+    ctx.fill();
+    // the rough, painted cave roof
+    const offR = camX * BS * 0.7;
+    ctx.fillStyle = '#6d95c8';
+    ctx.beginPath();
+    ctx.moveTo(-10, 0);
+    for (let x = -(((offR % 80) + 80) % 80) - 80; x < W + 160; x += 80) {
+      const i = Math.round((x + offR) / 80);
+      ctx.quadraticCurveTo(x + 40, 70 + U.hash(i) * 40, x + 80, 40 + U.hash(i + 0.5) * 30);
+    }
+    ctx.lineTo(W + 10, 0);
+    ctx.closePath();
+    ctx.fill();
+    // strip lights hanging under the roof
+    const offL = camX * BS * 0.8;
+    for (let x = -(((offL % 330) + 330) % 330) + 60; x < W + 200; x += 330) {
+      ctx.strokeStyle = '#54627a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 20, 60);
+      ctx.lineTo(x + 20, 118);
+      ctx.moveTo(x + 150, 60);
+      ctx.lineTo(x + 150, 118);
+      ctx.stroke();
+      const gl = ctx.createLinearGradient(0, 118, 0, 260);
+      gl.addColorStop(0, 'rgba(255,255,245,0.45)');
+      gl.addColorStop(1, 'rgba(255,255,245,0)');
+      ctx.fillStyle = gl;
+      ctx.beginPath();
+      ctx.moveTo(x, 124);
+      ctx.lineTo(x + 170, 124);
+      ctx.lineTo(x + 230, 260);
+      ctx.lineTo(x - 60, 260);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      Art.rr(ctx, x, 116, 170, 9, 4);
+      ctx.fill();
+    }
+    // the back wall of the platform, with a band of tiles
+    ctx.fillStyle = '#c5d2e0';
+    ctx.fillRect(0, GY - 64, W, 64);
+    ctx.fillStyle = '#2d63b8';
+    ctx.fillRect(0, GY - 64, W, 6);
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    const offT = camX * BS;
+    for (let x = -(((offT % 24) + 24) % 24); x < W; x += 24) ctx.fillRect(x, GY - 58, 2, 58);
+  };
+
+  // ------------------------------------------------------------------ the sewer (level 3)
+  function archPath(ctx, x, base, w, h) {
+    ctx.beginPath();
+    ctx.moveTo(x, base);
+    ctx.lineTo(x, base - h + w / 2);
+    ctx.arc(x + w / 2, base - h + w / 2, w / 2, Math.PI, 0);
+    ctx.lineTo(x + w, base);
+    ctx.closePath();
+  }
+  R.drawSewer = function (ctx, camX, t, center) {
+    const pk = areaWeight(this.lvl, ['pipe'], center, 24);
+    if (pk < 1) this.drawSewerWall(ctx, camX, t);
+    // inside the big pipe (the ball section) the wall becomes ringed concrete
+    if (pk > 0) {
+      const a0 = ctx.globalAlpha;
+      ctx.globalAlpha = a0 * pk;
+      this.drawPipeWall(ctx, camX, t);
+      ctx.globalAlpha = a0;
+    }
+  };
+  R.drawSewerWall = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#10140e');
+    g.addColorStop(1, '#283022');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    // brick courses of the far wall
+    const offF = camX * BS * 0.4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let r = 0, yy = 70; yy < GY; yy += 18, r++) {
+      ctx.moveTo(0, yy);
+      ctx.lineTo(W, yy);
+      for (let x = -((((offF + r * 21) % 42) + 42) % 42); x < W; x += 42) {
+        ctx.moveTo(x, yy);
+        ctx.lineTo(x, yy + 18);
+      }
+    }
+    ctx.stroke();
+    // side tunnels: dark arches in the far wall, with eyes glowing in the dark
+    const stepA = 460;
+    for (let x = -(((offF % stepA) + stepA) % stepA) - stepA; x < W + stepA; x += stepA) {
+      const i = Math.round((x + offF) / stepA);
+      const ax = x + 130, aw = 180, ah = 250, base = GY - 16;
+      ctx.fillStyle = '#39402f';
+      archPath(ctx, ax - 16, base, aw + 32, ah + 16);
+      ctx.fill();
+      const ig = ctx.createLinearGradient(0, base - ah, 0, base);
+      ig.addColorStop(0, '#050605');
+      ig.addColorStop(1, '#0d110b');
+      ctx.fillStyle = ig;
+      archPath(ctx, ax, base, aw, ah);
+      ctx.fill();
+      const blink = (t * 0.6 + i * 0.37) % 1 < 0.05;
+      if (!blink && i % 3 === 0) {
+        // a crocodile watching from the dark: yellow eyes with slit pupils
+        const ex = ax + aw * 0.45, ey = base - 110 + Math.sin(t * 0.8 + i) * 2;
+        for (const dx of [-13, 13]) {
+          ctx.fillStyle = '#e8d23a';
+          ctx.beginPath();
+          ctx.ellipse(ex + dx, ey, 7, 5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#111';
+          ctx.fillRect(ex + dx - 1, ey - 4, 2, 8);
+        }
+      } else if (!blink && i % 3 === 1) {
+        // rats
+        ctx.fillStyle = '#ff4a3a';
+        for (const [dx, dy] of [[-40, -10], [-34, -10], [30, -6], [36, -6]]) ctx.fillRect(ax + aw / 2 + dx, base + dy, 3, 3);
+      }
+    }
+    // rusty pipes along the near wall, with slime running down from the joints
+    const offP = camX * BS * 0.85;
+    for (const [py, pr] of [[212, 12], [244, 8]]) {
+      const pg = ctx.createLinearGradient(0, py - pr, 0, py + pr);
+      pg.addColorStop(0, '#8a7458');
+      pg.addColorStop(0.4, '#6b5840');
+      pg.addColorStop(1, '#2e261c');
+      ctx.fillStyle = pg;
+      ctx.fillRect(0, py - pr, W, pr * 2);
+    }
+    for (let x = -(((offP % 260) + 260) % 260); x < W + 20; x += 260) {
+      const i = Math.round((x + offP) / 260);
+      ctx.fillStyle = '#4a3c2c';
+      ctx.fillRect(x - 6, 196, 12, 32);
+      ctx.fillRect(x + 90, 234, 10, 20);
+      const sg = ctx.createLinearGradient(0, 228, 0, 228 + 140 + (i % 3) * 50);
+      sg.addColorStop(0, 'rgba(126,165,44,0.5)');
+      sg.addColorStop(1, 'rgba(126,165,44,0)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(x - 5, 228, 10, 140 + (i % 3) * 50);
+      // a drip from the joint
+      const u = (t * 0.7 + i * 0.41) % 1;
+      ctx.fillStyle = 'rgba(160,200,90,0.8)';
+      ctx.fillRect(x - 2, 230 + u * (GY - 240), 4, 7);
+    }
+    // the vaulted brick roof
+    const offV = camX * BS * 0.9;
+    ctx.fillStyle = '#171b13';
+    ctx.beginPath();
+    ctx.moveTo(-10, 0);
+    for (let x = -(((offV % 240) + 240) % 240) - 240; x < W + 240; x += 240) {
+      ctx.lineTo(x, 70);
+      ctx.quadraticCurveTo(x + 120, 18, x + 240, 70);
+    }
+    ctx.lineTo(W + 10, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#4f6a2a';
+    for (let x = -(((offV % 240) + 240) % 240) - 240; x < W + 240; x += 240) {
+      for (let k = 0; k < 4; k++) {
+        const dx = 20 + k * 58, len = 10 + ((k * 7 + Math.round((x + offV) / 240)) % 4) * 6;
+        const yy = 70 - Math.sin((dx / 240) * Math.PI) * 42;
+        ctx.fillRect(x + dx, yy - 2, 4, len);
+      }
+    }
+    // green haze over the water
+    for (let i = 0; i < 2; i++) {
+      const y = GY - 50 - i * 70;
+      const mg = ctx.createLinearGradient(0, y - 40, 0, y + 40);
+      mg.addColorStop(0, 'rgba(150,190,90,0)');
+      mg.addColorStop(0.5, 'rgba(150,190,90,' + (0.12 - i * 0.04) + ')');
+      mg.addColorStop(1, 'rgba(150,190,90,0)');
+      ctx.fillStyle = mg;
+      ctx.fillRect(0, y - 40, W, 80);
+    }
+  };
+  // the inside of the big sewer pipe: ringed concrete, rust, slime and little side pipes dribbling into it
+  R.drawPipeWall = function (ctx, camX, t) {
+    const pg = ctx.createLinearGradient(0, 0, 0, GY);
+    pg.addColorStop(0, '#121412');
+    pg.addColorStop(0.45, '#34383a');
+    pg.addColorStop(1, '#1f2322');
+    ctx.fillStyle = pg;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const offR = camX * BS * 0.6;
+    for (let x = -(((offR % 200) + 200) % 200); x < W + 200; x += 200) {
+      const i = Math.round((x + offR) / 200);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(x, GY / 2, 16, GY / 2 + 40, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.fillRect(x + 12, 0, 4, GY);
+      ctx.fillStyle = 'rgba(150,80,30,0.22)';
+      ctx.fillRect(x + 40, GY * 0.3, 10, GY * 0.4);
+      ctx.fillStyle = 'rgba(126,165,44,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(x + 110, GY * (0.35 + 0.3 * U.hash(i)), 40, 26, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (i % 3 === 0) {
+        // a side pipe dribbling slime
+        const py = GY * 0.42;
+        ctx.fillStyle = '#0a0b0a';
+        ctx.beginPath();
+        ctx.ellipse(x + 100, py, 20, 24, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#4a4036';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(126,165,44,0.7)';
+        ctx.fillRect(x + 96, py + 16, 8, GY - py - 16);
+      }
+    }
+  };
+
+  // ------------------------------------------------------------------ holes in the floor (level 3)
+  // the ragged hole in the tunnel floor, and where it comes out through the sewer roof one layer down
+  R.drawHoles = function (ctx, camX, t, L) {
+    for (const d of this.lvl.drops) {
+      const x0 = sx(d.x0, camX), x1 = sx(d.x1, camX);
+      if (x1 < -400 || x0 > W + 200) continue;
+      if (d.layer === L) Art.hole(ctx, x0, x1, GY, H, t);
+      else if (d.layer + 1 === L) Art.holeRoof(ctx, x0, x1, GY, t);
+    }
+  };
+
   // ------------------------------------------------------------------ near scenery (world anchored)
   // inside = only the decorations that belong inside a cave/hall (drawn over the indoor background)
-  R.drawNear = function (ctx, camX, t, inside) {
+  R.drawNear = function (ctx, camX, t, inside, L = 0) {
     const decos = this.lvl.decos;
     for (const d of decos) {
       if (d.x + (d.span || 0) < camX - 14) continue; // span = width in blocks of extra-wide scenery
       if (d.x > camX + 30) break;
-      if (!!d.inside !== inside) continue;
+      if (!!d.inside !== inside || (d.layer || 0) !== L) continue;
       const f = Art.near[d.type];
       if (f) f(ctx, sx(d.x, camX), GY, d, t, BS, FONT);
     }
   };
 
   // ------------------------------------------------------------------ ground
-  R.drawGround = function (ctx, camX, t, inT) {
+  R.drawGround = function (ctx, camX, t, inT, L = 0) {
     const T = Art.TL;
-    for (const a of this.lvl.areas) {
+    for (const a of this.layers[L].areas) {
       const x0 = Math.max(-5, sx(a.x0, camX)), x1 = Math.min(W + 5, sx(a.x1, camX));
       if (x1 <= x0) continue;
       const st = this.theme.ground[a.id];
@@ -819,6 +1249,127 @@
         }
         ctx.fillStyle = T('#d9c44a');
         ctx.fillRect(x0, GY + 14, x1 - x0, 3);
+      } else if (st === 'plattan') {
+        // Sergels torg ("Plattan"): the famous black-and-white triangle paving
+        ctx.fillStyle = T('#e4e2dc');
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x0, GY, x1 - x0, H - GY);
+        ctx.clip();
+        ctx.fillStyle = T('#26262a');
+        const tw = 44, th = 30;
+        for (let r = 0; r < 6; r++) {
+          const yy = GY + 10 + r * th;
+          ctx.beginPath();
+          for (let x = gridStart(x0, camX * BS, tw) - tw; x < x1 + tw; x += tw) {
+            if (r % 2) {
+              ctx.moveTo(x, yy);
+              ctx.lineTo(x + tw / 2, yy + th);
+              ctx.lineTo(x + tw, yy);
+            } else {
+              ctx.moveTo(x, yy + th);
+              ctx.lineTo(x + tw / 2, yy);
+              ctx.lineTo(x + tw, yy + th);
+            }
+          }
+          ctx.fill();
+        }
+        ctx.restore();
+        ctx.fillStyle = T('#f4f2ec');
+        ctx.fillRect(x0, GY, x1 - x0, 8);
+        ctx.fillStyle = T('#aaa69c');
+        ctx.fillRect(x0, GY + 8, x1 - x0, 2);
+      } else if (st === 'platform') {
+        // the platform: stone floor, the yellow safety line, the edge, and the track down in the pit
+        ctx.fillStyle = '#9ba0a6';
+        ctx.fillRect(x0, GY, x1 - x0, 46);
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        for (let x = gridStart(x0, camX * BS, 96); x < x1; x += 96) if (x >= x0) ctx.fillRect(x, GY + 6, 2, 16);
+        ctx.fillStyle = '#d6dadf';
+        ctx.fillRect(x0, GY, x1 - x0, 5);
+        ctx.fillStyle = '#f2c230';
+        ctx.fillRect(x0, GY + 22, x1 - x0, 11);
+        ctx.fillStyle = '#c4960e';
+        for (let x = gridStart(x0, camX * BS, 12); x < x1; x += 12) if (x >= x0 && x + 7 <= x1) ctx.fillRect(x + 3, GY + 25, 4, 4);
+        ctx.fillStyle = '#eef0f2';
+        ctx.fillRect(x0, GY + 42, x1 - x0, 4);
+        ctx.fillStyle = '#343840';
+        ctx.fillRect(x0, GY + 46, x1 - x0, 34);
+        ctx.fillStyle = '#121317';
+        ctx.fillRect(x0, GY + 80, x1 - x0, H - GY - 80);
+        ctx.fillStyle = '#3a3530';
+        for (let x = gridStart(x0, camX * BS, 40); x < x1; x += 40) {
+          const a0 = Math.max(x0, x), a1 = Math.min(x1, x + 22);
+          if (a1 > a0) ctx.fillRect(a0, GY + 128, a1 - a0, 10);
+        }
+        ctx.fillStyle = '#6f767e';
+        ctx.fillRect(x0, GY + 120, x1 - x0, 8);
+        ctx.fillStyle = '#c3c8ce';
+        ctx.fillRect(x0, GY + 120, x1 - x0, 2);
+      } else if (st === 'track') {
+        // the track bed: the running rail on its sleepers, gravel underneath
+        ctx.fillStyle = '#3b3733';
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        for (let i = Math.floor(camX * 3 + x0 / 16) - 1; i <= Math.ceil(camX * 3 + x1 / 16); i++) {
+          const x = i * 16 - camX * BS + ((i * 7) % 9);
+          if (x < x0 || x + 7 > x1) continue;
+          ctx.fillStyle = (i * 13) % 3 ? '#534e47' : '#6a645b';
+          ctx.fillRect(x, GY + 26 + ((i * 29) % 120), 7, 5);
+        }
+        ctx.fillStyle = '#5a4a3b';
+        for (let x = gridStart(x0, camX * BS, 36); x < x1; x += 36) {
+          const a0 = Math.max(x0, x), a1 = Math.min(x1, x + 22);
+          if (a1 > a0) ctx.fillRect(a0, GY + 8, a1 - a0, 14);
+        }
+        ctx.fillStyle = '#6c7279';
+        ctx.fillRect(x0, GY, x1 - x0, 8);
+        ctx.fillStyle = '#d2d7dd';
+        ctx.fillRect(x0, GY, x1 - x0, 3);
+      } else if (st === 'sewer') {
+        // a wet stone walkway along the sewer channel, dark slimy bricks below it
+        ctx.fillStyle = '#262a21';
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let r = 0; r < 8; r++) {
+          const yy = GY + 34 + r * 17;
+          ctx.moveTo(x0, yy);
+          ctx.lineTo(x1, yy);
+          for (let x = gridStart(x0, camX * BS + (r % 2) * 20, 40); x < x1; x += 40) {
+            if (x < x0) continue;
+            ctx.moveTo(x, yy);
+            ctx.lineTo(x, yy + 17);
+          }
+        }
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(120,165,40,0.22)';
+        ctx.fillRect(x0, GY + 58, x1 - x0, 12);
+        ctx.fillStyle = '#555b4b';
+        ctx.fillRect(x0, GY, x1 - x0, 34);
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
+        for (let x = gridStart(x0, camX * BS, 72); x < x1; x += 72) if (x >= x0) ctx.fillRect(x, GY + 5, 2, 29);
+        ctx.fillStyle = 'rgba(210,235,210,0.18)';
+        for (let x = gridStart(x0, camX * BS, 72); x < x1; x += 72) {
+          const a0 = Math.max(x0, x + 14), a1 = Math.min(x1, x + 44);
+          if (a1 > a0) ctx.fillRect(a0, GY + 13, a1 - a0, 3);
+        }
+        ctx.fillStyle = '#5f7d34';
+        ctx.fillRect(x0, GY, x1 - x0, 5);
+      } else if (st === 'pipe') {
+        // the bottom of the big sewer pipe, a trickle of green sludge running along it
+        const g = ctx.createLinearGradient(0, GY, 0, H);
+        g.addColorStop(0, '#50545a');
+        g.addColorStop(1, '#1d1f22');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        for (let x = gridStart(x0, camX * BS, 144); x < x1; x += 144) if (x >= x0) ctx.fillRect(x, GY, 6, H - GY);
+        ctx.fillStyle = '#7ea52c';
+        ctx.fillRect(x0, GY, x1 - x0, 6);
+        ctx.fillStyle = 'rgba(210,255,130,0.55)';
+        ctx.fillRect(x0, GY, x1 - x0, 2);
       } else if (st === 'hall') {
         ctx.fillStyle = '#2d6fb8';
         ctx.fillRect(x0, GY, x1 - x0, H - GY);
@@ -832,8 +1383,9 @@
     }
   };
 
-  R.drawCorridors = function (ctx, camX, t) {
+  R.drawCorridors = function (ctx, camX, t, L = 0) {
     for (const c of this.lvl.corridors) {
+      if ((c.layer || 0) !== L) continue;
       const x0 = Math.max(-5, sx(c.x0, camX)), x1 = Math.min(W + 5, sx(c.x1, camX));
       if (x1 <= x0) continue;
       const y = sy(c.ceil);
@@ -927,6 +1479,79 @@
         ctx.fill();
         ctx.fillStyle = 'rgba(200,255,200,0.5)';
         ctx.fillRect(x0, y - 2, x1 - x0, 2);
+      } else if (c.style === 'tunnel') {
+        // the concrete tunnel roof, with cables along it and lamps
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#0f1114');
+        g.addColorStop(1, '#30343c');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        for (let x = gridStart(x0, camX * BS, 192); x < x1; x += 192) if (x >= x0) ctx.fillRect(x, 0, 5, y);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x0, 0, x1 - x0, y + 30);
+        ctx.clip();
+        ctx.strokeStyle = '#07080a';
+        ctx.lineWidth = 3;
+        for (let k = 0; k < 2; k++) {
+          const cy = y - 20 - k * 12;
+          ctx.beginPath();
+          for (let x = gridStart(x0, camX * BS, 96) - 96; x < x1 + 96; x += 96) {
+            ctx.moveTo(x, cy);
+            ctx.quadraticCurveTo(x + 48, cy + 9, x + 96, cy);
+          }
+          ctx.stroke();
+        }
+        for (let x = gridStart(x0, camX * BS, 288) + 70; x < x1 + 90; x += 288) {
+          const gl = ctx.createRadialGradient(x, y + 2, 2, x, y + 2, 80);
+          gl.addColorStop(0, 'rgba(255,214,140,0.45)');
+          gl.addColorStop(1, 'rgba(255,214,140,0)');
+          ctx.fillStyle = gl;
+          ctx.fillRect(x - 80, y - 10, 160, 90);
+          ctx.fillStyle = '#ffe2a6';
+          ctx.fillRect(x - 12, y - 7, 24, 7);
+        }
+        ctx.restore();
+        ctx.fillStyle = '#4b5059';
+        ctx.fillRect(x0, y - 5, x1 - x0, 5);
+        ctx.fillStyle = 'rgba(255,207,112,0.65)';
+        ctx.fillRect(x0, y - 2, x1 - x0, 2);
+      } else if (c.style === 'pipe') {
+        // the curved top of the big sewer pipe, dripping slime
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#0c0e0b');
+        g.addColorStop(0.7, '#2a2d29');
+        g.addColorStop(1, '#474b45');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        for (let x = gridStart(x0, camX * BS, 144); x < x1; x += 144) if (x >= x0) ctx.fillRect(x, 0, 6, y);
+        ctx.fillStyle = 'rgba(150,80,30,0.25)';
+        for (let x = gridStart(x0, camX * BS, 144) + 40; x < x1; x += 144) if (x >= x0) ctx.fillRect(x, y - 90, 8, 80);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x0, 0, x1 - x0, y + 60);
+        ctx.clip();
+        ctx.fillStyle = '#7ea52c';
+        for (let x = gridStart(x0, camX * BS, 52); x < x1 + 52; x += 52) {
+          const i = Math.round((x + camX * BS) / 52);
+          const len = 6 + ((i * 37) % 17);
+          ctx.beginPath();
+          ctx.moveTo(x - 7, y - 2);
+          ctx.quadraticCurveTo(x - 3, y + len * 0.5, x, y + len);
+          ctx.quadraticCurveTo(x + 3, y + len * 0.5, x + 7, y - 2);
+          ctx.fill();
+          if (i % 3 === 0) {
+            const u = (t * 0.8 + i * 0.29) % 1;
+            ctx.fillRect(x - 2, y + len + u * 70, 4, 6);
+          }
+        }
+        ctx.restore();
+        ctx.fillStyle = '#7ea52c';
+        ctx.fillRect(x0, y - 4, x1 - x0, 4);
+        ctx.fillStyle = 'rgba(210,255,130,0.55)';
+        ctx.fillRect(x0, y - 2, x1 - x0, 2);
       } else {
         // leafy canopy of the riverside trees
         const g = ctx.createLinearGradient(0, 0, 0, y);
@@ -955,15 +1580,20 @@
   };
 
   // ------------------------------------------------------------------ gameplay objects
-  R.drawObjects = function (ctx, camX, t, G) {
+  const WATER_STYLE = { peat: 'bog', sewer: 'sludge' };
+  R.drawObjects = function (ctx, camX, t, G, L = 0) {
     const lvl = this.lvl;
-    const vis = lvl.visible(camX - 2, camX + W / BS + 2);
-    const glow = (x) => this.theme.glow[lvl.areaAt(x).id];
-    // water first (sits in the ground)
-    for (const o of vis) if (o.t === 'haz' && o.kind === 'water') Art.water(ctx, sx(o.x, camX), sx(o.x + o.w, camX), sy(0.22), H, t, this.theme.ground[lvl.areaAt(o.x).id] === 'peat' ? 'bog' : null);
+    const vis = lvl.visible(camX - 2, camX + W / BS + 2).filter((o) => (o.layer || 0) === L);
+    const glow = (x) => this.theme.glow[this.areaIn(L, x).id];
+    // water and the live rail first (they sit in the ground)
+    for (const o of vis) {
+      if (o.t !== 'haz') continue;
+      if (o.kind === 'water') Art.water(ctx, sx(o.x, camX), sx(o.x + o.w, camX), sy(0.22), H, t, WATER_STYLE[this.theme.ground[this.areaIn(L, o.x).id]]);
+      else if (o.kind === 'rail') Art.rail(ctx, sx(o.x, camX), sx(o.x + o.w, camX), GY, t, this.theme.ground[this.areaIn(L, o.x).id]);
+    }
     // checkpoints
     for (const cp of lvl.checkpoints) {
-      if (cp.index === 0 || cp.x < camX - 2 || cp.x > camX + 30) continue;
+      if (cp.index === 0 || (cp.layer || 0) !== L || cp.x < camX - 2 || cp.x > camX + 30) continue;
       const active = G.state !== 'menu' && G.cpIndex >= cp.index;
       Art.checkpoint(ctx, sx(cp.x, camX), GY, BS, active, t);
     }
@@ -974,11 +1604,13 @@
           Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
           break;
         case 'haz':
-          if (o.kind === 'spike') Art.spike(ctx, x, y, w, h, false, o.style, glow(o.x), t);
-          else if (o.kind === 'spikeDown') Art.spike(ctx, x, y, w, h, true, o.style, glow(o.x), t);
+          if (o.kind === 'spike') Art.spike(ctx, x, y, w, h, false, o.style, glow(o.x), t, o.id);
+          else if (o.kind === 'spikeDown') Art.spike(ctx, x, y, w, h, true, o.style, glow(o.x), t, o.id);
           else if (o.kind === 'half') Art.half(ctx, x, y, w, h, o.style, glow(o.x));
-          else if (o.kind === 'bird') Art.bird(ctx, x + w / 2, y + h / 2, BS, t, o.id, glow(o.x));
+          else if (o.kind === 'bird') Art.bird(ctx, x + w / 2, y + h / 2, BS, t, o.id, glow(o.x), o.style);
           else if (o.kind === 'thorny') Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
+          else if (o.kind === 'croc') Art.crocHead(ctx, x, y, w, h, o.dir, t, o.id, glow(o.x));
+          else if (o.kind === 'snapper') Art.snapper(ctx, x, y, w, h, t, o.id, glow(o.x));
           break;
         case 'pad':
           Art.pad(ctx, x, y, w, h, o.color, t);
@@ -995,7 +1627,7 @@
     }
     // finish line glow
     const fx = sx(lvl.finishX, camX);
-    if (fx > -40 && fx < W + 40) {
+    if (fx > -40 && fx < W + 40 && lvl.layerAt(lvl.finishX) === L) {
       const g = ctx.createLinearGradient(fx - 30, 0, fx + 30, 0);
       g.addColorStop(0, 'rgba(255,255,255,0)');
       g.addColorStop(0.5, 'rgba(255,240,180,0.55)');
@@ -1005,13 +1637,14 @@
     }
   };
 
-  R.drawTexts = function (ctx, camX, G) {
+  R.drawTexts = function (ctx, camX, G, L = 0) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';
     const list = this.lvl.texts.slice();
-    if (G.attemptText && G.state !== 'menu') list.push({ x: G.attemptText.x + 6, y: 6.2, text: 'Attempt ' + G.attemptText.n, size: 0.9 });
+    if (G.attemptText && G.state !== 'menu') list.push({ x: G.attemptText.x + 6, y: 6.2, text: 'Attempt ' + G.attemptText.n, size: 0.9, layer: G.attemptText.layer });
     for (const tx of list) {
+      if ((tx.layer || 0) !== L) continue;
       const x = sx(tx.x, camX);
       if (x < -500 || x > W + 500) continue;
       ctx.font = Math.round(tx.size * BS) + 'px ' + FONT;
@@ -1057,8 +1690,9 @@
     ctx.restore();
   };
 
-  R.drawParticles = function (ctx, camX, G) {
+  R.drawParticles = function (ctx, camX, G, L = 0) {
     for (const p of G.particles) {
+      if ((p.layer || 0) !== L) continue;
       const a = U.clamp(p.life / p.max, 0, 1);
       ctx.globalAlpha = a;
       ctx.fillStyle = p.color;
@@ -1086,6 +1720,7 @@
     const ph = VD.Physics.boxH(s);
     ctx.strokeRect(sx(s.x, camX), sy(s.y + ph), BS, ph * BS);
     for (const o of this.lvl.visible(camX - 2, camX + 30)) {
+      if ((o.layer || 0) !== (s.layer || 0)) continue;
       if (o.t === 'haz') {
         ctx.strokeStyle = '#f00';
         ctx.strokeRect(sx(o.hx0, camX), sy(o.hy1), (o.hx1 - o.hx0) * BS, (o.hy1 - o.hy0) * BS);

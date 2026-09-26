@@ -1508,10 +1508,12 @@
   // GAMEPLAY OBJECTS
   // =====================================================================
   // glow = outline colour for the area (from the level theme) so hazards always read against the scenery
-  Art.spike = function (ctx, x, y, w, h, down, style, glow, t) {
+  Art.spike = function (ctx, x, y, w, h, down, style, glow, t, seed = 0) {
     ctx.lineJoin = 'round';
     if (style === 'hedgehog') return hedgehog(ctx, x, y, w, h, glow, t);
     if (style === 'cave') return caveSpike(ctx, x, y, w, h, down, glow);
+    if (style === 'rat') return rat(ctx, x, y, w, h, glow, t, seed);
+    if (style === 'slime') return slimeSpike(ctx, x, y, w, h, down, glow, t, seed);
     if (style === 'cone') {
       const bx = x + w * 0.1, bw = w * 0.8;
       if (down) return;
@@ -1638,13 +1640,20 @@
     ctx.fillRect(x + w * 0.4, down ? y + 4 : y + h * 0.45, 3, h * 0.4);
   }
 
-  // gråkråka (hooded crow) hovering in the air is a hazard; wings flap, the hitbox stays put
-  Art.bird = function (ctx, cx, cy, s, t, seed, glow) {
+  // hovering birds are hazards; wings flap, the hitbox stays put. Gråkråka (hooded crow) in the forest,
+  // pigeons in the subway and gulls down by the water share the same shape in different colours.
+  const BIRDS = {
+    crow: { far: '#0e0e13', dark: '#1b1b22', body: '#9a9fa6', beak: '#2a2a33' },
+    pigeon: { far: '#5f6779', dark: '#7a8296', head: '#6a7286', body: '#a7aec0', beak: '#3a3a40', neck: '#4f9f8a' },
+    gull: { far: '#8f9ba8', dark: '#aeb8c4', head: '#ffffff', body: '#ffffff', beak: '#f2c230', tips: '#1b1b22' },
+  };
+  Art.bird = function (ctx, cx, cy, s, t, seed, glow, style) {
+    const C = BIRDS[style] || BIRDS.crow;
     const flap = Math.sin(t * 11 + seed * 1.7);
     cy += Math.sin(t * 3 + seed) * 2;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    const black = TL('#1b1b22'), grey = TL('#9a9fa6'), line = glow || '#fff';
+    const black = TL(C.dark), grey = TL(C.body), line = glow || '#fff';
     const wing = (k) => {
       // shoulder -> wing tip (up or down with the flap) -> back to the body
       const tipX = cx + s * (0.3 + k * 0.06), tipY = cy - s * (0.12 + 0.5 * flap);
@@ -1659,7 +1668,7 @@
     ctx.strokeStyle = line;
     // far wing
     wing(1);
-    ctx.fillStyle = TL('#0e0e13');
+    ctx.fillStyle = TL(C.far);
     ctx.fill();
     ctx.stroke();
     // tail
@@ -1678,12 +1687,18 @@
     ctx.ellipse(cx + s * 0.02, cy + s * 0.03, s * 0.32, s * 0.2, -0.06, 0, TAU);
     ctx.fill();
     ctx.stroke();
-    // black head facing Vippe, with an angry brow
-    ctx.fillStyle = black;
+    // the head facing Vippe, with an angry brow
+    if (C.neck) {
+      ctx.fillStyle = TL(C.neck);
+      ctx.beginPath();
+      ctx.ellipse(cx - s * 0.2, cy + s * 0.02, s * 0.12, s * 0.1, 0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.fillStyle = TL(C.head || C.dark);
     circle(ctx, cx - s * 0.28, cy - s * 0.1, s * 0.17);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = TL('#2a2a33');
+    ctx.fillStyle = TL(C.beak);
     tri(ctx, cx - s * 0.4, cy - s * 0.15, cx - s * 0.66, cy - s * 0.06, cx - s * 0.4, cy - s * 0.02);
     ctx.fill();
     ctx.lineWidth = 1.5;
@@ -1706,11 +1721,33 @@
     wing(0);
     ctx.fillStyle = black;
     ctx.fill();
+    if (C.tips) {
+      // gulls have black wing tips
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = TL(C.tips);
+      circle(ctx, cx + s * 0.34, cy - s * (0.12 + 0.5 * flap), s * 0.14);
+      ctx.fill();
+      ctx.restore();
+      wing(0);
+    }
     ctx.stroke();
+    if (C.neck) {
+      // pigeons have two dark bars on the wing
+      ctx.strokeStyle = TL('#3c4252');
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (const k of [0.35, 0.6]) {
+        ctx.moveTo(cx - s * 0.02 + k * s * 0.18, cy - s * 0.04 - k * s * (0.1 + 0.5 * flap));
+        ctx.lineTo(cx + s * 0.1 + k * s * 0.18, cy - s * 0.02 - k * s * (0.1 + 0.5 * flap));
+      }
+      ctx.stroke();
+    }
   };
 
   Art.water = function (ctx, x0, x1, ySurf, yBot, t, style) {
     if (style === 'bog') return bogWater(ctx, x0, x1, ySurf, yBot, t);
+    if (style === 'sludge') return sludge(ctx, x0, x1, ySurf, yBot, t);
     const g = ctx.createLinearGradient(0, ySurf, 0, yBot);
     g.addColorStop(0, TL('#3f93d6'));
     g.addColorStop(1, TL('#0f355c'));
@@ -2648,6 +2685,7 @@
         break;
       }
       default: {
+        if (METRO_BLOCKS[st]) return METRO_BLOCKS[st](ctx, x, y, w, h, bs, seed, t);
         bevel(ctx, x, y, w, h, '#30303a', '#16161c', '#ffffff', 4);
       }
     }
@@ -4552,5 +4590,1612 @@
     ctx.fillRect(x - 14, base - 134, 28, 10);
     ctx.fillStyle = T('#3a3d45');
     ctx.fillRect(x - 24, base - 146, 48, 8);
+  };
+  // =====================================================================
+  // LEVEL 3 — the subway and the sewers
+  // =====================================================================
+  // ---------- hazards ----------
+  // råtta: a sewer rat is a spike (same hitbox), sniffing towards Vippe with its tail curled up behind it
+  function rat(ctx, x, y, w, h, glow, t, seed) {
+    const b = y + h, sn = Math.sin(t * 11 + seed * 2.1) * 0.5 + 0.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = TL('#d98f9c');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.84, b - h * 0.1);
+    ctx.bezierCurveTo(x + w * 1.1, b - h * 0.04, x + w * 1.2, b - h * 0.3, x + w * (1.08 + 0.04 * Math.sin(t * 3 + seed)), b - h * 0.5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.92, b);
+    ctx.bezierCurveTo(x + w * 1.0, b - h * 0.52, x + w * 0.62, b - h * 0.66, x + w * 0.4, b - h * 0.48);
+    ctx.quadraticCurveTo(x + w * 0.22, b - h * 0.38, x + w * (0.05 - sn * 0.03), b - h * 0.2);
+    ctx.quadraticCurveTo(x + w * 0.16, b - h * 0.04, x + w * 0.3, b);
+    ctx.closePath();
+    ctx.fillStyle = TL('#6f635a');
+    ctx.fill();
+    ctx.strokeStyle = glow || '#fff';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = TL('#a8998c');
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.54, b - h * 0.12, w * 0.2, h * 0.09, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = TL('#e7a3ae');
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.42, b - h * 0.52, w * 0.08, h * 0.1, -0.3, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = TL('#4a3f38');
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#ff3b30';
+    circle(ctx, x + w * 0.25, b - h * 0.34, 2.6);
+    ctx.fill();
+    ctx.fillStyle = '#ffd0d6';
+    circle(ctx, x + w * (0.05 - sn * 0.03), b - h * 0.2, 2.3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const k of [-1, 1]) {
+      ctx.moveTo(x + w * 0.12, b - h * 0.22);
+      ctx.lineTo(x - w * 0.1, b - h * (0.24 + k * 0.08 + sn * 0.03));
+    }
+    ctx.stroke();
+    ctx.fillStyle = TL('#e7a3ae');
+    ctx.fillRect(x + w * 0.32, b - 3, 6, 3);
+    ctx.fillRect(x + w * 0.7, b - 3, 6, 3);
+  }
+
+  // green sewer slime: goo heaped up on the floor of the pipe, or dripping from its roof
+  function slimeSpike(ctx, x, y, w, h, down, glow, t, seed) {
+    const wob = Math.sin(t * 3 + seed) * w * 0.04, cx = x + w / 2;
+    const base = down ? y : y + h, tip = down ? y + h - 1 : y + 1, dir = down ? 1 : -1;
+    ctx.beginPath();
+    ctx.moveTo(x + 1, base);
+    ctx.bezierCurveTo(x + w * 0.3, base + dir * h * 0.12, cx - w * 0.14 + wob, base + dir * h * 0.6, cx + wob, tip);
+    ctx.bezierCurveTo(cx + w * 0.14 + wob, base + dir * h * 0.6, x + w * 0.7, base + dir * h * 0.12, x + w - 1, base);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, base, 0, tip);
+    g.addColorStop(0, TL('#3f7a12'));
+    g.addColorStop(1, TL('#a6e83c'));
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = glow || '#c8ff7a';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(cx - w * 0.1 + wob * 0.5, base + dir * h * 0.4, w * 0.04, h * 0.12, 0.2, 0, TAU);
+    ctx.fill();
+    if (down) {
+      // a drop gathering at the tip and falling off
+      const u = (t * 0.9 + seed * 0.31) % 1;
+      ctx.fillStyle = 'rgba(166,232,60,' + (1 - u) + ')';
+      circle(ctx, cx + wob, tip + 2 + u * u * 40, 3 + (1 - u) * 1.5);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = TL('#8fd12e');
+      circle(ctx, x + w * 0.22, base - 3, 3);
+      ctx.fill();
+      circle(ctx, x + w * 0.8, base - 2, 2.2);
+      ctx.fill();
+    }
+  }
+
+  // the sewer's dirty water: brown-green sludge with scum, bubbles, rubbish and the odd crocodile watching
+  function sludge(ctx, x0, x1, ySurf, yBot, t) {
+    const g = ctx.createLinearGradient(0, ySurf, 0, yBot);
+    g.addColorStop(0, TL('#58652a'));
+    g.addColorStop(0.18, TL('#39431c'));
+    g.addColorStop(1, TL('#0c0f08'));
+    ctx.fillStyle = g;
+    const wave = (x) => ySurf + Math.sin((x - x0) * 0.035 + t * 1.6) * 2;
+    ctx.beginPath();
+    ctx.moveTo(x0, yBot);
+    for (let x = x0; x <= x1 + 8; x += 8) ctx.lineTo(Math.min(x, x1), wave(Math.min(x, x1)));
+    ctx.lineTo(x1, yBot);
+    ctx.closePath();
+    ctx.fill();
+    // slow reflections drifting on the murk
+    ctx.fillStyle = 'rgba(190,215,120,0.16)';
+    for (let x = x0 + 20, k = 0; x < x1 - 40; x += 64, k++) {
+      const yy = ySurf + 16 + ((k * 37) % 5) * 12, dx = Math.sin(t * 0.9 + k * 1.7) * 10;
+      ctx.fillRect(x + dx, yy, 26 + (k % 3) * 8, 2);
+    }
+    ctx.strokeStyle = 'rgba(10,14,6,0.6)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let x = x0; x <= x1; x += 8) {
+      if (x === x0) ctx.moveTo(x, wave(x) + 3);
+      else ctx.lineTo(x, wave(x) + 3);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(185,215,85,0.85)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let x = x0; x <= x1; x += 8) {
+      if (x === x0) ctx.moveTo(x, wave(x));
+      else ctx.lineTo(x, wave(x));
+    }
+    ctx.stroke();
+    // scum floating on top
+    ctx.fillStyle = 'rgba(140,170,50,0.35)';
+    for (let x = x0 + 30, k = 0; x < x1 - 30; x += 90, k++) {
+      ctx.beginPath();
+      ctx.ellipse(x + Math.sin(t * 0.5 + k) * 8, ySurf + 6 + (k % 3) * 3, 20 + ((k * 7) % 14), 3, 0, 0, TAU);
+      ctx.fill();
+    }
+    // bubbles popping
+    ctx.lineWidth = 1.5;
+    for (let k = 0; k < (x1 - x0) / 40; k++) {
+      const u = (t * 0.7 + U.hash(k * 3.7)) % 1;
+      const bx = x0 + 12 + U.hash(k * 1.3) * Math.max(0, x1 - x0 - 24);
+      ctx.strokeStyle = 'rgba(205,225,120,' + (1 - u) * 0.8 + ')';
+      circle(ctx, bx, ySurf + 2 - u * 4, 2 + u * 5);
+      ctx.stroke();
+    }
+    // rubbish drifting by, and in the wide pools a crocodile lying low (placed relative to x0 so they scroll with the world)
+    const step = 170;
+    const k0 = Math.max(0, Math.floor((-80 - x0) / step)), k1 = Math.min(Math.floor((x1 - x0) / step), Math.ceil((1360 - x0) / step));
+    for (let k = k0; k <= k1; k++) {
+      const px = x0 + 40 + k * step + ((k * 53) % 60), py = ySurf + 3 + Math.sin(t * 2 + k) * 1.5;
+      if (px < x0 + 18 || px > x1 - 22) continue;
+      const kind = k % 4;
+      if (kind === 1) duck(ctx, px, py, t + k);
+      else if (kind === 3) tinCan(ctx, px, py, k);
+      else if (kind === 2 && x1 - x0 > 280) lurker(ctx, px, py + 2, t + k);
+    }
+  }
+  function duck(ctx, x, y, t) {
+    const tilt = Math.sin(t * 2.3) * 0.12;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(tilt);
+    ctx.fillStyle = '#ffd21c';
+    ctx.beginPath();
+    ctx.ellipse(0, -5, 12, 7, 0, 0, TAU);
+    ctx.fill();
+    circle(ctx, -7, -14, 6.5);
+    ctx.fill();
+    ctx.fillStyle = '#ff8a1f';
+    ctx.beginPath();
+    ctx.ellipse(-14, -13, 4, 2.2, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    circle(ctx, -9, -16, 1.4);
+    ctx.fill();
+    ctx.restore();
+  }
+  function tinCan(ctx, x, y, k) {
+    ctx.save();
+    ctx.translate(x, y - 3);
+    ctx.rotate(0.3 + (k % 3) * 0.4);
+    ctx.fillStyle = TL('#b8bec6');
+    ctx.fillRect(-9, -5, 18, 10);
+    ctx.fillStyle = TL(k % 2 ? '#d6453a' : '#2f6fcf');
+    ctx.fillRect(-5, -5, 10, 10);
+    ctx.restore();
+  }
+  // a crocodile lying low in the sludge: just its eyes, its nostrils and the ridge of its back
+  function lurker(ctx, x, y, t) {
+    const blink = (t * 0.45) % 1 < 0.05;
+    ctx.fillStyle = TL('#3d6a2b');
+    ctx.beginPath();
+    ctx.ellipse(x + 16, y, 34, 4, 0, Math.PI, TAU);
+    ctx.fill();
+    for (let k = 0; k < 5; k++) tri(ctx, x + 14 + k * 9, y - 2, x + 18 + k * 9, y - 7, x + 22 + k * 9, y - 2), ctx.fill();
+    for (const dx of [-8, 6]) {
+      ctx.beginPath();
+      ctx.ellipse(x + dx, y - 4, 7, 7, 0, Math.PI, TAU);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.ellipse(x - 34, y - 2, 6, 4, 0, Math.PI, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#1a2a12';
+    circle(ctx, x - 36, y - 4, 1.3);
+    ctx.fill();
+    circle(ctx, x - 32, y - 4, 1.3);
+    ctx.fill();
+    if (!blink) {
+      for (const dx of [-8, 6]) {
+        ctx.fillStyle = '#f0d83a';
+        ctx.beginPath();
+        ctx.ellipse(x + dx, y - 6, 4, 3, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.fillRect(x + dx - 0.8, y - 9, 1.6, 6);
+      }
+    }
+  }
+
+  // the live third rail, showing through a gap in the platform or the track bed: a crackling blue danger strip
+  Art.rail = function (ctx, x0, x1, gy, t) {
+    ctx.fillStyle = '#07080a';
+    ctx.fillRect(x0 + 2, gy - 1, x1 - x0 - 4, 170);
+    // an electric haze over it, flickering
+    const fl = 0.8 + 0.2 * Math.sin(t * 23) * Math.sin(t * 7.3);
+    const gl = ctx.createLinearGradient(0, gy - 44, 0, gy + 30);
+    gl.addColorStop(0, 'rgba(90,190,255,0)');
+    gl.addColorStop(0.65, 'rgba(90,190,255,' + 0.5 * fl + ')');
+    gl.addColorStop(1, 'rgba(90,190,255,0.15)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(x0 + 2, gy - 44, x1 - x0 - 4, 74);
+    // the rail on its insulators
+    ctx.fillStyle = '#e8e2d0';
+    for (let x = x0 + 14; x < x1 - 10; x += 34) ctx.fillRect(x, gy + 22, 8, 14);
+    ctx.fillStyle = '#7d858e';
+    ctx.fillRect(x0 + 2, gy + 10, x1 - x0 - 4, 12);
+    ctx.fillStyle = '#bfefff';
+    ctx.fillRect(x0 + 2, gy + 10, x1 - x0 - 4, 3);
+    // sparks crackling up from it
+    const f = Math.floor(t * 16);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const n = Math.max(2, Math.round((x1 - x0) / 34));
+    for (let k = 0; k < n; k++) {
+      if (U.hash(f * 7.3 + k * 13.1) < 0.3) continue;
+      let xx = x0 + 10 + U.hash(f * 3.1 + k * 5.7) * (x1 - x0 - 20), yy = gy + 10;
+      const pts = [[xx, yy]], hgt = 4 + Math.floor(U.hash(f * 1.9 + k) * 3);
+      for (let j = 0; j < hgt; j++) {
+        yy -= 9;
+        xx += (U.hash(f + k * 3.3 + j * 1.7) - 0.5) * 18;
+        pts.push([xx, yy]);
+      }
+      for (const lw of [7, 2.5]) {
+        ctx.strokeStyle = lw > 3 ? 'rgba(110,200,255,0.5)' : '#f4fcff';
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+        ctx.stroke();
+      }
+    }
+    // yellow and black warning stripes along both edges
+    for (const ex of [x0, x1 - 7]) {
+      for (let k = 0; k < 5; k++) {
+        ctx.fillStyle = k % 2 ? '#111' : '#f2c230';
+        ctx.fillRect(ex, gy + k * 7, 7, 7);
+      }
+    }
+  };
+
+  // the tunnel floor caves in: a ragged hole through the track bed, with cracks running up to it
+  Art.hole = function (ctx, x0, x1, gy, yb, t) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    const r = U.rng(77);
+    for (let k = 0; k < 6; k++) {
+      let x = x0 - 6, y = gy + 3 + r() * 34;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      const len = 60 + r() * 260;
+      while (x > x0 - len) {
+        x -= 12 + r() * 20;
+        y = U.clamp(y + (r() - 0.5) * 16, gy + 2, gy + 70);
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    const g = ctx.createLinearGradient(0, gy, 0, yb);
+    g.addColorStop(0, '#040405');
+    g.addColorStop(0.7, '#090d07');
+    g.addColorStop(1, '#1b2812');
+    ctx.fillStyle = g;
+    const q = U.rng(91);
+    ctx.beginPath();
+    ctx.moveTo(x0 - 12, gy - 2);
+    for (let y = gy + 10; y < yb; y += 16) ctx.lineTo(x0 + (q() - 0.3) * 16 + (y - gy) * 0.06, y);
+    ctx.lineTo(x0 + 12, yb + 2);
+    ctx.lineTo(x1 - 12, yb + 2);
+    for (let y = yb - 10; y > gy; y -= 16) ctx.lineTo(x1 + (q() - 0.7) * 16 - (y - gy) * 0.06, y);
+    ctx.lineTo(x1 + 12, gy - 2);
+    ctx.closePath();
+    ctx.fill();
+    // the snapped rails drooping into the hole
+    ctx.lineCap = 'round';
+    for (const [ax, ay, bx, by, cx, cy] of [[x0 - 30, gy + 3, x0 + 14, gy + 4, x0 + 40, gy + 74], [x1 + 30, gy + 3, x1 - 10, gy + 4, x1 - 34, gy + 58]]) {
+      ctx.strokeStyle = '#4c5157';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.quadraticCurveTo(bx, by, cx, cy);
+      ctx.stroke();
+      ctx.strokeStyle = '#c9ced4';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    // broken concrete at the lips
+    ctx.fillStyle = '#5d5750';
+    for (const [px, s] of [[x0 - 4, 1], [x0 + 6, 0.7], [x1 - 2, 1], [x1 + 8, 0.6]]) {
+      tri(ctx, px - 10 * s, gy - 1, px + 8 * s, gy - 1, px, gy + 16 * s);
+      ctx.fill();
+    }
+    // pebbles trickling down
+    ctx.fillStyle = '#6b625a';
+    for (let k = 0; k < 7; k++) {
+      const u = (t * 0.8 + k * 0.17) % 1;
+      ctx.fillRect(x0 + 18 + U.hash(k) * (x1 - x0 - 36), gy + u * (yb - gy), 4, 4);
+    }
+  };
+
+  // ...and where it comes out through the brick roof of the sewer: a ragged gap with dusty light falling in
+  Art.holeRoof = function (ctx, x0, x1, gy, t) {
+    const lg = ctx.createLinearGradient(0, 0, 0, gy);
+    lg.addColorStop(0, 'rgba(255,236,190,0.3)');
+    lg.addColorStop(1, 'rgba(255,236,190,0)');
+    ctx.fillStyle = lg;
+    ctx.beginPath();
+    ctx.moveTo(x0 + 6, 0);
+    ctx.lineTo(x1 - 6, 0);
+    ctx.lineTo(x1 + 80, gy);
+    ctx.lineTo(x0 - 80, gy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#040504';
+    const r = U.rng(123);
+    ctx.beginPath();
+    ctx.moveTo(x0 - 18, -2);
+    for (let x = x0 - 18; x <= x1 + 18; x += 12) ctx.lineTo(x, 30 + r() * 24 - Math.abs((x - (x0 + x1) / 2) / (x1 - x0)) * 30);
+    ctx.lineTo(x1 + 18, -2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#5a4430';
+    for (let k = 0; k < 6; k++) {
+      ctx.save();
+      ctx.translate(x0 - 20 + U.hash(k * 2.7) * (x1 - x0 + 40), 34 + U.hash(k * 4.1) * 22);
+      ctx.rotate(U.hash(k) * 1.4 - 0.7);
+      ctx.fillRect(-9, -4, 18, 8);
+      ctx.restore();
+    }
+    ctx.fillStyle = 'rgba(255,240,210,0.6)';
+    for (let k = 0; k < 16; k++) {
+      const u = (t * 0.15 + U.hash(k * 2.1)) % 1;
+      ctx.fillRect(x0 - 40 + U.hash(k * 5.3) * (x1 - x0 + 80) + Math.sin(t + k) * 6, 50 + u * (gy - 70), 2, 2);
+    }
+  };
+
+  // ---------- the crocodiles ----------
+  const rot = (x, y, a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+  // a crocodile's head in profile, facing left, with the jaw hinge at (0, 0); open = 0 (shut) .. 1 (wide open)
+  function crocHeadShape(ctx, L, open, glow) {
+    const skin = TL('#4c7f35'), dark = TL('#2f5a22'), belly = TL('#cfcf90'), line = glow || '#fff';
+    const lower = -open * 0.14, upper = open * 0.55;
+    ctx.lineJoin = 'round';
+    if (open > 0.05) {
+      const lt = rot(-L * 0.9, -0.02 * L, lower), ut = rot(-L * 0.9, -0.02 * L, upper);
+      ctx.fillStyle = '#8a2333';
+      ctx.beginPath();
+      ctx.moveTo(4, 0);
+      ctx.lineTo(lt[0], lt[1]);
+      ctx.lineTo(ut[0], ut[1]);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // lower jaw
+    ctx.save();
+    ctx.rotate(lower);
+    ctx.beginPath();
+    ctx.moveTo(6, -0.02 * L);
+    ctx.lineTo(-0.9 * L, -0.03 * L);
+    ctx.quadraticCurveTo(-1.02 * L, 0, -0.95 * L, 0.08 * L);
+    ctx.lineTo(0.02 * L, 0.15 * L);
+    ctx.closePath();
+    ctx.fillStyle = belly;
+    ctx.fill();
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    for (let u = 0.14; u < 0.86; u += 0.12) {
+      tri(ctx, -u * L - 3, -0.03 * L, -u * L, -0.03 * L - 7, -u * L + 3, -0.03 * L);
+      ctx.fill();
+    }
+    ctx.restore();
+    // upper jaw and skull
+    ctx.save();
+    ctx.rotate(upper);
+    ctx.fillStyle = '#ffffff';
+    for (let u = 0.2; u < 0.86; u += 0.12) {
+      tri(ctx, -u * L - 3, -0.02 * L, -u * L, -0.02 * L + 7, -u * L + 3, -0.02 * L);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.moveTo(0.1 * L, 0.03 * L);
+    ctx.lineTo(-0.9 * L, -0.02 * L);
+    ctx.quadraticCurveTo(-1.04 * L, -0.03 * L, -1.0 * L, -0.11 * L);
+    ctx.quadraticCurveTo(-0.96 * L, -0.18 * L, -0.86 * L, -0.15 * L);
+    ctx.lineTo(-0.42 * L, -0.17 * L);
+    ctx.quadraticCurveTo(-0.32 * L, -0.36 * L, -0.16 * L, -0.34 * L);
+    ctx.quadraticCurveTo(0.04 * L, -0.33 * L, 0.12 * L, -0.18 * L);
+    ctx.closePath();
+    ctx.fillStyle = skin;
+    ctx.fill();
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = dark;
+    for (let u = 0.5; u < 0.84; u += 0.08) {
+      circle(ctx, -u * L, -0.12 * L, 1.8);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#1a2a12';
+    circle(ctx, -0.93 * L, -0.14 * L, 2);
+    ctx.fill();
+    const ex = -0.2 * L, ey = -0.29 * L;
+    ctx.fillStyle = skin;
+    ctx.beginPath();
+    ctx.ellipse(ex, ey - 0.01 * L, 0.12 * L, 0.1 * L, 0, Math.PI, TAU);
+    ctx.fill();
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#f0d83a';
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, 0.085 * L, 0.065 * L, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.fillRect(ex - 1.1, ey - 0.05 * L, 2.2, 0.1 * L);
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(ex - 0.11 * L, ey - 0.1 * L);
+    ctx.lineTo(ex + 0.07 * L, ey - 0.05 * L);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // opens slowly... then SNAP!
+  function snap(t, seed, speed) {
+    const p = (t * speed + seed * 0.37) % 1;
+    return p < 0.7 ? U.smooth(p / 0.7) : Math.max(0, 1 - (p - 0.7) / 0.06);
+  }
+  // the head of a crocodile lying in the water (a hazard): dir 'left' faces Vippe, 'right' faces away
+  Art.crocHead = function (ctx, x, y, w, h, dir, t, seed, glow) {
+    const b = y + h;
+    ctx.save();
+    if (dir === 'right') {
+      ctx.translate(2 * x + w, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.translate(x + w * 0.95, b - h * 0.36);
+    crocHeadShape(ctx, w * 1.02, snap(t, seed, 0.85), glow);
+    ctx.restore();
+    const u = (t * 0.9 + seed) % 1;
+    ctx.strokeStyle = 'rgba(175,205,75,' + (1 - u) * 0.7 + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x + w * (dir === 'right' ? 0.8 : 0.2), b - 10, 10 + u * 16, 2 + u * 2, 0, 0, TAU);
+    ctx.stroke();
+  };
+  // a crocodile head sticking straight up out of the sludge, jaws snapping at the air
+  Art.snapper = function (ctx, x, y, w, h, t, seed, glow) {
+    const b = y + h;
+    ctx.save();
+    ctx.translate(x + w * 0.36, b - 6 + Math.sin(t * 2 + seed) * 2);
+    ctx.rotate(Math.PI / 2 - 0.12);
+    crocHeadShape(ctx, h * 0.82, 0.3 + snap(t, seed, 1.1) * 0.7, glow);
+    ctx.restore();
+    const u = (t * 1.2 + seed) % 1;
+    ctx.strokeStyle = 'rgba(175,205,75,' + (1 - u) * 0.8 + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.5, b - 10, 14 + u * 14, 3 + u * 2, 0, 0, TAU);
+    ctx.stroke();
+  };
+  // the crocodile's back: a platform to land on. A knobbly ridge, stubby legs paddling, a long tail
+  function crocBody(ctx, x, y, w, h, flip, t, seed) {
+    const b = y + h;
+    ctx.save();
+    if (flip) {
+      ctx.translate(2 * x + w, 0);
+      ctx.scale(-1, 1);
+    }
+    // (drawn with the neck at the left, x, and the tail sticking out past the right end)
+    const skin = TL('#4f8a36'), dark = TL('#2c5520'), light = TL('#78b04e'), line = TL('#17300f');
+    const tipX = x + w + 44, pad = Math.sin(t * 6 + seed) * 3;
+    const leg = (lx, k) => {
+      // a bent leg with a clawed foot, paddling at the waterline
+      ctx.fillStyle = dark;
+      ctx.beginPath();
+      ctx.ellipse(lx, y + h * 0.55, 11, 7, 0.5 * k, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(lx - 6, y + h * 0.6);
+      ctx.lineTo(lx - 10 + pad * k, b - 9);
+      ctx.lineTo(lx + 2 + pad * k, b - 9);
+      ctx.lineTo(lx + 6, y + h * 0.6);
+      ctx.fill();
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (const c of [-6, -1, 4]) {
+        ctx.moveTo(lx - 4 + pad * k + c, b - 10);
+        ctx.lineTo(lx - 6 + pad * k + c, b - 5);
+      }
+      ctx.stroke();
+    };
+    leg(x + w - 30, -1);
+    // body and tail
+    ctx.beginPath();
+    ctx.moveTo(x - 6, b - 4);
+    ctx.lineTo(x - 6, y + 8);
+    ctx.quadraticCurveTo(x - 4, y - 2, x + 10, y - 2);
+    ctx.lineTo(x + w - 16, y - 2);
+    ctx.quadraticCurveTo(x + w + 14, y, tipX, b - h * 0.5);
+    ctx.quadraticCurveTo(x + w + 8, b - h * 0.2, x + w - 24, b - 6);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, y, 0, b);
+    g.addColorStop(0, skin);
+    g.addColorStop(0.7, TL('#3e7029'));
+    g.addColorStop(1, TL('#c9c98a'));
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // a row of pale scales along its flank
+    ctx.fillStyle = light;
+    for (let px = x + 10; px < x + w - 12; px += 15) {
+      ctx.beginPath();
+      ctx.ellipse(px, y + h * 0.45, 5, 3.5, 0, 0, TAU);
+      ctx.fill();
+    }
+    // the knobbly ridge along its back (what you land on), carrying on down the tail
+    for (let px = x + 4, k = 0; px < tipX - 8; px += 10, k++) {
+      const top = px < x + w - 16 ? y - 2 : y - 2 + ((px - (x + w - 16)) / (tipX - x - w + 16)) * (b - h * 0.5 - y);
+      const r = px < x + w - 16 ? 5.5 : 4;
+      ctx.fillStyle = k % 2 ? dark : TL('#3b6d29');
+      ctx.beginPath();
+      ctx.arc(px, top + 1, r, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    leg(x + 26, 1);
+    ctx.restore();
+    // lying in the sludge: the water laps over its belly
+    ctx.fillStyle = 'rgba(60,70,28,0.65)';
+    ctx.fillRect(x - 50, b - 11, w + 100, 11);
+    ctx.strokeStyle = 'rgba(185,215,85,0.8)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let xx = x - 50; xx <= x + w + 50; xx += 8) {
+      const yy = b - 11 + Math.sin(xx * 0.1 + t * 2) * 1.5;
+      if (xx === x - 50) ctx.moveTo(xx, yy);
+      else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+
+  // ---------- solid blocks (and the thorny signals) ----------
+  // a Stockholm metro train, parked: silver cars with a blue stripe. You run along the roof.
+  function train(ctx, x, y, w, h, bs, seed, t) {
+    const b = y + h, cars = Math.max(1, Math.round(w / (bs * 7))), cw = w / cars;
+    const rnd = U.rng(seed * 131 + 5);
+    for (let c = 0; c < cars; c++) {
+      const first = c === 0, last = c === cars - 1;
+      const x0 = x + c * cw + (first ? 0 : 3), x1 = x + (c + 1) * cw - (last ? 0 : 3), wid = x1 - x0;
+      // underframe and bogies
+      ctx.fillStyle = TL('#23262b');
+      ctx.fillRect(x0 + 8, b - 22, wid - 16, 14);
+      for (const bx of [x0 + wid * 0.17, x0 + wid * 0.83]) {
+        ctx.fillStyle = TL('#2e3238');
+        ctx.fillRect(bx - 26, b - 16, 52, 6);
+        for (const dx of [-15, 15]) {
+          ctx.fillStyle = TL('#15171a');
+          circle(ctx, bx + dx, b - 9, 9);
+          ctx.fill();
+          ctx.fillStyle = TL('#5c636b');
+          circle(ctx, bx + dx, b - 9, 3.5);
+          ctx.fill();
+        }
+      }
+      // the body, with a rounded nose at the front
+      const top = y + 5, bot = b - 20, rl = first ? 30 : 6, rgt = last ? 18 : 6;
+      ctx.beginPath();
+      ctx.moveTo(x0 + rl, top);
+      ctx.lineTo(x1 - rgt, top);
+      ctx.quadraticCurveTo(x1, top, x1, top + rgt);
+      ctx.lineTo(x1, bot);
+      ctx.lineTo(x0 + 2, bot);
+      ctx.lineTo(x0, top + rl + 20);
+      ctx.quadraticCurveTo(x0, top, x0 + rl, top);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, top, 0, bot);
+      g.addColorStop(0, TL('#e6eaee'));
+      g.addColorStop(0.55, TL('#c4cad1'));
+      g.addColorStop(1, TL('#8f97a1'));
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = TL('#2a2f35');
+      ctx.stroke();
+      // the roof you run on
+      ctx.fillStyle = TL('#7a818a');
+      rr(ctx, x0 + (first ? 16 : 2), y, wid - (first ? 16 : 2) - (last ? 8 : 2), 8, 4);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillRect(x0 + (first ? 20 : 4), y + 1, wid - (first ? 24 : 8), 2);
+      // the blue stripe
+      ctx.fillStyle = TL('#1f5fb4');
+      ctx.fillRect(x0 + 1, bot - 26, wid - 2, 11);
+      // doors, and windows full of passengers between them
+      const nd = Math.max(2, Math.round(wid / 120)), dw = wid / nd;
+      for (let d = 0; d < nd; d++) {
+        const dx = x0 + (d + 0.5) * dw;
+        ctx.fillStyle = TL('#b3bac2');
+        ctx.fillRect(dx - 20, top + 12, 40, bot - top - 14);
+        ctx.fillStyle = '#ffeec4';
+        ctx.fillRect(dx - 16, top + 18, 13, 30);
+        ctx.fillRect(dx + 3, top + 18, 13, 30);
+        ctx.strokeStyle = TL('#4a5058');
+        ctx.lineWidth = 2;
+        ctx.strokeRect(dx - 20, top + 12, 40, bot - top - 14);
+        ctx.beginPath();
+        ctx.moveTo(dx, top + 12);
+        ctx.lineTo(dx, bot - 2);
+        ctx.stroke();
+      }
+      for (let d = 0; d <= nd; d++) {
+        let wx0 = x0 + (d - 0.5) * dw + 26, wx1 = x0 + (d + 0.5) * dw - 26;
+        wx0 = Math.max(wx0, x0 + (first ? 40 : 10));
+        wx1 = Math.min(wx1, x1 - (last ? 12 : 10));
+        if (wx1 - wx0 < 22) continue;
+        ctx.fillStyle = '#ffeebd';
+        rr(ctx, wx0, top + 16, wx1 - wx0, 34, 5);
+        ctx.fill();
+        // passengers
+        for (let px = wx0 + 10; px < wx1 - 8; px += 18) {
+          if (rnd() < 0.45) continue;
+          ctx.fillStyle = ['#6b4a2e', '#2b2b30', '#c9a06a', '#8a3a2a', '#3a4a6a'][Math.floor(rnd() * 5)];
+          circle(ctx, px, top + 34, 6);
+          ctx.fill();
+          ctx.fillRect(px - 7, top + 40, 14, 10);
+        }
+        ctx.strokeStyle = TL('#3a4048');
+        ctx.lineWidth = 2;
+        rr(ctx, wx0, top + 16, wx1 - wx0, 34, 5);
+        ctx.stroke();
+      }
+      if (first) {
+        // the cab: windscreen, a destination sign and the headlights
+        ctx.fillStyle = TL('#1a2a3d');
+        ctx.beginPath();
+        ctx.moveTo(x0 + 4, top + 26);
+        ctx.quadraticCurveTo(x0 + 6, top + 10, x0 + 26, top + 9);
+        ctx.lineTo(x0 + 34, top + 9);
+        ctx.lineTo(x0 + 34, top + 50);
+        ctx.lineTo(x0 + 3, top + 50);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.fillRect(x0 + 10, top + 14, 4, 30);
+        ctx.fillStyle = '#101010';
+        ctx.fillRect(x0 + 38, top + 9, 44, 12);
+        ctx.fillStyle = '#ffb020';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('13 STORVRETA', x0 + 39, top + 15.5, 42);
+        const hg = ctx.createRadialGradient(x0 + 8, bot - 12, 1, x0 + 8, bot - 12, 26);
+        hg.addColorStop(0, 'rgba(255,250,210,0.9)');
+        hg.addColorStop(1, 'rgba(255,250,210,0)');
+        ctx.fillStyle = hg;
+        ctx.fillRect(x0 - 20, bot - 38, 50, 52);
+        ctx.fillStyle = '#fffbe0';
+        circle(ctx, x0 + 8, bot - 12, 4);
+        ctx.fill();
+      }
+      if (last) {
+        ctx.fillStyle = '#ff3b30';
+        circle(ctx, x1 - 7, bot - 12, 4);
+        ctx.fill();
+      }
+    }
+  }
+  // an air-conditioning box on a train roof
+  function vent(ctx, x, y, w, h) {
+    rr(ctx, x + 2, y + 1, w - 4, h, 4);
+    ctx.fillStyle = TL('#9aa1aa');
+    ctx.fill();
+    ctx.strokeStyle = TL('#343940');
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.strokeStyle = TL('#5d646d');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let xx = x + 9; xx < x + w - 6; xx += 7) {
+      ctx.moveTo(xx, y + 6);
+      ctx.lineTo(xx, y + h - 3);
+    }
+    ctx.stroke();
+  }
+  // an SL ticket gate: a steel cabinet with its glass flap sticking out and a blue card reader
+  function gate(ctx, x, y, w, h, seed, t) {
+    const b = y + h;
+    ctx.fillStyle = 'rgba(190,225,255,0.45)';
+    rr(ctx, x + w - 4, y + h * 0.2, w * 0.6, h * 0.4, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    bevel(ctx, x + 2, y, w - 4, h, TL('#d5dade'), TL('#7f878f'), TL('#2c3137'), 6);
+    ctx.fillStyle = TL('#3a4048');
+    ctx.fillRect(x + 5, y + 3, w - 10, 5);
+    ctx.fillStyle = '#3aa0ff';
+    rr(ctx, x + w * 0.18, y + 13, w * 0.3, 8, 3);
+    ctx.fill();
+    ctx.fillStyle = Math.floor(t * 2 + seed) % 2 ? '#44e06a' : '#1f6e33';
+    tri(ctx, x + w * 0.6, y + 11, x + w * 0.8, y + 17, x + w * 0.6, y + 23);
+    ctx.fill();
+    ctx.fillStyle = TL('#1f5fb4');
+    ctx.fillRect(x + 5, b - 14, w - 10, 5);
+  }
+  // somebody's suitcases, piled one on top of the other
+  function luggage(ctx, x, y, w, h, bs, seed) {
+    const n = Math.max(1, Math.round(h / bs)), ch = h / n;
+    const cols = ['#d6453a', '#2f6fcf', '#f2b632', '#3aa66a', '#8a4fc2'];
+    for (let i = 0; i < n; i++) {
+      const cy = y + h - (i + 1) * ch, c = cols[(seed + i * 3) % cols.length];
+      ctx.strokeStyle = TL('#2a2a2a');
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.35, cy + 8);
+      ctx.lineTo(x + w * 0.35, cy + 3);
+      ctx.lineTo(x + w * 0.65, cy + 3);
+      ctx.lineTo(x + w * 0.65, cy + 8);
+      ctx.stroke();
+      rr(ctx, x + 3, cy + 7, w - 6, ch - 9, 6);
+      ctx.fillStyle = TL(c);
+      ctx.fill();
+      ctx.strokeStyle = TL('#2a1c12');
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (const k of [0.3, 0.5, 0.7]) {
+        ctx.moveTo(x + w * k, cy + 11);
+        ctx.lineTo(x + w * k, cy + ch - 6);
+      }
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(x + w * 0.66, cy + ch * 0.55);
+      ctx.rotate(-0.3 + i * 0.4);
+      ctx.fillStyle = i % 2 ? '#ffffff' : '#ffe14a';
+      ctx.fillRect(-7, -5, 14, 10);
+      ctx.restore();
+    }
+    ctx.fillStyle = TL('#1b1b1b');
+    circle(ctx, x + 10, y + h - 2, 3);
+    ctx.fill();
+    circle(ctx, x + w - 10, y + h - 2, 3);
+    ctx.fill();
+  }
+  // a big rusty sewer pipe lying along the walkway (two, stacked, if it's two blocks tall)
+  function sewerPipe(ctx, x, y, w, h, bs, seed) {
+    const n = Math.max(1, Math.round(h / bs)), ph = h / n;
+    const rnd = U.rng(seed * 53 + 9);
+    for (let i = n - 1; i >= 0; i--) {
+      const py = y + i * ph;
+      const g = ctx.createLinearGradient(0, py, 0, py + ph);
+      g.addColorStop(0, TL('#8a7a62'));
+      g.addColorStop(0.35, TL('#a38c6c'));
+      g.addColorStop(1, TL('#43382b'));
+      rr(ctx, x + 1, py + 2, w - 2, ph - 3, ph * 0.42);
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = TL('#231c14');
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(140,60,20,0.35)';
+      for (let k = 0; k < w / 30; k++) ctx.fillRect(x + 10 + rnd() * (w - 30), py + ph * 0.4, 6 + rnd() * 10, ph * 0.5);
+      for (const fx of [x + 5, x + w - 13, x + w / 2 - 4]) {
+        rr(ctx, fx, py, 8, ph, 3);
+        ctx.fillStyle = TL('#6e5c46');
+        ctx.fill();
+        ctx.strokeStyle = TL('#231c14');
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.fillStyle = TL('#5f7d34');
+      rr(ctx, x + w * 0.15, py + 1, w * 0.5, 5, 2);
+      ctx.fill();
+    }
+  }
+  // an old oil drum floating on its side in the sludge
+  function barrel(ctx, x, y, w, h, seed, t) {
+    const b = y + h;
+    const g = ctx.createLinearGradient(0, y, 0, b);
+    g.addColorStop(0, TL('#4f86c0'));
+    g.addColorStop(0.45, TL('#2f5f96'));
+    g.addColorStop(1, TL('#1a3558'));
+    rr(ctx, x + 2, y + 2, w - 4, h - 3, h * 0.42);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = TL('#0f1c2e');
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(150,70,30,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.7, y + h * 0.6, 12, 6, 0.3, 0, TAU);
+    ctx.ellipse(x + w * 0.3, y + h * 0.35, 7, 4, -0.2, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = TL('#16304f');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (const k of [0.36, 0.66]) {
+      ctx.moveTo(x + w * k, y + 4);
+      ctx.quadraticCurveTo(x + w * k + 5, y + h / 2, x + w * k, b - 3);
+    }
+    ctx.stroke();
+    ctx.fillStyle = TL('#6a9ad0');
+    ctx.beginPath();
+    ctx.ellipse(x + 10, y + h / 2, 7, h / 2 - 4, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = TL('#0f1c2e');
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#f2c230';
+    rr(ctx, x + w * 0.44, y + h * 0.28, w * 0.14, h * 0.36, 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(78,78,32,0.6)';
+    ctx.fillRect(x - 4, b - 11, w + 8, 11);
+    ctx.strokeStyle = 'rgba(175,205,75,0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let xx = x - 4; xx <= x + w + 4; xx += 8) {
+      const yy = b - 11 + Math.sin(xx * 0.12 + t * 2.2) * 1.5;
+      if (xx === x - 4) ctx.moveTo(xx, yy);
+      else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+  // an iron grating across the pipe, slime oozing off it
+  function grating(ctx, x, y, w, h, seed, t) {
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 5);
+    ctx.fillStyle = TL('#24272b');
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = TL('#5d646c');
+    for (let xx = x + 8; xx < x + w - 4; xx += 13) ctx.fillRect(xx, y, 5, h);
+    for (const k of [0.33, 0.66]) ctx.fillRect(x, y + h * k - 3, w, 6);
+    ctx.fillStyle = 'rgba(150,70,30,0.45)';
+    ctx.fillRect(x + w * 0.2, y + h * 0.4, 10, h * 0.5);
+    ctx.restore();
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 5);
+    ctx.strokeStyle = TL('#9aa1a8');
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#7ea52c';
+    for (let xx = x + 10; xx < x + w - 6; xx += 22) {
+      const len = 6 + ((xx * 7) % 9);
+      ctx.beginPath();
+      ctx.moveTo(xx - 6, y + h);
+      ctx.quadraticCurveTo(xx, y + h + len * 2, xx + 6, y + h);
+      ctx.fill();
+    }
+  }
+  // a concrete beam across the tunnel roof, hazard-striped along its bottom edge
+  function beam(ctx, x, y, w, h) {
+    bevel(ctx, x, y, w, h, TL('#6b7078'), TL('#3c4046'), TL('#16181b'), 4);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x + 3, y + h - 15, w - 6, 12);
+    ctx.clip();
+    ctx.fillStyle = '#f2c230';
+    ctx.fillRect(x, y + h - 15, w, 12);
+    ctx.fillStyle = '#111';
+    for (let xx = x - 20; xx < x + w + 20; xx += 16) {
+      ctx.beginPath();
+      ctx.moveTo(xx, y + h - 3);
+      ctx.lineTo(xx + 8, y + h - 3);
+      ctx.lineTo(xx + 20, y + h - 15);
+      ctx.lineTo(xx + 12, y + h - 15);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.fillStyle = TL('#23262b');
+    for (let xx = x + 10; xx < x + w - 6; xx += 24) {
+      circle(ctx, xx, y + 10, 3);
+      ctx.fill();
+    }
+  }
+  // signal lamps: one of red / amber / green is lit, and they change as you watch
+  function lamps(ctx, cx, y0, y1, r, t, seed) {
+    const cols = ['#ff3b30', '#ffb020', '#3cff78'];
+    const lit = Math.floor(t * 1.2 + seed) % 3, n = 3, sp = (y1 - y0) / n;
+    for (let i = 0; i < n; i++) {
+      const ly = y0 + sp * (i + 0.5);
+      if (i === lit) {
+        const g = ctx.createRadialGradient(cx, ly, 1, cx, ly, r * 3);
+        g.addColorStop(0, U.rgba(cols[i], 0.7));
+        g.addColorStop(1, U.rgba(cols[i], 0));
+        ctx.fillStyle = g;
+        circle(ctx, cx, ly, r * 3);
+        ctx.fill();
+      }
+      ctx.fillStyle = i === lit ? cols[i] : U.rgba(cols[i], 0.22);
+      circle(ctx, cx, ly, r);
+      ctx.fill();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, ly, r + 2, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+    }
+  }
+  // a signal box hanging from the tunnel roof (thorny: touching it crashes the bike)
+  function signalBox(ctx, x, y, w, h, t, seed) {
+    const bx = x + 8, bw = w - 16, by = y + Math.min(h * 0.3, 46), bh = y + h - by;
+    ctx.fillStyle = TL('#2f3238');
+    ctx.fillRect(bx + bw * 0.25 - 3, y - 6, 6, by - y + 8);
+    ctx.fillRect(bx + bw * 0.75 - 3, y - 6, 6, by - y + 8);
+    rr(ctx, bx, by, bw, bh, 9);
+    ctx.fillStyle = TL('#17191d');
+    ctx.fill();
+    lamps(ctx, bx + bw / 2, by + 6, by + bh - 16, Math.min(12, bw * 0.2), t, seed);
+    ctx.save();
+    rr(ctx, bx, by, bw, bh, 9);
+    ctx.clip();
+    for (let xx = bx - 10, k = 0; xx < bx + bw + 10; xx += 10, k++) {
+      ctx.fillStyle = k % 2 ? '#111' : '#f2c230';
+      ctx.fillRect(xx, by + bh - 10, 10, 10);
+    }
+    ctx.restore();
+    rr(ctx, bx, by, bw, bh, 9);
+    ctx.strokeStyle = '#ffcf70';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+  // a signal on a post sticking up from the track bed (thorny too)
+  function signalPost(ctx, x, y, w, h, t, seed) {
+    const b = y + h, cx = x + w / 2, hh = Math.min(96, h * 0.45);
+    ctx.fillStyle = TL('#4a4e56');
+    ctx.fillRect(cx - 6, y + hh, 12, h - hh);
+    for (let yy = b - 36, k = 0; yy < b; yy += 9, k++) {
+      ctx.fillStyle = k % 2 ? '#111' : '#f2c230';
+      ctx.fillRect(cx - 6, yy, 12, 9);
+    }
+    ctx.strokeStyle = '#ffcf70';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(cx - 6, y + hh, 12, h - hh);
+    rr(ctx, x + 5, y, w - 10, hh, 9);
+    ctx.fillStyle = TL('#17191d');
+    ctx.fill();
+    lamps(ctx, cx, y + 4, y + hh - 4, Math.min(10, (w - 10) * 0.28), t, seed + 1);
+    rr(ctx, x + 5, y, w - 10, hh, 9);
+    ctx.strokeStyle = '#ffcf70';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+  const METRO_BLOCKS = {
+    train: (ctx, x, y, w, h, bs, seed, t) => train(ctx, x, y, w, h, bs, seed, t),
+    vent: (ctx, x, y, w, h) => vent(ctx, x, y, w, h),
+    gate: (ctx, x, y, w, h, bs, seed, t) => gate(ctx, x, y, w, h, seed, t),
+    luggage: (ctx, x, y, w, h, bs, seed) => luggage(ctx, x, y, w, h, bs, seed),
+    pipe: (ctx, x, y, w, h, bs, seed) => sewerPipe(ctx, x, y, w, h, bs, seed),
+    barrel: (ctx, x, y, w, h, bs, seed, t) => barrel(ctx, x, y, w, h, seed, t),
+    grate: (ctx, x, y, w, h, bs, seed, t) => grating(ctx, x, y, w, h, seed, t),
+    beam: (ctx, x, y, w, h) => beam(ctx, x, y, w, h),
+    signal: (ctx, x, y, w, h, bs, seed, t) => signalBox(ctx, x, y, w, h, t, seed),
+    signalpost: (ctx, x, y, w, h, bs, seed, t) => signalPost(ctx, x, y, w, h, t, seed),
+    crocL: (ctx, x, y, w, h, bs, seed, t) => crocBody(ctx, x, y, w, h, false, t, seed),
+    crocR: (ctx, x, y, w, h, bs, seed, t) => crocBody(ctx, x, y, w, h, true, t, seed),
+  };
+
+  // ---------- scenery: Sergels torg ----------
+  function tLogo(ctx, x, y, r) {
+    ctx.fillStyle = '#ffffff';
+    circle(ctx, x, y, r);
+    ctx.fill();
+    ctx.fillStyle = '#1f5fb4';
+    circle(ctx, x, y, r * 0.86);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x - r * 0.52, y - r * 0.5, r * 1.04, r * 0.24);
+    ctx.fillRect(x - r * 0.13, y - r * 0.5, r * 0.26, r * 1.1);
+  }
+  // the blue T of the Stockholm subway, up on its pole
+  near.tsign = function (ctx, x, base) {
+    ctx.fillStyle = T('#3a3f47');
+    ctx.fillRect(x - 4, base - 190, 8, 190);
+    tLogo(ctx, x, base - 212, 30);
+  };
+  // the subway entrance: a stone pavilion with the escalators going down (Vippe runs in through the opening)
+  near.tbana = function (ctx, x, base, d, t, bs, font) {
+    const w = 16 * bs, h = 400;
+    ctx.fillStyle = T('#8d9299');
+    ctx.fillRect(x, base - h, w, h);
+    ctx.fillStyle = T('#7b8088');
+    for (let yy = base - h + 100; yy < base; yy += 40) ctx.fillRect(x, yy, w, 3);
+    ctx.fillStyle = T('#15335c');
+    ctx.fillRect(x, base - h, w, 78);
+    tLogo(ctx, x + 64, base - h + 39, 30);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '44px ' + font;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('TUNNELBANA', x + 110, base - h + 41);
+    // the ticket hall windows
+    for (let wx = x + 8.4 * bs; wx < x + w - 60; wx += 112) {
+      ctx.fillStyle = T('#a9c3dc');
+      ctx.fillRect(wx, base - 290, 84, 210);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillRect(wx + 8, base - 284, 10, 196);
+      ctx.strokeStyle = T('#3a3f47');
+      ctx.lineWidth = 5;
+      ctx.strokeRect(wx, base - 290, 84, 210);
+    }
+    // the way in: escalators going down into the light
+    const ox = x + 1.4 * bs, ow = 6.2 * bs, oh = 240;
+    const g = ctx.createLinearGradient(0, base - oh, 0, base);
+    g.addColorStop(0, '#19202e');
+    g.addColorStop(1, '#4a5d7e');
+    ctx.fillStyle = g;
+    ctx.fillRect(ox, base - oh, ow, oh);
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let k = 0; k < 14; k++) {
+      const u = ((k / 14 + t * 0.12) % 1);
+      const sxp = ox + u * ow, syp = base - oh * 0.72 + u * oh * 0.72;
+      ctx.moveTo(sxp, syp);
+      ctx.lineTo(sxp + 18, syp);
+    }
+    ctx.moveTo(ox, base - oh * 0.8);
+    ctx.lineTo(ox + ow, base - oh * 0.08);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,248,220,0.6)';
+    for (let k = 0; k < 4; k++) ctx.fillRect(ox + 30 + k * 70, base - oh + 10, 40, 5);
+    // the glass canopy over the doorway
+    ctx.fillStyle = 'rgba(200,228,255,0.55)';
+    ctx.fillRect(ox - 24, base - oh - 18, ow + 48, 16);
+    ctx.strokeStyle = T('#3a3f47');
+    ctx.lineWidth = 4;
+    ctx.strokeRect(ox - 24, base - oh - 18, ow + 48, 16);
+    ctx.strokeRect(ox, base - oh, ow, oh);
+  };
+  near.bollard = function (ctx, x, base) {
+    ctx.fillStyle = T('#26292e');
+    rr(ctx, x - 12, base - 42, 24, 42, 6);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x, base - 42, 16, 7, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(x - 8, base - 38, 4, 34);
+  };
+
+  // ---------- scenery: T-Centralen and the tunnel (drawn over the subway background) ----------
+  // the station name on the wall, SL-style: white letters on dark blue
+  near.stationsign = function (ctx, x, base, d, t, bs, font) {
+    ctx.font = '34px ' + font;
+    const tw = ctx.measureText(d.text).width + 86, y = base - 300;
+    ctx.fillStyle = '#10305e';
+    rr(ctx, x - tw / 2, y, tw, 58, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    tLogo(ctx, x - tw / 2 + 32, y + 29, 18);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(d.text, x + 22, y + 31);
+  };
+  // the next-train display hanging over the platform
+  near.display = function (ctx, x, base, d, t, bs, font) {
+    const y = base - 350;
+    ctx.fillStyle = '#54627a';
+    ctx.fillRect(x - 110, 0, 4, y);
+    ctx.fillRect(x + 106, 0, 4, y);
+    ctx.fillStyle = '#0b0c10';
+    rr(ctx, x - 160, y, 320, 78, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#50607a';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.font = '22px ' + font;
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffb020';
+    ctx.textAlign = 'left';
+    ctx.fillText('13 Storvreta', x - 146, y + 22);
+    ctx.fillText('14 Mörby c.', x - 146, y + 54);
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.floor(t * 0.8) % 2 ? 'Nu' : '1 min', x + 146, y + 22);
+    ctx.fillText('7 min', x + 146, y + 54);
+  };
+  // the station clock
+  near.clock = function (ctx, x, base, d, t) {
+    const y = base - 380;
+    ctx.fillStyle = '#54627a';
+    ctx.fillRect(x - 3, 0, 6, y - 30);
+    ctx.fillStyle = '#ffffff';
+    circle(ctx, x, y, 32);
+    ctx.fill();
+    ctx.strokeStyle = '#1b1b22';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU;
+      ctx.moveTo(x + Math.cos(a) * 22, y + Math.sin(a) * 22);
+      ctx.lineTo(x + Math.cos(a) * 27, y + Math.sin(a) * 27);
+    }
+    ctx.stroke();
+    const hand = (a, len, lw, col) => {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = lw;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.sin(a) * len, y - Math.cos(a) * len);
+      ctx.stroke();
+    };
+    hand(4.1 + t * 0.002, 14, 4, '#1b1b22');
+    hand(1.2 + t * 0.02, 22, 3, '#1b1b22');
+    hand(Math.floor(t) * (TAU / 60), 24, 1.5, '#d42020');
+  };
+  // an advert on the platform wall
+  near.poster = function (ctx, x, base, d, t, bs, font) {
+    const pw = 150, ph = 204, y = base - 262;
+    ctx.fillStyle = '#2a2f36';
+    rr(ctx, x - pw / 2 - 9, y - 9, pw + 18, ph + 18, 5);
+    ctx.fill();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x - pw / 2, y, pw, ph);
+    ctx.clip();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (d.seed === 1) {
+      // a film poster starring Vippe himself
+      const g = ctx.createLinearGradient(0, y, 0, y + ph);
+      g.addColorStop(0, '#ff8a3a');
+      g.addColorStop(1, '#c2185b');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - pw / 2, y, pw, ph);
+      ctx.save();
+      ctx.translate(x, y + 92);
+      Art.cube(ctx, 64, 'grin', 'red', 0);
+      ctx.restore();
+      ctx.fillStyle = '#ffe14a';
+      ctx.font = '26px ' + font;
+      ctx.fillText('VIPPE DASH', x, y + 26);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '18px ' + font;
+      ctx.fillText('NU PÅ BIO!', x, y + ph - 26);
+    } else {
+      // fika: an ad for cinnamon buns
+      ctx.fillStyle = '#f7e6c4';
+      ctx.fillRect(x - pw / 2, y, pw, ph);
+      for (const [bx, by, br] of [[x - 30, y + 110, 30], [x + 34, y + 124, 24], [x + 4, y + 158, 20]]) {
+        ctx.fillStyle = '#c98a45';
+        circle(ctx, bx, by, br);
+        ctx.fill();
+        ctx.strokeStyle = '#7a4a1e';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let a = 0; a < 12; a += 0.3) ctx.lineTo(bx + Math.cos(a) * a * br * 0.075, by + Math.sin(a) * a * br * 0.075);
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        for (let k = 0; k < 5; k++) ctx.fillRect(bx - br * 0.6 + k * br * 0.3, by - br * 0.4 + ((k * 7) % 5), 3, 3);
+      }
+      ctx.fillStyle = '#7a4a1e';
+      ctx.font = '34px ' + font;
+      ctx.fillText('FIKA?', x, y + 42);
+    }
+    ctx.restore();
+  };
+  // a running-man sign (exit / emergency exit)
+  function exitSign(ctx, x, y, text, font, hang, t) {
+    ctx.font = '24px ' + font;
+    const tw = ctx.measureText(text).width + 70;
+    if (hang) {
+      ctx.fillStyle = '#54627a';
+      ctx.fillRect(x - tw / 2 + 20, 0, 4, y);
+      ctx.fillRect(x + tw / 2 - 24, 0, 4, y);
+    }
+    const g = ctx.createRadialGradient(x, y + 24, 4, x, y + 24, tw * 0.7);
+    g.addColorStop(0, 'rgba(60,255,120,' + (0.18 + 0.05 * Math.sin(t * 3)) + ')');
+    g.addColorStop(1, 'rgba(60,255,120,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - tw, y - 40, tw * 2, 130);
+    ctx.fillStyle = '#138a3e';
+    rr(ctx, x - tw / 2, y, tw, 48, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#e8fff0';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // the running man
+    const mx = x - tw / 2 + 24, my = y + 24;
+    ctx.strokeStyle = '#ffffff';
+    ctx.fillStyle = '#ffffff';
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    circle(ctx, mx + 3, my - 13, 3.5);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(mx + 1, my - 8);
+    ctx.lineTo(mx - 2, my + 3);
+    ctx.lineTo(mx - 8, my + 12);
+    ctx.moveTo(mx - 2, my + 3);
+    ctx.lineTo(mx + 5, my + 6);
+    ctx.lineTo(mx + 4, my + 13);
+    ctx.moveTo(mx - 7, my - 3);
+    ctx.lineTo(mx + 1, my - 6);
+    ctx.lineTo(mx + 8, my - 1);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x - tw / 2 + 42, y + 26);
+  }
+  near.exit = function (ctx, x, base, d, t, bs, font) {
+    exitSign(ctx, x, base - 380, 'UTGÅNG →', font, true, t);
+  };
+  near.nodutgang = function (ctx, x, base, d, t, bs, font) {
+    exitSign(ctx, x, base - 250, 'NÖDUTGÅNG', font, false, t);
+  };
+  // warning on the tunnel wall: danger, live rail
+  near.voltage = function (ctx, x, base, d, t, bs, font) {
+    const y = base - 230;
+    ctx.fillStyle = '#f2c230';
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 5;
+    ctx.lineJoin = 'round';
+    tri(ctx, x - 40, y + 70, x, y, x + 40, y + 70);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.moveTo(x + 6, y + 18);
+    ctx.lineTo(x - 10, y + 44);
+    ctx.lineTo(x + 1, y + 44);
+    ctx.lineTo(x - 6, y + 62);
+    ctx.lineTo(x + 12, y + 36);
+    ctx.lineTo(x + 1, y + 36);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    rr(ctx, x - 58, y + 80, 116, 32, 4);
+    ctx.fill();
+    ctx.fillStyle = '#d42020';
+    ctx.font = '20px ' + font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('LIVSFARA!', x, y + 97);
+  };
+  // a signal lamp on the tunnel wall
+  near.signallamp = function (ctx, x, base, d, t) {
+    const y = base - 210;
+    ctx.fillStyle = '#3a3f47';
+    ctx.fillRect(x - 3, y + 60, 6, 150);
+    rr(ctx, x - 16, y, 32, 64, 8);
+    ctx.fillStyle = '#111317';
+    ctx.fill();
+    const green = Math.floor(t / 3) % 2 === 0;
+    for (const [ly, col, on] of [[y + 18, '#ff3b30', !green], [y + 46, '#3cff78', green]]) {
+      if (on) {
+        const g = ctx.createRadialGradient(x, ly, 1, x, ly, 40);
+        g.addColorStop(0, U.rgba(col, 0.6));
+        g.addColorStop(1, U.rgba(col, 0));
+        ctx.fillStyle = g;
+        circle(ctx, x, ly, 40);
+        ctx.fill();
+      }
+      ctx.fillStyle = on ? col : U.rgba(col, 0.2);
+      circle(ctx, x, ly, 9);
+      ctx.fill();
+    }
+  };
+  // RASRISK: the tunnel is about to cave in
+  near.rasrisk = function (ctx, x, base, d, t, bs, font) {
+    const y = base - 250;
+    ctx.fillStyle = '#3a3f47';
+    ctx.fillRect(x - 3, y + 60, 6, 190);
+    ctx.save();
+    ctx.translate(x, y + 30);
+    ctx.rotate(-0.12 + Math.sin(t * 7) * 0.02);
+    ctx.fillStyle = '#f2c230';
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 4;
+    rr(ctx, -80, -30, 160, 60, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.font = '30px ' + font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('RASRISK!', 0, 2);
+    ctx.restore();
+    // cracks up the tunnel wall
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 2;
+    const r = U.rng(5);
+    for (let k = 0; k < 3; k++) {
+      let cx = x + 100 + k * 90, cy = base;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      while (cy > base - 240) {
+        cy -= 14 + r() * 20;
+        cx += (r() - 0.5) * 26;
+        ctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+    }
+  };
+  // the end of the line: a buffer stop with a red lamp (past the hole, on the floor above the sewer)
+  near.bufferstop = function (ctx, x, base) {
+    ctx.fillStyle = '#2a2d33';
+    ctx.fillRect(x - 4, base - 70, 90, 70);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x - 14, base - 104, 30, 70);
+    ctx.clip();
+    for (let yy = base - 110, k = 0; yy < base - 30; yy += 14, k++) {
+      ctx.fillStyle = k % 2 ? '#ffffff' : '#d42020';
+      ctx.fillRect(x - 14, yy, 30, 14);
+    }
+    ctx.restore();
+    ctx.fillStyle = '#ff3b30';
+    circle(ctx, x + 1, base - 118, 8);
+    ctx.fill();
+    const g = ctx.createRadialGradient(x + 1, base - 118, 2, x + 1, base - 118, 60);
+    g.addColorStop(0, 'rgba(255,59,48,0.5)');
+    g.addColorStop(1, 'rgba(255,59,48,0)');
+    ctx.fillStyle = g;
+    circle(ctx, x + 1, base - 118, 60);
+    ctx.fill();
+  };
+
+  // ---------- scenery: the sewer ----------
+  // rubble from the roof, piled up where Vippe lands
+  near.rubble = function (ctx, x, base, d, t, bs) {
+    const r = U.rng(31);
+    for (let k = 0; k < 14; k++) {
+      const px = x + r() * bs * 4.5, s = 8 + r() * 16, py = base - r() * 14 - s * 0.3;
+      ctx.fillStyle = k % 3 ? '#5d5750' : '#7a5a40';
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(r() * 3);
+      ctx.fillRect(-s / 2, -s / 3, s, s * 0.66);
+      ctx.restore();
+    }
+  };
+  // an iron ladder up the wall to a manhole, a little daylight showing round the lid
+  near.ladder = function (ctx, x, base) {
+    ctx.fillStyle = 'rgba(255,240,200,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(x - 30, 60);
+    ctx.lineTo(x + 30, 60);
+    ctx.lineTo(x + 70, base);
+    ctx.lineTo(x - 70, base);
+    ctx.fill();
+    ctx.fillStyle = '#2a2d26';
+    ctx.fillRect(x - 36, 44, 72, 18);
+    ctx.fillStyle = '#ffe9b0';
+    ctx.fillRect(x - 32, 44, 64, 3);
+    ctx.strokeStyle = '#6b5a44';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(x - 18, 62);
+    ctx.lineTo(x - 18, base - 20);
+    ctx.moveTo(x + 18, 62);
+    ctx.lineTo(x + 18, base - 20);
+    for (let yy = 90; yy < base - 20; yy += 32) {
+      ctx.moveTo(x - 18, yy);
+      ctx.lineTo(x + 18, yy);
+    }
+    ctx.stroke();
+  };
+  // a pipe in the wall, pouring sludge down into the channel
+  near.outfall = function (ctx, x, base, d, t) {
+    const y = base - 230;
+    ctx.fillStyle = '#1b1e17';
+    circle(ctx, x, y, 34);
+    ctx.fill();
+    ctx.strokeStyle = '#5a4a36';
+    ctx.lineWidth = 10;
+    ctx.stroke();
+    ctx.fillStyle = '#080a07';
+    circle(ctx, x, y, 26);
+    ctx.fill();
+    const g = ctx.createLinearGradient(0, y + 10, 0, base);
+    g.addColorStop(0, 'rgba(140,150,60,0.9)');
+    g.addColorStop(1, 'rgba(110,120,50,0.4)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x - 18, y + 12);
+    ctx.quadraticCurveTo(x + 6, y + 30, x + 10, base);
+    ctx.lineTo(x + 30, base);
+    ctx.quadraticCurveTo(x + 22, y + 34, x + 16, y + 12);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(200,220,120,0.7)';
+    for (let k = 0; k < 5; k++) {
+      const u = (t * 1.3 + k * 0.2) % 1;
+      ctx.fillRect(x + 14 + Math.sin(k) * 4, y + 20 + u * (base - y - 30), 3, 8);
+    }
+    for (let k = 0; k < 3; k++) {
+      const u = (t * 2 + k * 0.33) % 1;
+      ctx.strokeStyle = 'rgba(175,205,75,' + (1 - u) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(x + 20, base - 4, 8 + u * 22, 2 + u * 3, 0, Math.PI, TAU);
+      ctx.stroke();
+    }
+  };
+  // a street grating in the roof, with daylight falling through it
+  near.grate = function (ctx, x, base, d, t) {
+    const g = ctx.createLinearGradient(0, 60, 0, base);
+    g.addColorStop(0, 'rgba(255,244,210,0.3)');
+    g.addColorStop(1, 'rgba(255,244,210,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x - 40, 60);
+    ctx.lineTo(x + 40, 60);
+    ctx.lineTo(x + 160, base);
+    ctx.lineTo(x + 20, base);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#1b1e17';
+    ctx.fillRect(x - 46, 46, 92, 16);
+    ctx.fillStyle = '#ffeab8';
+    for (let k = 0; k < 6; k++) ctx.fillRect(x - 40 + k * 14, 48, 8, 12);
+    ctx.fillStyle = 'rgba(255,245,215,0.7)';
+    for (let k = 0; k < 10; k++) {
+      const u = (t * 0.12 + U.hash(k * 3.3 + d.x)) % 1;
+      ctx.fillRect(x - 30 + u * 150 + U.hash(k) * 40, 70 + u * (base - 90), 2, 2);
+    }
+  };
+  // the way out: the sewer's outlet through the stone quay wall, seen from outside (d.mouth: see cavehill)
+  near.culvert = function (ctx, x, base, d, t, bs) {
+    const w = (d.w || 14) * bs, h = 340;
+    const mx = x + (d.mouth == null ? w / bs - 5.4 : d.mouth) * bs, mw = 5.4 * bs, mh = 250;
+    ctx.fillStyle = T('#7d776c');
+    ctx.fillRect(x - 40, base - h, w + 40, h);
+    ctx.strokeStyle = T('#5f5a51');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let r = 0, yy = base - h + 38; yy < base; yy += 38, r++) {
+      ctx.moveTo(x - 40, yy);
+      ctx.lineTo(x + w, yy);
+      for (let xx = x - 40 + (r % 2) * 40; xx < x + w; xx += 80) {
+        ctx.moveTo(xx, yy);
+        ctx.lineTo(xx, yy - 38);
+      }
+    }
+    ctx.stroke();
+    // railing on top
+    ctx.strokeStyle = T('#2a2d33');
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x - 40, base - h - 40);
+    ctx.lineTo(x + w, base - h - 40);
+    for (let xx = x - 30; xx < x + w; xx += 44) {
+      ctx.moveTo(xx, base - h);
+      ctx.lineTo(xx, base - h - 40);
+    }
+    ctx.stroke();
+    // the round outlet, its old grating bent open
+    ctx.fillStyle = T('#6a5040');
+    archFill(ctx, mx - 16, base, mw + 32, mh + 16);
+    const g = ctx.createLinearGradient(0, base - mh, 0, base);
+    g.addColorStop(0, '#0b0d09');
+    g.addColorStop(1, '#232a1a');
+    ctx.fillStyle = g;
+    archFill(ctx, mx, base, mw, mh);
+    ctx.strokeStyle = T('#2a2d33');
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (let k = 0; k < 4; k++) {
+      const bx = mx + 20 + k * 14;
+      ctx.moveTo(bx, base - mh + 40 + k * 8);
+      ctx.quadraticCurveTo(bx - 20, base - mh * 0.5, bx - 40 + k * 4, base - 30);
+    }
+    ctx.stroke();
+    // sludge trickling out onto the quay
+    ctx.fillStyle = 'rgba(120,130,55,0.75)';
+    ctx.fillRect(mx, base - 8, mw + 60, 8);
+  };
+  function archFill(ctx, x, base, w, h) {
+    ctx.beginPath();
+    ctx.moveTo(x, base);
+    ctx.lineTo(x, base - h + w / 2);
+    ctx.arc(x + w / 2, base - h + w / 2, w / 2, Math.PI, 0);
+    ctx.lineTo(x + w, base);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ---------- mid-layer landmarks: Stockholm ----------
+  // Sergels torg: the tall glass obelisk in its fountain, Kulturhuset's glass front behind it
+  mid.obelisk = function (ctx, x, base, d, t) {
+    ctx.fillStyle = T('#8d949c');
+    ctx.fillRect(x + 20, base - 130, 330, 130);
+    ctx.fillStyle = T('#b9cfe0');
+    for (let yy = base - 122; yy < base - 10; yy += 28) ctx.fillRect(x + 26, yy, 318, 18);
+    ctx.fillStyle = T('#6f7a86');
+    ctx.beginPath();
+    ctx.ellipse(x - 20, base - 4, 110, 14, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = T('#7fb0cf');
+    ctx.beginPath();
+    ctx.ellipse(x - 20, base - 6, 96, 9, 0, 0, TAU);
+    ctx.fill();
+    const g = ctx.createLinearGradient(x - 40, 0, x, 0);
+    g.addColorStop(0, T('#d6f0ff'));
+    g.addColorStop(1, T('#7fb4d8'));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x - 38, base - 8);
+    ctx.lineTo(x - 30, base - 300);
+    ctx.lineTo(x - 10, base - 300);
+    ctx.lineTo(x - 2, base - 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    for (let yy = base - 290; yy < base - 20; yy += 22) ctx.fillRect(x - 32 + (yy % 3), yy, 26, 2);
+  };
+  // Stadshuset, the city hall, across the water: red brick and a tall tower with three gold crowns
+  mid.stadshuset = function (ctx, x, base, d, t) {
+    const brick = T('#9c4a32'), dark = T('#7a3524'), copper = T('#5f9e84'), gold = T('#f2c230');
+    ctx.fillStyle = brick;
+    ctx.fillRect(x - 250, base - 118, 400, 118);
+    ctx.fillStyle = copper;
+    ctx.fillRect(x - 256, base - 128, 412, 12);
+    ctx.fillStyle = dark;
+    for (let wx = x - 236; wx < x + 140; wx += 26) ctx.fillRect(wx, base - 96, 10, 20);
+    for (let k = 0; k < 7; k++) {
+      ctx.beginPath();
+      ctx.arc(x - 220 + k * 50, base - 26, 16, Math.PI, 0);
+      ctx.lineTo(x - 204 + k * 50, base);
+      ctx.lineTo(x - 236 + k * 50, base);
+      ctx.fill();
+    }
+    // the tower
+    const tx = x + 96;
+    ctx.fillStyle = brick;
+    ctx.fillRect(tx - 30, base - 330, 60, 330);
+    ctx.fillStyle = dark;
+    for (let yy = base - 310; yy < base - 140; yy += 36) ctx.fillRect(tx - 6, yy, 12, 22);
+    ctx.fillStyle = T('#e9dfc8');
+    ctx.fillRect(tx - 34, base - 336, 68, 8);
+    ctx.fillStyle = copper;
+    ctx.beginPath();
+    ctx.moveTo(tx - 22, base - 336);
+    ctx.lineTo(tx - 16, base - 380);
+    ctx.lineTo(tx + 16, base - 380);
+    ctx.lineTo(tx + 22, base - 336);
+    ctx.fill();
+    ctx.fillRect(tx - 4, base - 404, 8, 26);
+    // the three crowns
+    ctx.fillStyle = gold;
+    for (const [cx, cy] of [[tx - 10, base - 404], [tx + 10, base - 404], [tx, base - 420]]) {
+      ctx.beginPath();
+      ctx.moveTo(cx - 7, cy + 5);
+      ctx.lineTo(cx - 7, cy - 4);
+      ctx.lineTo(cx - 3.5, cy);
+      ctx.lineTo(cx, cy - 6);
+      ctx.lineTo(cx + 3.5, cy);
+      ctx.lineTo(cx + 7, cy - 4);
+      ctx.lineTo(cx + 7, cy + 5);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (Art.dark() > 0.1) {
+      ctx.fillStyle = 'rgba(255,214,130,0.8)';
+      for (let wx = x - 236; wx < x + 140; wx += 52) ctx.fillRect(wx, base - 96, 10, 20);
+    }
   };
 })();
