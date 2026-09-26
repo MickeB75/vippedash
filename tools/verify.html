@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VippeDash level verifier</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; background: #111; color: #eee; padding: 16px; }
+  table { border-collapse: collapse; }
+  td, th { border: 1px solid #333; padding: 4px 8px; text-align: right; }
+  .ok { color: #6f6; } .bad { color: #f66; font-weight: bold; } .warn { color: #fc4; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h2>VippeDash level verifier</h2>
+<p>Runs the search bot from every checkpoint to the next one using the real game physics.
+Add <code>?windows</code> to also measure how much timing slack every jump has (slower).</p>
+<div id="out">Running…</div>
+<script src="../js/util.js"></script>
+<script src="../js/physics.js"></script>
+<script src="../js/level.js"></script>
+<script src="../js/solver.js"></script>
+<script>
+  setTimeout(function () {
+    const lvl = VD.buildLevel();
+    const windows = location.search.indexOf('windows') >= 0;
+    const t0 = performance.now();
+    const rep = VD.Solver.verifyAll(lvl, { windows });
+    // whole level in one go
+    const full = VD.Solver.solve(lvl, VD.Physics.spawn(lvl.checkpoints[0]), lvl.finishX + 1, { maxNodes: 3000000 });
+    let html = '<table><tr><th>cp</th><th>from</th><th>to</th><th>ok</th><th>furthest x</th><th>nodes</th><th>ms</th>' + (windows ? '<th>tightest press (ms)</th><th>at x</th>' : '') + '</tr>';
+    for (const r of rep) {
+      let tight = '', at = '';
+      if (r.ship) {
+        tight = '<span class="' + (r.fatOk ? 'ok' : 'warn') + '">ship clearance ' + (r.fatOk ? 'ok' : 'tight') + '</span>';
+      } else if (windows && r.windows && r.windows.length) {
+        const w = r.windows.reduce((a, b) => (b.ms < a.ms ? b : a));
+        tight = '<span class="' + (w.ms < 50 ? 'bad' : w.ms < 90 ? 'warn' : 'ok') + '">' + w.ms + '</span>';
+        at = w.x;
+      }
+      html += '<tr><td>' + r.cp + '</td><td>' + r.from + '</td><td>' + r.to + '</td><td class="' + (r.ok ? 'ok' : 'bad') + '">' + (r.ok ? 'yes' : 'NO') + '</td><td>' + r.maxX + '</td><td>' + r.nodes + '</td><td>' + r.ms + '</td>' + (windows ? '<td>' + tight + '</td><td>' + at + '</td>' : '') + '</tr>';
+    }
+    html += '</table>';
+    html += '<p>Full run start → finish: <b class="' + (full.ok ? 'ok' : 'bad') + '">' + (full.ok ? 'beatable' : 'NOT beatable (' + full.reason + ', furthest ' + full.maxX.toFixed(1) + ')') + '</b> (' + full.nodes + ' nodes)</p>';
+    html += '<p>Total ' + Math.round(performance.now() - t0) + ' ms</p>';
+    if (windows) html += '<pre>' + JSON.stringify(rep.map((r) => ({ cp: r.cp, windows: r.windows })), null, 1) + '</pre>';
+    document.getElementById('out').innerHTML = html;
+    window.REPORT = { rep, full };
+  }, 50);
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Python venv used once to convert the reference photos (not needed by the game)
+.venv/
+
+# Private reference photos of Vincent (only used to design the character, not by the game)
+Vincent/
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# OS clutter
+Thumbs.db
+desktop.ini
+.DS_Store
