@@ -934,8 +934,8 @@
     b.half(31);
     b.spikes(36, 2, 0, 'urchin');
     b.block(44, 0, 2, 1, 'coral');
-    b.spikes(46, 3); // an adjacent triple right off the coral's edge
-    b.block(52, 0, 2, 2, 'coral');
+    b.spikes(46, 2); // an adjacent double right off the coral's edge
+    b.block(52, 0, 2, 1, 'coral');
     b.half(56);
     b.spike(60, 0, 'urchin');
     b.spikes(64, 3, 0, 'urchin');
