@@ -1,6 +1,6 @@
 # VippeDash
 
-A Geometry Dash–style runner starring **Vippe** (Vincent). There are four levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Vilda skogen** (medium, about 1:37) runs through the wild forest, **3 · Tunnelbanan** (hard, about 1:29) runs through the Stockholm subway and down into the sewers, and **4 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
+A Geometry Dash–style runner starring **Vippe** (Vincent). There are four levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **3 · Vilda skogen** (hard, about 1:37) runs through the wild forest, and **4 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
 
 ## Play
 
@@ -111,24 +111,9 @@ Coins, skins and progress are saved in the browser (`localStorage`), so they sta
 
 The sun sets as you go: it's noon in Uppland, sunset over Fyrisån and night in Storvreta.
 
-## Level 2: Vilda skogen (≈ 1:37, 9 checkpoints)
+## Level 2: Tunnelbanan (≈ 1:29, 8 checkpoints)
 
-Shorter than level 1 but harder, with fewer checkpoints. New things: triple spikes, hedgehogs (they're spikes), crows you must not hit, an orb chain, a tighter bike ride and faster gravity flips.
-
-| Section | Where | What happens |
-| --- | --- | --- |
-| **Skogsbrynet** | the forest edge: pines, a hunting stand, squirrels, a hare, a moose | Hedgehogs, logs, a stump staircase over thorns, a moose crossing and stepping stones across a pool. Low-flying crows: stay on the ground under them. |
-| **Granskogen** | deep spruce forest, an owl, a fox, a squirrel running up a pine | A woodpile with a spike on it, branch hopping over a floor of thorns, an orb chain, and a timber pile with a crow above it (jump early). |
-| **Myren** | the misty bog: cranes, frogs on lily pads, dead trees | **Flying-bike mode** under the spruce boughs, weaving between dead trees and crows. The dead trees and the boughs are thorny: touching them crashes the bike. |
-| **Björngrottan** | the bear cave: a sleeping bear, bats, glowing crystals | **Floorball mode** with a lower roof and a spike group every 5 blocks. |
-| **Bäckravinen** | the brook ravine: deer, a woodpecker | Stones across the brook, a fox in the path, branches over the rapids. |
-| **Gläntan** | the sunny clearing: a tent and a campfire | A last moose, an orb chain and the finish. |
-
-Level 2 has its own folk-style soundtrack in D minor that ends in a major key when you reach the clearing.
-
-## Level 3: Tunnelbanan (≈ 1:29, 8 checkpoints)
-
-A little shorter than level 2 but harder, with fewer checkpoints and the tightest jumps about as tight as level 2's triple spikes. It's like Subway Surfers: you jump up onto parked metro trains and run along their roofs. Halfway through, the tunnel floor caves in and you fall through a hole into the sewers, where crocodiles lie in the dirty water. The camera follows you down the hole, so you see the tunnel above and the sewer below.
+Shorter than level 1 and a step up from it, with fewer checkpoints. It's like Subway Surfers: you jump up onto parked metro trains and run along their roofs. Halfway through, the tunnel floor caves in and you fall through a hole into the sewers, where crocodiles lie in the dirty water. The camera follows you down the hole, so you see the tunnel above and the sewer below.
 
 | Section | Where | What happens |
 | --- | --- | --- |
@@ -141,7 +126,22 @@ A little shorter than level 2 but harder, with fewer checkpoints and the tightes
 | **Utloppet** | the last of the sewer | More crocodiles, two snapping heads with an orb between them, and out through the outlet... |
 | **Riddarfjärden** | the waterfront at sunset: Gamla stan and Stadshuset with its three crowns | Gulls, cones and barriers, and the finish. |
 
-Level 3 has its own soundtrack in E minor: a train rhythm on the tracks, a drum roll as the floor gives way, dripping water in the sewer, and G major when you come out into the sunshine.
+Level 2 has its own soundtrack in E minor: a train rhythm on the tracks, a drum roll as the floor gives way, dripping water in the sewer, and G major when you come out into the sunshine.
+
+## Level 3: Vilda skogen (≈ 1:37, 9 checkpoints)
+
+A little longer than level 2 and harder: triple spikes, hedgehogs (they're spikes), crows you must not hit, orb chains, a tighter bike ride and faster gravity flips.
+
+| Section | Where | What happens |
+| --- | --- | --- |
+| **Skogsbrynet** | the forest edge: pines, a hunting stand, squirrels, a hare, a moose | Hedgehogs, logs, a stump staircase over thorns, a moose crossing and stepping stones across a pool. Low-flying crows: stay on the ground under them. |
+| **Granskogen** | deep spruce forest, an owl, a fox, a squirrel running up a pine | A woodpile with a spike on it, branch hopping over a floor of thorns, an orb chain, and a timber pile with a crow above it (jump early). |
+| **Myren** | the misty bog: cranes, frogs on lily pads, dead trees | **Flying-bike mode** under the spruce boughs, weaving between dead trees and crows. The dead trees and the boughs are thorny: touching them crashes the bike. |
+| **Björngrottan** | the bear cave: a sleeping bear, bats, glowing crystals | **Floorball mode** with a lower roof and a spike group every 5 blocks. |
+| **Bäckravinen** | the brook ravine: deer, a woodpecker | Stones across the brook, a fox in the path, branches over the rapids. |
+| **Gläntan** | the sunny clearing: a tent and a campfire | A last moose, an orb chain and the finish. |
+
+Level 3 has its own folk-style soundtrack in D minor that ends in a major key when you reach the clearing.
 
 ## Level 4: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
 
@@ -229,7 +229,7 @@ b.portal(712, 'ship', { ceil: 10 });
 b.checkpoint(96);
 ```
 
-Level 3 adds:
+Level 2 adds:
 
 ```js
 b.train(233, 12);            // a parked metro train, 2.5 blocks tall: too tall to jump onto, so use a pad or a step
@@ -269,7 +269,7 @@ python tools/verify.py
 
 This runs the search bot from every checkpoint to the next one using the real game physics. Add a level name to check one level only: `python tools/verify.py forest`. Options: `--windows` to measure timing slack (slower; `!` marks a jump with less than 90 ms, `!!` less than 50 ms), `--json` to print the raw report. Exit code 0 when every level is beatable.
 
-Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2 is harder: its triple spikes have about 80 ms, and everything else has more. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms too, but there are more of them and fewer checkpoints. Level 4's tightest presses are about 67 ms, with more of them than level 3.
+Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms. Level 3 is harder: its triple spikes have about 80 ms too, and it's longer. Level 4's tightest presses are about 67 ms, with more of them than level 3.
 
 To see a level's layout and rhythm at a glance, open `tools/map.html?level=<id>` in a browser. It draws a schematic top-down/side map of the level's hitboxes, obstacles and checkpoints. Options: `from=<x>&to=<x>` (show part of the level), `cols=<n>` (blocks per row), `scale=<px>` (pixels per block, default 12), `bot` (draw the bot's path from every checkpoint, red where it fails), `windows` (also colour each jump by its timing slack). Example: `tools/map.html?level=forest&from=380&to=500&windows&scale=20`.
 

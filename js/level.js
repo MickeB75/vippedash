@@ -1,4 +1,4 @@
-// VippeDash — level builder + the levels (1: Uppland → Uppsala → Storvreta, 2: the wild forest, 3: the subway)
+// VippeDash — level builder + the levels (1: Uppland → Uppsala → Storvreta, 2: the subway, 3: the wild forest)
 // Units are blocks. 10.4 blocks/s at 156 BPM => 1 beat = 4 blocks, 1 bar = 16 blocks.
 (function () {
   const VD = (window.VD = window.VD || {});
@@ -57,7 +57,7 @@
     bird(x, y, style) {
       return this.add({ t: 'haz', kind: 'bird', x, y, w: 1, h: 1, style, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.25, hy1: y + 0.7, dmg: 12 });
     }
-    // ---- level 3: the subway and the sewers ----
+    // ---- level 2: the subway and the sewers ----
     // a stretch of live third rail: touch it and you're out (like water)
     rail(x, w) {
       return this.add({ t: 'haz', kind: 'rail', x, y: 0, w, h: 0.3, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28, dmg: 10 });
@@ -584,7 +584,7 @@
   }
 
   // ======================================================================
-  // LEVEL 2 — Vilda skogen (the wild forest). Harder: triple spikes, birds, orb chains,
+  // LEVEL 3 — Vilda skogen (the wild forest). The hardest of the first three: triple spikes, birds, orb chains,
   // a tighter bike ride over the bog and a quicker ball section in the bear cave.
   // ======================================================================
   function buildForest() {
@@ -600,7 +600,7 @@
 
     // ============ SKOGSBRYNET (0 – 208) ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 2 · Vilda skogen', 0.55);
+    b.text(12, 4.6, 'Level 3 · Vilda skogen', 0.55);
     b.text(12, 3.9, 'Hedgehogs are spiky too!', 0.4);
     b.spike(24, 0, 'hedgehog');
     b.spike(32, 0, 'hedgehog');
@@ -890,7 +890,7 @@
   }
 
   // ======================================================================
-  // LEVEL 3 — Tunnelbanan (the Stockholm subway). A little shorter than level 2 but harder: surf the
+  // LEVEL 2 — Tunnelbanan (the Stockholm subway). The step up after level 1: surf the
   // parked trains over the live rail, fly through the tunnel, and halfway through the floor caves in and
   // you drop into the sewers, where crocodiles lurk in the dirty water.
   // ======================================================================
@@ -909,7 +909,7 @@
 
     // ============ SERGELS TORG (0 – 48) ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 3 · Tunnelbanan', 0.55);
+    b.text(12, 4.6, 'Level 2 · Tunnelbanan', 0.55);
     b.text(12, 3.9, 'Jump up onto the trains!', 0.4);
     b.spike(24, 0, 'cone');
     b.spikes(30, 2, 0, 'cone');
@@ -1352,7 +1352,7 @@
     b.spikes(991, 2, 0, 'skeleton');
     b.spikesDown(996, 2, 6, 'skeleton');
     b.scare(1000, 'duo'); // next obstacle is 6+ blocks later
-    // faster flips: a spike group every 5 blocks, like the bear cave in level 2
+    // faster flips: a spike group every 5 blocks, like the bear cave in level 3
     b.spikes(1006, 2, 0, 'skeleton');
     b.spikesDown(1011, 2, 6, 'skeleton');
     b.spikes(1016, 2, 0, 'skeleton');
@@ -1553,16 +1553,16 @@
       build: buildHome, theme: HOME_THEME,
     },
     {
-      id: 'forest', num: 2, name: 'Vilda skogen', route: 'Skogsbrynet › Myren › Björngrottan › Gläntan',
+      id: 'metro', num: 2, name: 'Tunnelbanan', route: 'T-Centralen › Tunneln › Kloakerna',
       difficulty: 2, diffName: 'Medium', reward: 100,
-      winTitle: 'Skogens hjälte!', winSub: 'Past the hedgehogs, over the bog, through the bear cave and out into the sunny clearing.',
-      build: buildForest, theme: FOREST_THEME,
-    },
-    {
-      id: 'metro', num: 3, name: 'Tunnelbanan', route: 'T-Centralen › Tunneln › Kloakerna',
-      difficulty: 3, diffName: 'Hard', reward: 150,
       winTitle: 'Ur kloaken!', winSub: 'Over the trains, through the tunnel, down the hole, past the crocodiles and out into the sunshine.',
       build: buildMetro, theme: METRO_THEME,
+    },
+    {
+      id: 'forest', num: 3, name: 'Vilda skogen', route: 'Skogsbrynet › Myren › Björngrottan › Gläntan',
+      difficulty: 3, diffName: 'Hard', reward: 150,
+      winTitle: 'Skogens hjälte!', winSub: 'Past the hedgehogs, over the bog, through the bear cave and out into the sunny clearing.',
+      build: buildForest, theme: FOREST_THEME,
     },
     {
       id: 'nightmare', num: 4, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',

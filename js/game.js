@@ -833,7 +833,7 @@
     p.vx = p.vx || 0;
     p.vy = p.vy || 0;
     p.max = p.life;
-    if (p.layer == null) p.layer = G.s ? G.s.layer : 0; // which floor it's drawn on (level 3 has two)
+    if (p.layer == null) p.layer = G.s ? G.s.layer : 0; // which floor it's drawn on (level 2 has two)
     if (G.particles.length < 400) G.particles.push(p);
   }
   function updateParticles(dt) {

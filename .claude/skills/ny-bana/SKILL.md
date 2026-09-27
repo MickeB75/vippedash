@@ -16,13 +16,14 @@ Läs `js/level.js` (särskilt `buildForest()` som mall — kortare och nyare än
 Bestäm (fråga användaren bara om uppdraget är genuint tvetydigt, annars sunt förnuft):
 - **Tema och plats** (t.ex. rymden, vintern, ett slott) och **svårighetsgrad** 1 (Easy), 2 (Medium) eller 3
   (Hard) — se difficulty-tabellen nedan.
-- **Bantid**: bana 1 ≈ 2:00, bana 2 ≈ 1:37, bana 3 ≈ 1:29. En ny bana ska passa in i den kurvan (kortare
-  och svårare, eller sätt en egen plats om användaren ber om det).
-- **Antal checkpoints**: färre = svårare (bana 3 har 8 på 1:29).
+- **Bantid**: bana 1 ≈ 2:00, bana 2 ≈ 1:29, bana 3 ≈ 1:37, bana 4 ≈ 1:48. Längden styr inte svårigheten;
+  sikta på 1:30–2:00 om användaren inte ber om något annat.
+- **Antal checkpoints**: färre per minut = svårare (bana 1 har 16 på 2:00, bana 2 har 8 på 1:29,
+  bana 3 har 9 på 1:37).
 - **Lägesbyten**: bana 1 har ship + ball, bana 2 och 3 har samma. Nya lägen kräver ingen ny kod — bara
   `b.portal(x, 'ship'|'ball'|'cube', {ceil, y})`.
-- **Svårighetsmål** (från README): easy ≥ 100 ms överallt, medium ~80 ms i de svåraste partierna (trippel-
-  spikarna), hard ~80 ms men fler sådana partier och färre checkpoints.
+- **Svårighetsmål** (från README): easy ≥ 100 ms överallt, medium ~80 ms i de svåraste partierna
+  (strömskenan, krokodilhuvudena i Tunnelbanan), hard ~80 ms men fler sådana partier (trippelspikarna i skogen).
 
 Skriv en **sektionsplan** innan du delegerar: en lista av sektioner med x-intervall (i block, hastighet
 10.4 block/s), vad som händer i varje (hinder, landmärken, lägesbyte), var checkpoints ligger och vilken

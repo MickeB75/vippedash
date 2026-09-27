@@ -236,7 +236,7 @@
     const drops = lvl.drops;
     if (!drops.length) this.drawScene(ctx, camX, t, G, 0);
     else {
-      // Level 3 has one floor on top of another (you fall through a hole into the sewer). Each floor is a
+      // Level 2 has one floor on top of another (you fall through a hole into the sewer). Each floor is a
       // whole scene, stacked shift blocks apart, and the camera looks G.camV blocks down from the top one.
       const camV = G.camV || 0;
       let top = 0;
@@ -981,7 +981,7 @@
     }
   };
 
-  // ------------------------------------------------------------------ the subway (level 3)
+  // ------------------------------------------------------------------ the subway (level 2)
   R.drawMetro = function (ctx, camX, t, center) {
     this.drawTunnelWall(ctx, camX, t);
     // T-Centralen's painted cave fades into the plain tunnel as you run out along the tracks
@@ -1177,7 +1177,7 @@
     for (let x = -(((offT % 24) + 24) % 24); x < W; x += 24) ctx.fillRect(x, GY - 58, 2, 58);
   };
 
-  // ------------------------------------------------------------------ the sewer (level 3)
+  // ------------------------------------------------------------------ the sewer (level 2)
   function archPath(ctx, x, base, w, h) {
     ctx.beginPath();
     ctx.moveTo(x, base);
@@ -1606,7 +1606,7 @@
     ctx.stroke();
   };
 
-  // ------------------------------------------------------------------ holes in the floor (level 3)
+  // ------------------------------------------------------------------ holes in the floor (level 2)
   // the ragged hole in the tunnel floor, and where it comes out through the sewer roof one layer down
   R.drawHoles = function (ctx, camX, t, L) {
     for (const d of this.lvl.drops) {

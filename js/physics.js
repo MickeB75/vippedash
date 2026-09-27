@@ -84,7 +84,7 @@
       lastOrb: -1,
       lastPad: -1,
       lastPortal: -1,
-      layer: cp.layer || 0, // 0 = the normal floor; +1 for every hole you've fallen through (level 3)
+      layer: cp.layer || 0, // 0 = the normal floor; +1 for every hole you've fallen through (level 2)
       dead: false,
       cause: null,
       dmg: null, // how much damage the last death dealt (null until a hazard/solid kills)

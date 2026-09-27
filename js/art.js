@@ -2508,7 +2508,7 @@
       case 'goalTop':
         floorballGoal(ctx, x, y, w, h, st === 'goalTop');
         break;
-      // ---- forest (level 2) ----
+      // ---- forest (level 3) ----
       case 'rock': {
         rr(ctx, x + 1, y + 1, w - 2, h - 2, Math.min(18, h * 0.4));
         const g = ctx.createLinearGradient(x, y, x + w * 0.6, y + h);
@@ -3633,7 +3633,7 @@
   };
 
   // =====================================================================
-  // THE WILD FOREST (level 2) — trees, animals and the bear cave
+  // THE WILD FOREST (level 3) — trees, animals and the bear cave
   // =====================================================================
   function spruceTree(ctx, x, base, h, col, hi) {
     ctx.fillStyle = T('#3a2a1c');
@@ -4638,7 +4638,7 @@
     ctx.fillRect(x - 24, base - 146, 48, 8);
   };
   // =====================================================================
-  // LEVEL 3 — the subway and the sewers
+  // LEVEL 2 — the subway and the sewers
   // =====================================================================
   // ---------- hazards ----------
   // råtta: a sewer rat is a spike (same hitbox), sniffing towards Vippe with its tail curled up behind it

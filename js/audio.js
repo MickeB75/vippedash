@@ -40,7 +40,7 @@
     C: parseMelody('A5 - C6 - A5 F5 C5 - | B5 - D6 - B5 G5 D5 - | G5 - B5 - G5 E5 B4 - | A5 - C6 - E6 - - -'),
     D: parseMelody('A4 . E5 . A5 . G5 E5 | F5 . C5 . A4 . C5 F5 | E5 . C5 . G4 . C5 E5 | D5 . B4 . G4 A4 B4 D5'),
     E: parseMelody('A5 A5 . A5 G5 . E5 . | F5 F5 . F5 E5 . C5 . | G5 G5 . G5 F5 . D5 . | E5 - - - G#5 - B5 -'),
-    // the forest song (level 2), D minor with a folk-tune feel
+    // the forest song (level 3), D minor with a folk-tune feel
     F1: parseMelody('D5 - E5 F5 - E5 D5 - | C5 - D5 E5 - D5 C5 - | D5 - F5 A5 - G5 F5 - | E5 - C#5 A4 - - . .'),
     F2: parseMelody('A5 - F5 D5 A5 - F5 D5 | G5 - E5 C5 G5 - E5 C5 | F5 - D5 A#4 F5 - D5 A#4 | E5 - C#5 A4 E5 G5 F5 E5'),
     F3: parseMelody('D5 - - - F5 - E5 - | D5 - - - A#4 - - - | A4 - - - F5 - D5 - | C#5 - - - E5 - A4 -'),
@@ -52,7 +52,7 @@
     N2: parseMelody('C5 - D#5 - . C5 D#5 - | C#5 - . D#5 - C5 . - | G4 - A#4 - C5 - D#5 - | F#4 - . G4 - F5 - -'),
     N3: parseMelody('C5 D#5 G5 . C6 . G5 D#5 | B4 D5 F5 . B4 D5 F5 . | G#4 C5 D#5 . G#5 . D#5 C5 | F#4 A#4 C#5 . F#5 . C#5 A#4'),
     N4: parseMelody('C5 D#5 G5 C6 A#5 G5 D#5 C5 | F#5 A#5 C#6 A#5 F#5 D#5 F#5 A#5 | C#5 F5 G#5 F5 C#5 A#4 C#5 F5 | G#5 C6 D#6 C6 G#5 F5 G#5 C6'),
-    // the subway song (level 3), E minor: city groove, train rhythm, a sneaky sewer tune, and G major in the sunshine
+    // the subway song (level 2), E minor: city groove, train rhythm, a sneaky sewer tune, and G major in the sunshine
     M1: parseMelody('E5 - G5 E5 - B4 D5 E5 | C5 - E5 C5 - G4 B4 C5 | D5 - G5 D5 - B4 D5 G5 | F#5 - D5 A4 - D5 F#5 A5'),
     M2: parseMelody('B5 A5 G5 E5 . E5 G5 A5 | A5 F#5 D5 F#5 . D5 F#5 A5 | G5 E5 C5 E5 . C5 E5 G5 | F#5 - D#5 - B4 - D#5 F#5'),
     M3: parseMelody('E5 - - - G5 - - - | B5 - - - A5 - G5 - | C6 - - - B5 - G5 - | F#5 - - - D#5 - - -'),
@@ -129,7 +129,7 @@
         [63, 65, { end: true }],
       ],
     },
-    // level 3: the street 0, T-Centralen 3, the tracks 13, the tunnel 22, the floor caves in during bar 28,
+    // level 2: the street 0, T-Centralen 3, the tracks 13, the tunnel 22, the floor caves in during bar 28,
     // the sewer 29, the pipe 41, the outlet 48, out in the sunshine 54; the finish is bar 58
     metro: {
       endChord: 'G',
