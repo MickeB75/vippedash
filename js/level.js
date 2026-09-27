@@ -939,10 +939,10 @@
     b.half(56);
     b.spike(60, 0, 'urchin');
     b.spikes(64, 3, 0, 'urchin');
-    b.pad(74);
+    b.pad(76);
     // a reef shark lying in the current: its back is a platform, its jaws are not
-    b.shark(78, 5, 'left');
-    b.spikes(87, 2, 0, 'urchin');
+    b.shark(80, 5, 'left');
+    b.spikes(88, 2, 0, 'urchin');
     // a RISING staircase of coral pillars over the current — not a flat stepping-stone hop
     b.block(94, 0, 2, 1, 'coral');
     b.water(96, 3, 'current');
