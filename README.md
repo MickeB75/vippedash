@@ -1,6 +1,6 @@
 # VippeDash
 
-A Geometry Dash–style runner starring **Vippe**. There are five levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **3 · Vilda skogen** (hard, about 1:37) runs through the wild forest, **4 · Djupet** (very hard, about 1:38) dives through **Korallrevet › Manetsvärmen › Valens buk › Ytan**, and **5 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
+A Geometry Dash–style runner starring **Vippe**. There are six levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **3 · Vilda skogen** (hard, about 1:37) runs through the wild forest, **4 · Schackmatt** (very hard, about 1:38) plays on a giant chessboard with **Brädet › Springarna › Tornet › Kungens tron**, **5 · Djupet** (very hard, about 1:38) dives through **Korallrevet › Manetsvärmen › Valens buk › Ytan**, and **6 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
 
 ## Play
 
@@ -93,11 +93,11 @@ The web app URL is public, since it's right there in the game's code, so in prin
 
 You win coins every time you finish a level:
 
-| | Level 1 (easy) | Level 2 (medium) | Level 3 (hard) | Level 4 (very hard) | Level 5 (nightmare) |
-| --- | --- | --- | --- | --- | --- |
-| Level cleared | 50 | 100 | 150 | 200 | 250 |
-| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 50 | up to 100 | up to 150 | up to 200 | up to 250 |
-| First time you beat the level | 50 | 100 | 150 | 200 | 250 |
+| | Level 1 (easy) | Level 2 (medium) | Level 3 (hard) | Level 4 (very hard) | Level 5 (very hard) | Level 6 (nightmare) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Level cleared | 50 | 100 | 150 | 175 | 200 | 250 |
+| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 50 | up to 100 | up to 150 | up to 175 | up to 200 | up to 250 |
+| First time you beat the level | 50 | 100 | 150 | 175 | 200 | 250 |
 
 So a harder level and fewer crashes give more coins. The coin total is shown at the top right of the menu.
 
@@ -172,9 +172,24 @@ A little longer than level 2 and harder: triple spikes, hedgehogs (they're spike
 
 Level 3 has its own folk-style soundtrack in D minor that ends in a major key when you reach the clearing.
 
-## Level 4: Djupet (≈ 1:38, 9 checkpoints)
+## Level 4: Schackmatt (≈ 1:38, 10 checkpoints)
 
-Longer than level 3 and harder: a deep-sea dive with half-jumps, a shark, an eel, a cave-in that shifts you to a deeper layer, flying-bike mode through jellyfish swarms, floorball mode inside a whale with an irregular rhythm, and the longest stretch without a checkpoint.
+A grand marble chessboard under a twilight sky that deepens from pale lilac at the start to midnight purple at the king's throne. Six sections with rising difficulty: pawn spikes and marble pedestals, knight's L-jumps onto tall platforms, a flying-ship ride up a rook tower with winding spirals and banners, the bishop's diagonal in ball mode with interlocking spikes, everything mixed in the queen's hall, and a boss fight against the king himself who throws pawns that land on the ground and on platforms.
+
+| Section | Where | What happens |
+| --- | --- | --- |
+| **Brädet** | the giant chessboard, morning light | Pawn spikes, rising and falling pedestal staircases (marble and ebony blocks), a pad up onto a tall rook tower. |
+| **Springarna** | the knights' jumping grounds | Knights' L-jumps: pads launch you high onto tall platforms, then short drops to low landings. A long spike row with a rising chain of orbs at four different heights. |
+| **Tornet** | inside a rook tower, flying | **Flying-ship mode** up inside a tall tower, weaving between spires and banners (thorny obstacles) with a dark current running down the middle. |
+| **Löparens diagonal** | the bishop's diagonal pattern | **Ball mode**: threading through floor and ceiling spikes arranged diagonally, like a bishop's moves on a chessboard. |
+| **Damens sal** | the queen's hall, hardest stretch | Everything mixed: pedestals, pads, platforms at different heights, spike-topped landings, orbs, a steep drop. The queen moves anywhere, and so do the obstacles. |
+| **Kungens tron** | the king's throne, boss fight | The king stands on the board ahead of you, throwing pawns that land on ground level and on platform heights. Jump over the pawns and platforms, then reach the king to topple him — **Schack matt!** |
+
+Level 4 has its own D-minor baroque soundtrack with a harpsichord lead and a march for the king's procession. The harmonic minor scale gives the board an ancient, formal tone that shifts toward the king's fanfare as you near the end.
+
+## Level 5: Djupet (≈ 1:38, 10 checkpoints)
+
+A little longer and harder than the chess level: a deep-sea dive with half-jumps, sharks, eels, a cave-in that shifts you to a deeper layer, flying-ship mode through jellyfish swarms, floorball mode inside a whale with an irregular rhythm, and the tightest stretch without a checkpoint.
 
 | Section | Where | What happens |
 | --- | --- | --- |
@@ -185,9 +200,9 @@ Longer than level 3 and harder: a deep-sea dive with half-jumps, a shark, an eel
 | **Djuphavet** | the darkest, tightest, longest stretch | Eels darting up from holes in the sea floor, sharks to jump over, kelp platforms over a deep chasm. No checkpoint midway. |
 | **Ytan** | swimming toward the light and surface | A final rising chain of bubbles straight to the goal. |
 
-Level 4 has its own ambient soundtrack in A minor: flowing and ethereal in the reef and wreck, darker and sparser in the whale and deep sea, brightening toward major as you reach the surface.
+Level 5 has its own ambient soundtrack in A minor: flowing and ethereal in the reef and wreck, darker and sparser in the whale and deep sea, brightening toward major as you reach the surface.
 
-## Level 5: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
+## Level 6: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
 
 A dark horror level with blood, jump scares, bloody nuns, creepy clowns and strobe lights, rated 16+ (the menu card shows a red 16+ badge and a ⚡ for flashing lights). It is hard in other ways than tight jumps too: darkness where only your lantern shines, strobe light where you only see the level in the flashes, moving hazards, running upside down on the ceiling, a mirrored screen, and jump scares that distract you. The last stretch, from the ghost train to the finish, has no checkpoint.
 
@@ -216,7 +231,7 @@ So you can make 8–10 crashes before your health runs out. Below 30 health the 
 
 ### Strobe and flashing lights
 
-The strobe flashes are locked to the music at most once per beat (2.6 per second, under the 3-per-second limit in the WCAG accessibility guidelines). Turn the strobe off with the **⚡ Strobe: On/Off** button in the pause menu, which only shows on level 4. With the strobe off there is a steady dim light instead. The setting is saved.
+The strobe flashes are locked to the music at most once per beat (2.6 per second, under the 3-per-second limit in the WCAG accessibility guidelines). Turn the strobe off with the **⚡ Strobe: On/Off** button in the pause menu, which only shows on level 6. With the strobe off there is a steady dim light instead. The setting is saved.
 
 Music: its own doom-metal soundtrack in C minor, in half-time so it feels like 78 BPM. It uses distorted guitar, organ, a choir, church bells, a detuned circus organ in the circus and a double-time climax in the ghost train. The melodies are original: the brief was "in the style of" the doom-metal song *Solitude* by Candlemass, and nothing is copied from it.
 
@@ -233,7 +248,7 @@ js/level.js       level builder, the level layouts, their themes and the level l
 js/solver.js      search bot that proves the levels are beatable
 js/audio.js       procedural chiptune (one song per level) + sound effects
 js/art.js         all drawing: Vippe, Affelito and their skins, obstacles, animals, landmarks
-js/horror.js      level 4 only: nuns, clowns, pendulums, jump-scare faces, graveyard/convent/circus scenery
+js/horror.js      level 6 only: nuns, clowns, pendulums, jump-scare faces, graveyard/convent/circus scenery
 js/render.js      parallax scene, camera (incl. following you down a hole), HUD
 js/game.js        game loop, input, checkpoints, menus, coins and the shop
 js/mobile.js      phone extras: fullscreen + landscape, portrait pause, back button
@@ -246,7 +261,7 @@ tools/verify.html level verifier in the browser
 tools/verify.py   level verifier from the command line (headless Chrome)
 tools/map.html    draws a schematic map of a level's layout and rhythm
 tools/skins.html  gallery of every skin in every mode, for checking designs
-tools/horror.html gallery of all level 4 art: nuns, clowns, pendulums, jump scares; use ?t=<seconds> to freeze time
+tools/horror.html gallery of all level 6 art: nuns, clowns, pendulums, jump scares; use ?t=<seconds> to freeze time
 tools/shot.py     takes a PNG screenshot of any page with headless Chrome
 tools/headless.py shared helper: runs pages in headless Chrome (finds Chrome or Edge automatically)
 tools/icons.html  draws the app icons
@@ -286,7 +301,17 @@ b.hole(454, 7);              // a hole in the floor: fall through it to the laye
 
 `b.hole()` splits the level into two floors, one above the other. Everything placed after the hole is on the lower floor. When you fall in, the physics moves you up by one screen (15 blocks) and onto the lower floor, so the fall looks continuous and the camera follows you down.
 
-Level 4 (Djupet) adds:
+Level 4 (Schackmatt) adds:
+
+```js
+b.king(x0, x1);              // the king boss: stands KING_AHEAD blocks ahead as the player moves through [x0, x1]
+b.pawn(x, y, { trigger, fall, arc }); // a pawn thrown by the king: lands at (x, y); y > 0 lands on a platform.
+                             // trigger − fall must be ≥ 4 (the pawn lands before you reach it); the flight takes
+                             // `fall` blocks of travel and arcs `arc` blocks high in a parabola, starting from the
+                             // king's hand (always KING_AHEAD blocks ahead) to the landing position
+```
+
+Level 5 (Djupet) adds:
 
 ```js
 b.half(27);                  // a low, fast hop (level 1 only until now)
@@ -296,7 +321,7 @@ b.rail(233, 3, 'eel');       // rail()'s touch-and-die mechanic, reskinned as a 
 b.hole(364, 8, 16);          // the floor caves in — the rest of the level plays out one layer deeper
 ```
 
-Level 5 adds:
+Level 6 (Mardrömmen) adds:
 
 ```js
 b.nun(x, y, { bob, beats, phase });      // a bloody nun bobbing up and down in time with the music
@@ -323,7 +348,7 @@ python tools/verify.py
 
 This runs the search bot from every checkpoint to the next one using the real game physics. Add a level name to check one level only: `python tools/verify.py forest`. Options: `--windows` to measure timing slack (slower; `!` marks a jump with less than 90 ms, `!!` less than 50 ms), `--json` to print the raw report. Exit code 0 when every level is beatable.
 
-Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms. Level 3 is harder: its triple spikes have about 80 ms too, and it's longer. Level 4's tightest presses are about 67 ms, with more of them than level 3.
+Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms. Level 3 is harder: its triple spikes have about 80 ms too, and it's longer. Level 4 (Schackmatt) sits between level 3 and Djupet: most of its tightest presses are around 83 ms, with one 67 ms section in the queen's hall. Level 5's tightest presses are about 67 ms, with more of them than level 4.
 
 To see a level's layout and rhythm at a glance, open `tools/map.html?level=<id>` in a browser. It draws a schematic top-down/side map of the level's hitboxes, obstacles and checkpoints. Options: `from=<x>&to=<x>` (show part of the level), `cols=<n>` (blocks per row), `scale=<px>` (pixels per block, default 12), `bot` (draw the bot's path from every checkpoint, red where it fails), `windows` (also colour each jump by its timing slack). Example: `tools/map.html?level=forest&from=380&to=500&windows&scale=20`.
 
@@ -352,17 +377,17 @@ Open `index.html#debug`. This shows hitboxes and FPS and adds these keys:
 | `G` | God mode |
 | `B` | The bot plays for you |
 | `C` | +500 coins (also works in the menu), for testing the shop |
-| `H` | Refill health to full (level 4 only) |
+| `H` | Refill health to full (level 6 only) |
 
 The hash (or query string) also accepts URL parameters to drop straight into a specific moment for screenshots or video:
 
 | Parameter | Effect |
 | --- | --- |
-| `level=<id>` | Start that level directly, skipping the menu. Ids: `home`, `forest`, `metro`, `ocean`, `nightmare` |
+| `level=<id>` | Start that level directly, skipping the menu. Ids: `home`, `metro`, `forest`, `chess`, `ocean`, `nightmare` |
 | `cp=<n>` | Start at checkpoint *n* (0 = the start) |
 | `x=<blocks>` | Start at any x position. The bot plays from the checkpoint before it up to x, so the mode, gravity and floor are right |
 | `skin=<id>` | Wear any skin for this session only (not saved; coins and owned skins untouched) |
-| `hp=<n>` | Start with that much health on level 4 (e.g. to test game over); has no effect on other levels |
+| `hp=<n>` | Start with that much health on level 6 (e.g. to test game over); has no effect on other levels |
 | `bot` | The bot plays |
 | `god` | God mode |
 | `mute` | Start muted (not saved) |

@@ -15,9 +15,11 @@
       this.drops = [];
       this.nextId = 1;
       this.finishX = 0;
-      // level 4: screen effects (always present, empty by default) and jump-scare markers
+      // level 6: screen effects (always present, empty by default) and jump-scare markers
       this.fx = { dark: [], strobe: [], mirror: [], lightning: [] };
       this.scares = [];
+      // level 4 "Schackmatt": the king boss span, null unless the level calls king()
+      this.boss = null;
     }
     add(o) {
       o.id = this.nextId++;
@@ -83,7 +85,7 @@
     hole(x, w, shift = 15) {
       this.drops.push({ x0: x, x1: x + w, shift, depth: 1.5 });
     }
-    // ---- level 4 "Djupet" (the ocean): a shark lying on the sea floor and an eel darting from a hole ----
+    // ---- level 5 "Djupet" (the ocean): a shark lying on the sea floor and an eel darting from a hole ----
     // a shark lying in the current. Its back is a platform, its jaws are not — same idea as croc(), a
     // separate style so art.js can draw a shark instead of a crocodile. dir 'left': jaws face you (jump
     // over them onto its back); 'right': land on the tail, jump off before the jaws.
@@ -114,7 +116,29 @@
     finish(x) {
       this.finishX = x;
     }
-    // ---- level 4: the nightmare (bloody nuns, clowns, moving hazards) ----
+    // ---- level 4 "Schackmatt": the king boss, standing KING_AHEAD blocks ahead of the player while
+    // x is inside [x0, x1], and the pawns he throws ----
+    // records the boss span; he slides in at x0 and topples over at x1 (the finish)
+    king(x0, x1) {
+      this.boss = { kind: 'king', x0, x1 };
+    }
+    // a pawn thrown by the king, landing at (x, y) — y > 0 lands it on top of a platform. mv.type
+    // 'throw' (see moveOf in physics.js): the flight lasts from x = o.x - trigger to x = o.x - trigger +
+    // fall, always finishing (p reaches 1) well before the player is within 4 blocks of the landing spot,
+    // since trigger - fall >= 4 is required below. While flying, the pawn's world x is a lerp from the
+    // king's hand (always KING_AHEAD blocks ahead of the player) to the landing x, so it's always ahead
+    // of its own landing column until it actually lands there — it can never be touched mid-flight, and
+    // the object's static x (used to bucket it into a column, see Level below) stays a valid stand-in for
+    // where its hitbox actually is once the player is close enough to reach it.
+    pawn(x, y = 0, { trigger = 14, fall = 8, arc = 3 } = {}) {
+      if (trigger - fall < 4) throw new Error('pawn(): trigger - fall must be >= 4');
+      return this.add({
+        t: 'haz', kind: 'pawn', x, y, w: 1, h: 1.3,
+        hx0: x + 0.25, hx1: x + 0.75, hy0: y, hy1: y + 1.0, dmg: 10,
+        mv: { type: 'throw', trigger, fall, arc, ahead: KING_AHEAD, handY: KING_HAND_Y },
+      });
+    }
+    // ---- level 6: the nightmare (bloody nuns, clowns, moving hazards) ----
     // a nun bobbing up and down in place (mv.type 'bob'); her phase at any x is fixed since x is locked
     // to the level clock, so where she is when you arrive is a level-design choice, not a player one
     nun(x, y, { bob = 0.8, beats = 4, phase = 0 } = {}) {
@@ -145,7 +169,7 @@
     balloon(x, y, { bob = 0.6, beats = 4, phase = 0 } = {}) {
       return this.add({ t: 'haz', kind: 'balloon', x, y, w: 1, h: 1.6, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.55, hy1: y + 1.5, dmg: 12, mv: { type: 'bob', amp: bob, beats, phase } });
     }
-    // ---- level 4: screen effects and jump scares ----
+    // ---- level 6: screen effects and jump scares ----
     dark(x0, x1, { r = 7 } = {}) {
       this.fx.dark.push({ x0, x1, r });
     }
@@ -178,6 +202,10 @@
 
   const CROC_HEAD = 1.4, CROC_BACK = 0.75;
   const SHARK_HEAD = 1.5, SHARK_BACK = 0.85;
+  // level 4 "Schackmatt": how far ahead of the player the king stands (the visible screen is W/BS = 1280/48
+  // = 26.67 blocks wide and the player sits PX = 8 blocks in from the left edge, so 15 blocks ahead puts him
+  // comfortably in view near the right side of the screen), and the height of his throwing hand
+  const KING_AHEAD = 15, KING_HAND_Y = 3.2;
 
   class Level {
     constructor(b, def) {
@@ -194,6 +222,7 @@
       this.scares = (b.scares || []).slice().sort((a, c) => a.x - c.x);
       this.finishX = b.finishX;
       this.length = b.finishX + 40;
+      this.boss = b.boss || null;
       this.areas = b.areas.sort((a, c) => a.x0 - c.x0);
       for (let i = 0; i < this.areas.length; i++) {
         this.areas[i].index = i;
@@ -262,7 +291,7 @@
       for (let i = 0; i < this.checkpoints.length; i++) if (this.checkpoints[i].x <= x) best = i;
       return best;
     }
-    // level 4: 0..1 strength of a screen effect (fx.dark/strobe/mirror/lightning) at x — 1 inside any
+    // level 6: 0..1 strength of a screen effect (fx.dark/strobe/mirror/lightning) at x — 1 inside any
     // zone, ramping linearly over `fade` blocks at both edges, 0 outside
     zone(name, x, fade = 4) {
       const list = this.fx[name];
@@ -905,7 +934,271 @@
   }
 
   // ======================================================================
-  // LEVEL 4 — Djupet (the deep). Harder than the forest, easier than the nightmare: no health bar, no
+  // LEVEL 4 — Schackmatt (the chess level). Harder than the forest, a little easier than Djupet: a giant
+  // marble chessboard under a twilight sky. Pawn spikes and halves give way to rising/falling pedestal
+  // staircases (b.block heights 1-4) and a pad up onto a tall rook; SPRINGARNA is all "knight's L-jumps" —
+  // pads onto high platforms, short drops to low ones, orbs at three different heights over long spike
+  // rows; TORNET is a ship flight up inside a rook tower with winding floor/ceiling gaps (b.thorny 'spire'
+  // / 'banner'); LÖPARENS DIAGONAL is a ball section threading floor/ceiling spikes in the bishop's
+  // diagonal pattern; DAMENS SAL mixes every tool at once (the queen moves anywhere); KUNGENS TRON is a
+  // boss fight against the king himself, who throws pawns (b.king()/b.pawn(), see physics.js moveOf
+  // 'throw') that land on the ground and on platforms of different heights.
+  // ======================================================================
+  function buildChess() {
+    const b = new Builder();
+
+    // ============ AREAS ============
+    b.area('board', -60, 'BRÄDET', 'Onto the giant chessboard');
+    b.area('knights', 208, 'SPRINGARNA', "The knights' L-jumps");
+    b.area('tower', 384, 'TORNET', 'Up inside the rook tower');
+    b.area('diagonal', 576, 'LÖPARENS DIAGONAL', 'Tap to flip — the bishop strikes!');
+    b.area('queen', 704, 'DAMENS SAL', 'The queen moves anywhere');
+    b.area('throne', 880, 'KUNGENS TRON', 'The king awakens!');
+
+    // ============ BRÄDET (0 – 208) ============
+    b.checkpoint(0);
+    b.text(12, 4.6, 'Level 4 · Schackmatt', 0.55);
+    b.text(12, 3.9, 'Pawns are spikes too!', 0.4);
+    b.spike(22, 0, 'pawnspike');
+    b.spike(32, 0, 'pawnspike');
+    b.spikes(42, 2, 0, 'pawnspike');
+    b.half(52);
+    b.half(56);
+    b.spikes(64, 2, 0, 'pawnspike');
+    b.block(72, 0, 3, 1, 'marble');
+    b.spikes(76, 2, 0, 'pawnspike');
+    // a rising staircase of pedestals: 1 -> 2 -> 3 (each jump is only a 1-block net rise, taken from
+    // the top of the previous step, never a fresh jump from the ground — a standing jump only reaches
+    // about 2.2 blocks up)
+    b.block(82, 0, 2, 1, 'marble');
+    b.block(86, 0, 2, 2, 'marble');
+    b.block(90, 0, 2, 3, 'marble');
+    // ...then falling: 3 -> 2 -> 1 (stepping down is never a height problem, only stepping up is)
+    b.block(94, 0, 2, 2, 'ebony');
+    b.block(98, 0, 2, 1, 'ebony');
+    b.spikes(102, 2, 0, 'pawnspike');
+    // a spike standing on top of a height-2 pedestal, reached directly (height 2 is within jump range)
+    b.block(110, 0, 3, 2, 'ebony');
+    b.spike(111, 2, 'pawnspike');
+
+    b.checkpoint(120);
+    b.spikes(128, 2, 0, 'pawnspike');
+    // a pad up onto a tall rook
+    b.pad(136);
+    b.block(140, 0, 3, 3, 'rook');
+    b.spikes(146, 2, 0, 'pawnspike');
+    b.block(154, 0, 2, 1, 'marble');
+    b.block(158, 0, 2, 1, 'ebony');
+    b.spikes(164, 2, 0, 'pawnspike');
+    b.half(172);
+    b.half(176);
+    b.spikes(182, 3, 0, 'pawnspike');
+    b.block(190, 0, 2, 2, 'marble');
+    b.spike(191, 2, 'pawnspike');
+    b.spikes(198, 2, 0, 'pawnspike');
+    b.spike(206, 0, 'pawnspike');
+
+    // ============ SPRINGARNA (208 – 384) ============
+    b.checkpoint(208);
+    b.text(212, 5.4, "The knights' L-jumps", 0.45);
+    b.spikes(216, 2, 0, 'pawnspike');
+    // an L-jump: a pad launches you up high, then you drop down to a low landing
+    b.pad(224);
+    b.block(228, 0, 2, 4, 'marble');
+    b.block(236, 0, 2, 1, 'ebony');
+    b.spikes(242, 2, 0, 'pawnspike');
+    b.pad(250);
+    b.block(254, 0, 2, 3, 'ebony');
+    b.block(261, 0, 2, 1, 'marble');
+    b.spikes(268, 3, 0, 'pawnspike');
+    // a long spike row with a rising chain of orbs at four different heights
+    b.text(278, 5.8, 'Orbs at every height!', 0.45);
+    b.spikes(276, 14, 0, 'pawnspike');
+    b.orb(278, 2);
+    b.orb(282, 3.2);
+    b.orb(286, 4.4);
+    b.orb(289, 5.6);
+
+    b.checkpoint(296);
+    b.block(304, 0, 2, 1, 'marble');
+    b.spikes(312, 2, 0, 'pawnspike');
+    b.pad(314);
+    b.block(318, 0, 2, 4, 'ebony');
+    b.block(325, 0, 2, 1, 'marble');
+    b.spikes(332, 3, 0, 'pawnspike');
+    // a platform bridge over a long row of spikes — a pad launches you up onto it (height 2.5 is just
+    // out of standing-jump range); plenty of flat ground before the pad so you land on it, not fly over it
+    b.pad(339);
+    b.spikes(342, 10, 0, 'pawnspike');
+    b.block(344, 2.5, 6, 0.5, 'bridge');
+    b.block(354, 0, 2, 1, 'ebony');
+    b.spikes(362, 2, 0, 'pawnspike');
+    b.pad(370);
+    b.block(374, 0, 2, 3, 'marble');
+    b.spikes(382, 2, 0, 'pawnspike');
+
+    // ============ TORNET — ship, up inside a rook tower (384 – 576) ============
+    b.checkpoint(384);
+    b.text(388, 5.4, 'HOLD to fly — up the rook tower!', 0.45);
+    b.portal(392, 'ship', { ceil: 9 });
+    b.corridor(392, 566, 9, 'rooktower');
+    b.water(398, 160, 'current'); // a dark, swirling pit down the middle of the tower shaft
+    b.thorny(404, 0, 1, 2, 'spire');
+    b.thorny(408, 7, 1, 2, 'banner');
+    b.thorny(416, 0, 1, 2.5, 'spire');
+    b.thorny(420, 6.5, 1, 2.5, 'banner');
+    b.thorny(430, 0, 1, 3, 'spire');
+    b.thorny(434, 6, 1, 3, 'banner');
+    b.thorny(442, 0, 1, 2, 'spire');
+    b.thorny(446, 7, 1, 2, 'banner');
+    b.thorny(454, 0, 1, 2.5, 'spire');
+    b.thorny(458, 6.5, 1, 2.5, 'banner');
+    b.thorny(468, 0, 1, 3, 'spire');
+    b.thorny(472, 6, 1, 3, 'banner');
+
+    b.checkpoint(480, 'ship', 4.15, 9);
+    b.thorny(488, 0, 1, 2, 'spire');
+    b.thorny(492, 7, 1, 2, 'banner');
+    b.thorny(500, 0, 1, 2.5, 'spire');
+    b.thorny(504, 6.5, 1, 2.5, 'banner');
+    b.thorny(512, 0, 1, 3, 'spire');
+    b.thorny(516, 6, 1, 3, 'banner');
+    b.thorny(524, 0, 1, 1.5, 'spire');
+    b.thorny(528, 5, 1, 4, 'banner');
+    b.thorny(536, 0, 1, 4, 'spire');
+    b.thorny(540, 8, 1, 1, 'banner');
+    b.thorny(548, 0, 1, 2.5, 'spire');
+    b.thorny(552, 6.5, 1, 2.5, 'banner');
+    b.portal(566, 'cube', { y: 3 });
+
+    // ============ LÖPARENS DIAGONAL — ball, the bishop's diagonal (576 – 704) ============
+    b.checkpoint(576);
+    b.text(580, 4.3, "TAP to flip — the bishop's diagonal!", 0.45);
+    b.spikes(579, 3, 0, 'pawnspike'); // a tight cube-mode triple right at the checkpoint, before the portal
+    b.portal(584, 'ball', { ceil: 6 });
+    b.corridor(584, 700, 6, 'cathedral');
+    b.spikes(596, 3, 0, 'diagonal');
+    b.spikesDown(603, 3, 6, 'diagonal');
+    b.spikes(610, 3, 0, 'diagonal');
+    b.spikesDown(617, 2, 6, 'diagonal');
+    b.block(621, 0, 3, 2, 'ebony');
+    b.spikesDown(627, 3, 6, 'diagonal');
+    b.spikes(632, 2, 0, 'diagonal');
+    b.spikesDown(637, 2, 6, 'diagonal');
+    b.orb(644, 3.2);
+    b.spikes(646, 2, 0, 'diagonal');
+    b.block(656, 4, 3, 2, 'marble');
+    b.spikesDown(663, 2, 6, 'diagonal');
+    b.spikes(668, 3, 0, 'diagonal');
+    b.spikesDown(675, 3, 6, 'diagonal');
+    b.spikes(682, 2, 0, 'diagonal');
+    b.orb(688, 3.5);
+    b.spikesDown(690, 3, 6, 'diagonal');
+    b.spikes(696, 3, 0, 'diagonal');
+    b.portal(700, 'cube', { y: 2 });
+
+    // ============ DAMENS SAL (704 – 880), the hardest stretch — everything mixed at once ============
+    b.checkpoint(704);
+    b.spikes(714, 3, 0, 'pawnspike');
+    // a mini rising staircase up to a spike-topped height-3 landing (a wide landing, so there's room
+    // to time the jump over the spike before running off the end)
+    b.block(720, 0, 2, 1, 'marble');
+    b.block(724, 0, 2, 2, 'ebony');
+    b.block(728, 0, 4, 3, 'marble');
+    b.spike(731, 3, 'pawnspike');
+    b.pad(736);
+    b.block(740, 0, 2, 4, 'marble');
+    // a height-drop onto a spike-edged landing: land short of the first spike or in the gap between
+    // the two, well clear of both platform edges
+    b.block(750, 0, 7, 2, 'ebony');
+    b.spike(752, 2, 'pawnspike');
+    b.spike(755, 2, 'pawnspike');
+    b.spikes(763, 3, 0, 'pawnspike');
+    b.orb(769, 2);
+    b.block(773, 0, 2, 1, 'marble');
+    b.block(777, 0, 2, 2, 'ebony');
+    b.block(781, 0, 2, 3, 'marble');
+    b.spikes(789, 2, 0, 'pawnspike');
+    b.pad(792);
+    b.block(796, 0, 2, 3, 'ebony');
+
+    b.checkpoint(800);
+    b.spikes(808, 3, 0, 'pawnspike');
+    b.orb(816, 3.5);
+    b.block(820, 0, 2, 1, 'marble');
+    b.pad(824);
+    b.block(828, 0, 2, 4, 'marble');
+    b.block(836, 0, 3, 1, 'ebony');
+    b.spikes(842, 3, 0, 'pawnspike');
+    b.block(850, 0, 2, 2, 'marble');
+    b.spike(851, 2, 'pawnspike');
+    b.pad(858);
+    b.block(862, 0, 2, 3, 'ebony');
+    b.spikes(870, 3, 0, 'pawnspike');
+    b.spike(878, 0, 'pawnspike');
+
+    // ============ KUNGENS TRON (880 – finish), the boss: the king throws pawns ============
+    b.checkpoint(880);
+    b.text(884, 5.4, 'The king awakens!', 0.45);
+    b.king(880, 1024);
+    b.pawn(890, 0);
+    b.pawn(898, 0);
+    b.block(906, 0, 3, 2, 'marble');
+    b.pawn(908, 2);
+    b.pawn(916, 0);
+    b.pawn(924, 0);
+    b.pad(928);
+    b.block(932, 0, 3, 3, 'ebony');
+    b.pawn(934, 3);
+    b.pad(944);
+    b.block(948, 0, 2, 4, 'marble');
+    b.pawn(958, 0);
+    b.pawn(966, 0);
+    b.block(972, 0, 3, 1, 'ebony');
+    b.pawn(974, 1);
+    b.pawn(982, 0);
+    b.spike(990, 0, 'pawnspike');
+    b.pawn(998, 0);
+    b.block(1006, 0, 3, 2, 'marble');
+    b.pawn(1008, 2);
+    b.pawn(1016, 0);
+    b.text(1000, 5.8, 'Schack matt!', 0.5);
+    b.finish(1024);
+
+    // ============ NEAR SCENERY ============
+    b.deco('trailsign', 4, { text: 'Schackmatt' });
+    b.deco('flagpole', 30);
+    b.deco('flagpole', 96);
+    b.deco('flagpole', 160);
+    b.deco('trailsign', 212, { text: 'Springarna' });
+    b.deco('flagpole', 260);
+    b.deco('flagpole', 330);
+    b.deco('candles', 410, { inside: true });
+    b.deco('candles', 450, { inside: true });
+    b.deco('candles', 494, { inside: true });
+    b.deco('candles', 532, { inside: true });
+    b.deco('trailsign', 580, { text: 'Löparens diagonal' });
+    b.deco('trailsign', 708, { text: 'Damens sal' });
+    b.deco('flagpole', 760);
+    b.deco('flagpole', 830);
+    b.deco('trailsign', 884, { text: 'Kungens tron' });
+    b.deco('flagpole', 946);
+    b.deco('flagpole', 1000);
+    b.deco('finish', 1024);
+
+    // ============ MID-LAYER LANDMARKS (X = world x where it is centred on screen) ============
+    b.landmark('rookpiece', 40);
+    b.landmark('knightpiece', 250);
+    b.landmark('rookpiece', 372);
+    b.landmark('bishoppiece', 592);
+    b.landmark('queenpiece', 740);
+    b.landmark('bishoppiece', 826);
+
+    return b;
+  }
+
+  // ======================================================================
+  // LEVEL 5 — Djupet (the deep). Harder than the forest, easier than the nightmare: no health bar, no
   // age gate, no jump scares. Genuinely different tools than the forest ever touches: b.half() for low
   // fast hops, b.shark()/b.eel() (new, croc()/snapper() reinterpreted), b.rail() reskinned as a live eel
   // in a floor gap, and a real b.hole() layer-drop partway through the wreck that puts the rest of the
@@ -927,7 +1220,7 @@
 
     // ============ KORALLREVET (0 – 208) ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 4 · Djupet', 0.55);
+    b.text(12, 4.6, 'Level 5 · Djupet', 0.55);
     b.text(12, 3.9, 'Sea urchins are spiky too!', 0.4);
     b.spike(22, 0, 'urchin');
     b.half(27); // a low, fast hop — the forest never uses this
@@ -1501,7 +1794,7 @@
   }
 
   // ======================================================================
-  // LEVEL 4 — Mardrömmen (the nightmare). Age-rated 16+: a health bar, bloody nuns, creepy clowns,
+  // LEVEL 6 — Mardrömmen (the nightmare). Age-rated 16+: a health bar, bloody nuns, creepy clowns,
   // jump scares and strobe lights. Graveyard -> convent -> upside-down chapel -> catacombs by ship ->
   // fairground -> mirror hall -> ghost train by ball -> the bell tower.
   // ======================================================================
@@ -1520,7 +1813,7 @@
 
     // ============ KYRKOGÅRDEN (0 – 128) ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 4 · Mardrömmen', 0.55);
+    b.text(12, 4.6, 'Level 6 · Mardrömmen', 0.55);
     b.text(12, 3.9, '⚠ Flashing lights: turn them off in the pause menu (Esc)', 0.4);
     b.lightning(40, 128);
     b.spike(20, 0, 'fence');
@@ -1848,6 +2141,31 @@
     flocks: true, // flocks of birds crossing the sky
     song: 'forest',
   };
+  const CHESS_THEME = {
+    // a giant chessboard under a sky that deepens from a pale lilac morning to a royal purple/gold dusk
+    // by the time you reach the king
+    sky: [
+      { x: -100, top: '#cdb8e0', bot: '#f5e6d0', far: '#8a7a9e', dark: 0, sun: 0.15 },
+      { x: 200, top: '#a893c9', bot: '#e8c9a0', far: '#6a5a82', dark: 0.05, sun: 0.3 },
+      { x: 400, top: '#7a5ea3', bot: '#d99a6a', far: '#4a3a68', dark: 0.15, sun: 0.45 },
+      { x: 576, top: '#5a3f8a', bot: '#c07a5a', far: '#382a56', dark: 0.28, sun: 0.58 },
+      { x: 704, top: '#3f2a72', bot: '#9a5a6a', far: '#281c48', dark: 0.42, sun: 0.72 },
+      { x: 880, top: '#2a1a5e', bot: '#7a3a5a', far: '#1c1440', dark: 0.55, sun: 0.88 },
+      { x: 1200, top: '#1a0f4a', bot: '#4a2a52', far: '#120c30', dark: 0.65, sun: 1.0 },
+    ],
+    field: { default: 'checker' },
+    // ground is looked up directly by area id (no 'default' fallback), so every area needs its own entry
+    ground: { board: 'board', knights: 'board', tower: 'flagstone', diagonal: 'flagstone', queen: 'board', throne: 'board' },
+    glow: { board: '#e8c85a', knights: '#c9a8ff', tower: '#ffcf6a', diagonal: '#e0a8ff', queen: '#ff9ad6', throne: '#ffd700' },
+    far: { default: 'castle' },
+    farExtra: [],
+    midFill: { default: null }, // no procedural filler — just the explicit giant chess-piece landmarks
+    midStep: [4, 6],
+    indoor: { tower: 'rooktower', diagonal: 'cathedral' },
+    beams: ['board'], // morning sunbeams over the board
+    mist: ['throne'], // twilight haze around the king
+    song: 'chess',
+  };
   const OCEAN_THEME = {
     // a dive down and back up: bright turquoise shallows -> dimmer wreck & current -> near-black in the
     // whale and the trench -> back up into golden-turquoise light at the surface
@@ -1943,14 +2261,21 @@
       build: buildForest, theme: FOREST_THEME,
     },
     {
-      id: 'ocean', num: 4, name: 'Djupet', route: 'Korallrevet › Manetsvärmen › Valens buk › Ytan',
+      id: 'chess', num: 4, name: 'Schackmatt', route: 'Brädet › Springarna › Tornet › Kungens tron',
+      difficulty: 4, diffName: 'Very Hard', reward: 175,
+      winTitle: 'Schack matt!',
+      winSub: "Over the pawns, past the knights, up the rook tower, down the bishop's diagonal and all the way to a toppled king.",
+      build: buildChess, theme: CHESS_THEME,
+    },
+    {
+      id: 'ocean', num: 5, name: 'Djupet', route: 'Korallrevet › Manetsvärmen › Valens buk › Ytan',
       difficulty: 4, diffName: 'Very Hard', reward: 200,
       winTitle: 'Djupets mästare!',
       winSub: 'Past the urchins, through the wreck, over the current, straight through a whale and up into the light.',
       build: buildOcean, theme: OCEAN_THEME,
     },
     {
-      id: 'nightmare', num: 5, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
+      id: 'nightmare', num: 6, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
       difficulty: 5, diffName: 'Nightmare', reward: 250, health: 135, age: 16, strobe: true,
       winTitle: 'Du överlevde natten!',
       winSub: 'Past the graves, the bloody nuns, the catacombs and the clowns, and out before the bell struck one.',
@@ -1965,4 +2290,8 @@
     return new Level(def.build(), def);
   };
   VD.Level = Level;
+  // level 4 "Schackmatt": exported so render.js can draw the king and his pawns at the same distances
+  // the physics (Builder.pawn(), physics.js moveOf's 'throw' case) use
+  VD.KING_AHEAD = KING_AHEAD;
+  VD.KING_HAND_Y = KING_HAND_Y;
 })();

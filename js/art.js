@@ -1563,6 +1563,8 @@
     if (style === 'urchin') return urchin(ctx, x, y, w, h, glow, t);
     if (style === 'tooth') return tooth(ctx, x, y, w, h, down, glow);
     if (style === 'rib') return caveSpike(ctx, x, y, w, h, down, glow, true);
+    if (style === 'pawnspike') return pawnSpike(ctx, x, y, w, h, glow, t, seed);
+    if (style === 'diagonal') return diagonalSpike(ctx, x, y, w, h, down, glow);
     if (style === 'cone') {
       const bx = x + w * 0.1, bw = w * 0.8;
       if (down) return;
@@ -1691,6 +1693,78 @@
     ctx.fillStyle = 'rgba(120,90,160,0.5)';
     circle(ctx, cx - r * 0.2, cy - r * 0.2, r * 0.35);
     ctx.fill();
+  }
+
+  // a solid, chunky chess pawn (round head, a collar, a body flaring to a wide base), used both for the
+  // pawnspike ground hazard and for the boss's thrown pawn — level 4 "Schackmatt". Drawn around (cx, b),
+  // b being the ground/base y; bw is the overall width (about 0.8 block for a 1-block hazard).
+  function drawPawnShape(ctx, cx, b, bw, h, white, glow) {
+    ctx.fillStyle = TL(white ? '#f2eee2' : '#221c28');
+    ctx.strokeStyle = glow || (white ? '#8a8272' : '#0a0810');
+    ctx.lineWidth = Math.max(1.6, bw * 0.07);
+    ctx.lineJoin = 'round';
+    // base (a wide, low plinth)
+    rr(ctx, cx - bw * 0.46, b - h * 0.1, bw * 0.92, h * 0.1, h * 0.035);
+    ctx.fill();
+    ctx.stroke();
+    // body: flares from a narrow neck down to the wide base — solid, no gaps
+    ctx.beginPath();
+    ctx.moveTo(cx - bw * 0.15, b - h * 0.46);
+    ctx.lineTo(cx - bw * 0.4, b - h * 0.11);
+    ctx.lineTo(cx + bw * 0.4, b - h * 0.11);
+    ctx.lineTo(cx + bw * 0.15, b - h * 0.46);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // collar (wider than the neck, sits right under the head so there's no gap)
+    ctx.beginPath();
+    ctx.ellipse(cx, b - h * 0.5, bw * 0.24, h * 0.055, 0, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    // head (a full round ball, overlapping the collar)
+    ctx.beginPath();
+    ctx.arc(cx, b - h * 0.68, bw * 0.3, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    // a soft highlight (marble/ebony sheen) and a matching shadow, so it reads as solid and round
+    ctx.fillStyle = white ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.16)';
+    ctx.beginPath();
+    ctx.ellipse(cx - bw * 0.11, b - h * 0.66, bw * 0.09, h * 0.17, -0.3, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = white ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(cx + bw * 0.15, b - h * 0.26, bw * 0.11, h * 0.13, 0.25, 0, TAU);
+    ctx.fill();
+  }
+
+  // a small marble/ebony pawn standing where a spike would be (same hitbox) — level 4 "Schackmatt"
+  function pawnSpike(ctx, x, y, w, h, glow, t, seed) {
+    drawPawnShape(ctx, x + w * 0.5, y + h, w * 0.8, h, seed % 2 === 0, glow);
+  }
+
+  // a small purple spire with a gold diagonal accent stripe — the bishop's diagonal (level 4 "Schackmatt")
+  function diagonalSpike(ctx, x, y, w, h, down, glow) {
+    const g = ctx.createLinearGradient(0, down ? y + h : y, 0, down ? y : y + h);
+    g.addColorStop(0, '#7a3fc0');
+    g.addColorStop(1, '#1a0a30');
+    ctx.fillStyle = g;
+    if (down) tri(ctx, x + 1, y, x + w / 2, y + h - 1, x + w - 1, y);
+    else tri(ctx, x + 1, y + h, x + w / 2, y + 1, x + w - 1, y + h);
+    ctx.fill();
+    ctx.strokeStyle = glow || '#e8c85a';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(232,200,90,0.65)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (down) {
+      ctx.moveTo(x + w * 0.25, y + h * 0.15);
+      ctx.lineTo(x + w * 0.6, y + h * 0.7);
+    } else {
+      ctx.moveTo(x + w * 0.25, y + h * 0.85);
+      ctx.lineTo(x + w * 0.6, y + h * 0.3);
+    }
+    ctx.stroke();
   }
 
   // a single ivory tooth, upright or hanging — the whale's jaws
@@ -3043,6 +3117,106 @@
         ctx.strokeStyle = 'rgba(220,150,255,0.7)';
         ctx.lineWidth = 2.5;
         ctx.stroke();
+        break;
+      }
+      // ---------- level 4 "Schackmatt": giant chessboard pedestals, a rook tower and thorny spires/banners ----------
+      case 'marble': {
+        // a pale marble chess pedestal with grey veining and a thin gold inlay top edge
+        bevel(ctx, x, y, w, h, TL('#f4f1e8'), TL('#c7c2b4'), TL('#3a3730'), 6);
+        ctx.strokeStyle = 'rgba(110,105,95,0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < (w * h) / 900 + 2; i++) {
+          const vx = x + 6 + rnd() * (w - 12), vy = y + 8 + rnd() * (h - 14);
+          ctx.moveTo(vx, vy);
+          ctx.lineTo(vx + (rnd() - 0.5) * 22, vy + (rnd() - 0.5) * 14);
+        }
+        ctx.stroke();
+        ctx.fillStyle = TL('#e8c85a');
+        rr(ctx, x + 2, y + 1, w - 4, 5, 2);
+        ctx.fill();
+        cellLines(ctx, x, y, w, h, bs, 'rgba(0,0,0,0.08)');
+        break;
+      }
+      case 'ebony': {
+        // an ebony chess pedestal: near-black polished stone with the same gold inlay edge
+        bevel(ctx, x, y, w, h, TL('#3a3440'), TL('#151218'), TL('#0a080c'), 6);
+        ctx.strokeStyle = 'rgba(210,200,220,0.16)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < (w * h) / 900 + 2; i++) {
+          const vx = x + 6 + rnd() * (w - 12), vy = y + 8 + rnd() * (h - 14);
+          ctx.moveTo(vx, vy);
+          ctx.lineTo(vx + (rnd() - 0.5) * 22, vy + (rnd() - 0.5) * 14);
+        }
+        ctx.stroke();
+        ctx.fillStyle = TL('#e8c85a');
+        rr(ctx, x + 2, y + 1, w - 4, 5, 2);
+        ctx.fill();
+        cellLines(ctx, x, y, w, h, bs, 'rgba(255,255,255,0.05)');
+        break;
+      }
+      case 'rook': {
+        // a tall rook tower block: pale marble with squared battlements along the top
+        bevel(ctx, x, y, w, h, TL('#eee8da'), TL('#b8b2a0'), TL('#2e2b24'), 5);
+        ctx.fillStyle = TL('#d8d0ba');
+        const m = Math.max(3, w / 5);
+        for (let xx = x; xx < x + w - 1; xx += m * 2) ctx.fillRect(xx, y, m, Math.min(10, h * 0.3));
+        ctx.strokeStyle = 'rgba(120,110,90,0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let yy = y + 18; yy < y + h - 6; yy += 16) {
+          ctx.moveTo(x + 3, yy);
+          ctx.lineTo(x + w - 3, yy);
+        }
+        ctx.stroke();
+        ctx.fillStyle = TL('#e8c85a');
+        rr(ctx, x + 2, y + 12, w - 4, 4, 2);
+        ctx.fill();
+        break;
+      }
+      case 'spire': {
+        // a tall bishop/queen spire jutting up from the floor — thorny, like the reef's coral spikes
+        const g2 = ctx.createLinearGradient(x, 0, x + w, 0);
+        g2.addColorStop(0, TL('#9a5fe0'));
+        g2.addColorStop(1, TL('#3a1868'));
+        ctx.fillStyle = g2;
+        ctx.beginPath();
+        ctx.moveTo(x + 2, y + h);
+        ctx.lineTo(x + 2, y + h * 0.3);
+        ctx.lineTo(x + w * 0.5, y);
+        ctx.lineTo(x + w - 2, y + h * 0.3);
+        ctx.lineTo(x + w - 2, y + h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = TL('#1a0a30');
+        ctx.stroke();
+        ctx.fillStyle = TL('#f2cf4a');
+        circle(ctx, x + w * 0.5, y + h * 0.18, Math.min(w, h) * 0.09);
+        ctx.fill();
+        break;
+      }
+      case 'banner': {
+        // a heavy chess banner hanging from the ceiling — thorny, its stiff bottom edge is the hazard
+        const cols = ['#5a1090', '#7a1a40'];
+        ctx.fillStyle = TL(cols[seed % 2]);
+        ctx.beginPath();
+        ctx.moveTo(x + 2, y);
+        ctx.lineTo(x + w - 2, y);
+        ctx.lineTo(x + w - 2, y + h - 10);
+        ctx.lineTo(x + w * 0.5, y + h);
+        ctx.lineTo(x + 2, y + h - 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = TL('#1a0a30');
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = TL('#f2cf4a');
+        rr(ctx, x + w * 0.3, y + h * 0.25, w * 0.4, w * 0.4, 4);
+        ctx.fill();
+        ctx.fillStyle = TL(cols[seed % 2]);
+        ctx.fillRect(x - 2, y - 6, w + 4, 8);
         break;
       }
       default: {
@@ -5871,6 +6045,100 @@
     ctx.fill();
   };
 
+  // ---------- level 4 "Schackmatt": the king boss and the pawns he throws ----------
+  // a pawn in flight (or freshly landed): k is moveOf's 0..1 flight progress, cx/cy its centre on screen.
+  // It spins while flying and settles flat once landed; `dust` (0..1) fades in a little landing puff.
+  Art.pawnThrown = function (ctx, cx, cy, bs, k, t, seed, glow, dust) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (k < 0.999) ctx.rotate(k * TAU * 3 + seed);
+    // the same chunky pawn as pawnSpike, just drawn around its own centre (b = the base, h*0.5 below it)
+    // so it spins in place instead of around its feet
+    drawPawnShape(ctx, 0, bs * 0.52, bs * 0.8, bs * 1.05, seed % 2 === 0, glow);
+    ctx.restore();
+    if (dust > 0.01) {
+      ctx.fillStyle = 'rgba(230,220,255,' + (0.5 * dust).toFixed(3) + ')';
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * TAU;
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(a) * bs * 0.32 * (1 - dust * 0.3), cy + 6 + Math.abs(Math.sin(a)) * 4, bs * 0.09 * (1 - dust * 0.2), 0, TAU);
+        ctx.fill();
+      }
+    }
+  };
+  // the king himself: a big stately figure standing a fixed distance ahead of the player, drawn at
+  // (x, groundY) with his feet at that point. `toppled` (0..1) tips him over at the finish; `armK` is
+  // the thrown pawn's own 0..1 flight progress when one is in the air (drives the throwing arm), or
+  // null for a slow idle sway.
+  Art.king = function (ctx, x, groundY, bs, t, toppled, armK) {
+    const h = bs * 4.6, w = bs * 2.3;
+    ctx.save();
+    ctx.translate(x, groundY);
+    if (toppled > 0) ctx.rotate(toppled * (Math.PI / 2) * 0.94);
+    // robe
+    const rg = ctx.createLinearGradient(0, -h, 0, 0);
+    rg.addColorStop(0, '#5a1e8a');
+    rg.addColorStop(1, '#2e0f52');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.5, 0);
+    ctx.lineTo(-w * 0.3, -h * 0.66);
+    ctx.lineTo(w * 0.3, -h * 0.66);
+    ctx.lineTo(w * 0.5, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#7a2ea8';
+    ctx.fillRect(-w * 0.07, -h * 0.66, w * 0.14, h * 0.66);
+    ctx.strokeStyle = '#e8c85a';
+    ctx.lineWidth = bs * 0.1;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.5, -2);
+    ctx.lineTo(w * 0.5, -2);
+    ctx.stroke();
+    // throwing arm — swings on armK (0..1 through the throw) or sways gently when idle
+    const swing = armK != null ? (armK < 0.5 ? armK * 2 : (1 - armK) * 2) : 0.2 + 0.12 * Math.sin(t * 1.6);
+    const shX = w * 0.34, shY = -h * 0.56;
+    const armA = -0.25 - swing * 1.35;
+    ctx.strokeStyle = '#4a1874';
+    ctx.lineWidth = w * 0.13;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(shX, shY);
+    ctx.lineTo(shX + Math.cos(armA) * w * 0.34, shY + Math.sin(armA) * w * 0.34);
+    ctx.stroke();
+    ctx.fillStyle = '#e8c9a0';
+    circle(ctx, shX + Math.cos(armA) * w * 0.34, shY + Math.sin(armA) * w * 0.34, w * 0.075);
+    ctx.fill();
+    // head + face
+    ctx.fillStyle = '#e8c9a0';
+    circle(ctx, 0, -h * 0.74, w * 0.16);
+    ctx.fill();
+    ctx.fillStyle = '#241a30';
+    circle(ctx, -w * 0.05, -h * 0.745, 1.6);
+    ctx.fill();
+    circle(ctx, w * 0.05, -h * 0.745, 1.6);
+    ctx.fill();
+    ctx.strokeStyle = '#241a30';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, -h * 0.71, w * 0.05, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+    // crown with a cross on top
+    ctx.fillStyle = '#f2cf4a';
+    ctx.fillRect(-w * 0.19, -h * 0.88, w * 0.38, h * 0.1);
+    for (const dx of [-0.14, 0, 0.14]) {
+      ctx.beginPath();
+      ctx.moveTo(dx * w - w * 0.045, -h * 0.88);
+      ctx.lineTo(dx * w, -h * 0.97);
+      ctx.lineTo(dx * w + w * 0.045, -h * 0.88);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillRect(-w * 0.018, -h * 1.04, w * 0.036, w * 0.12);
+    ctx.fillRect(-w * 0.06, -h * 1.01, w * 0.12, w * 0.036);
+    ctx.restore();
+  };
+
   // ---------- solid blocks (and the thorny signals) ----------
   // a Stockholm metro train, parked: silver cars with a blue stripe. You run along the roof.
   function train(ctx, x, y, w, h, bs, seed, t) {
@@ -7118,6 +7386,136 @@
     ctx.fillStyle = '#0a1218';
     circle(ctx, x - 60, by - 70, 5);
     ctx.fill();
+  };
+  // ---------- level 4 "Schackmatt": giant chess pieces looming in the mid-layer ----------
+  mid.rookpiece = function (ctx, x, base, d) {
+    const w = 130, h = 210, col = T(d.color || '#e8e4da'), dark = T('#3a3552');
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.3, base);
+    ctx.lineTo(x - w * 0.24, base - h * 0.78);
+    ctx.lineTo(x - w * 0.4, base - h * 0.78);
+    ctx.lineTo(x - w * 0.4, base - h);
+    ctx.lineTo(x + w * 0.4, base - h);
+    ctx.lineTo(x + w * 0.4, base - h * 0.78);
+    ctx.lineTo(x + w * 0.24, base - h * 0.78);
+    ctx.lineTo(x + w * 0.3, base);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // battlement notches
+    ctx.fillStyle = col;
+    for (let i = 0; i < 5; i += 2) ctx.fillRect(x - w * 0.4 + (i * w * 0.8) / 5, base - h - 16, (w * 0.8) / 5, 16);
+    ctx.strokeRect(x - w * 0.4, base - h - 16, w * 0.8, 16);
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 2;
+    for (let yy = base - h * 0.3; yy > base - h * 0.75; yy -= 26) {
+      ctx.beginPath();
+      ctx.moveTo(x - w * 0.36, yy);
+      ctx.lineTo(x + w * 0.36, yy);
+      ctx.stroke();
+    }
+  };
+  mid.knightpiece = function (ctx, x, base, d) {
+    const w = 130, h = 190, col = T(d.color || '#e8e4da'), dark = T('#3a3552');
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.32, base);
+    ctx.quadraticCurveTo(x - w * 0.4, base - h * 0.4, x - w * 0.22, base - h * 0.6);
+    ctx.quadraticCurveTo(x - w * 0.3, base - h * 0.78, x - w * 0.1, base - h * 0.9);
+    ctx.quadraticCurveTo(x + w * 0.05, base - h, x + w * 0.34, base - h * 0.86);
+    ctx.quadraticCurveTo(x + w * 0.42, base - h * 0.78, x + w * 0.3, base - h * 0.68);
+    ctx.quadraticCurveTo(x + w * 0.4, base - h * 0.5, x + w * 0.22, base - h * 0.36);
+    ctx.quadraticCurveTo(x + w * 0.3, base - h * 0.16, x + w * 0.3, base);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // mane serrations
+    ctx.fillStyle = dark;
+    for (let yy = base - h * 0.42; yy > base - h * 0.86; yy -= 18) {
+      ctx.beginPath();
+      ctx.moveTo(x - w * 0.18, yy);
+      ctx.lineTo(x - w * 0.32, yy - 9);
+      ctx.lineTo(x - w * 0.18, yy - 18);
+      ctx.fill();
+    }
+    // eye + ear
+    ctx.fillStyle = dark;
+    circle(ctx, x + w * 0.14, base - h * 0.82, 5);
+    ctx.fill();
+    tri(ctx, x + w * 0.02, base - h * 0.92, x + w * 0.1, base - h, x + w * 0.18, base - h * 0.9);
+    ctx.fill();
+  };
+  mid.bishoppiece = function (ctx, x, base, d) {
+    const w = 100, h = 200, col = T(d.color || '#e8e4da'), dark = T('#3a3552');
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.32, base);
+    ctx.quadraticCurveTo(x - w * 0.34, base - h * 0.45, x - w * 0.14, base - h * 0.72);
+    ctx.quadraticCurveTo(x - w * 0.22, base - h * 0.85, x, base - h);
+    ctx.quadraticCurveTo(x + w * 0.22, base - h * 0.85, x + w * 0.14, base - h * 0.72);
+    ctx.quadraticCurveTo(x + w * 0.34, base - h * 0.45, x + w * 0.32, base);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // the traditional mitre notch
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.1, base - h * 0.86);
+    ctx.lineTo(x + w * 0.1, base - h * 0.7);
+    ctx.stroke();
+    // ball + cross finial
+    ctx.fillStyle = col;
+    circle(ctx, x, base - h * 1.02, 8);
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, base - h * 1.08);
+    ctx.lineTo(x, base - h * 1.18);
+    ctx.moveTo(x - 6, base - h * 1.14);
+    ctx.lineTo(x + 6, base - h * 1.14);
+    ctx.stroke();
+  };
+  mid.queenpiece = function (ctx, x, base, d) {
+    const w = 130, h = 230, col = T(d.color || '#e8e4da'), dark = T('#3a3552');
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.32, base);
+    ctx.lineTo(x - w * 0.22, base - h * 0.82);
+    ctx.lineTo(x - w * 0.34, base - h * 0.82);
+    ctx.lineTo(x, base - h);
+    ctx.lineTo(x + w * 0.34, base - h * 0.82);
+    ctx.lineTo(x + w * 0.22, base - h * 0.82);
+    ctx.lineTo(x + w * 0.32, base);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // a ring of crown points
+    ctx.fillStyle = col;
+    for (let i = -2; i <= 2; i++) {
+      const px = x + i * w * 0.13, ph = 18 + (i % 2 === 0 ? 10 : 0);
+      tri(ctx, px - 8, base - h * 0.82, px, base - h * 0.82 - ph, px + 8, base - h * 0.82);
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 2;
+    for (let yy = base - h * 0.25; yy > base - h * 0.78; yy -= 24) {
+      ctx.beginPath();
+      ctx.moveTo(x - w * 0.28, yy);
+      ctx.lineTo(x + w * 0.28, yy);
+      ctx.stroke();
+    }
   };
   mid.reeftower = function (ctx, x, base) {
     const cols = ['#c0507a', '#7a4fae', '#e08a4a'];

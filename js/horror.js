@@ -1,4 +1,4 @@
-// VippeDash — level 4 "Mardrömmen" art: bloody nuns, killer clowns, bones and blood.
+// VippeDash — level 6 "Mardrömmen" art: bloody nuns, killer clowns, bones and blood.
 // Loaded right after art.js. Everything vector, no image files. See Art.horror for the registry.
 (function () {
   const VD = (window.VD = window.VD || {});

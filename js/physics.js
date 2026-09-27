@@ -36,7 +36,8 @@
   const MV = { dx: 0, dy: 0, a: 0, k: 0 };
 
   // The player's x-based "level clock" offset/state of a moving hazard, at player position x.
-  // mv.type: 'bob' (sine bob), 'pop' (jack-in-the-box), 'drop' (falling/rising nun), 'swing' (pendulum).
+  // mv.type: 'bob' (sine bob), 'pop' (jack-in-the-box), 'drop' (falling/rising nun), 'swing' (pendulum),
+  // 'throw' (a pawn thrown by the level 4 king boss, see level.js Builder.pawn()).
   function moveOf(o, x) {
     MV.dx = 0;
     MV.dy = 0;
@@ -50,6 +51,19 @@
       if (p < 0) p = 0;
       else if (p > 1) p = 1;
       MV.dy = -mv.dist * p * p;
+      return MV;
+    }
+    if (mv.type === 'throw') {
+      // x, not the beat clock: 0 at the trigger point, 1 once it's landed (o.x, o.y)
+      let p = (x - (o.x - mv.trigger)) / mv.fall;
+      if (p < 0) p = 0;
+      else if (p > 1) p = 1;
+      // the king's hand is always mv.ahead blocks ahead of the player, at height mv.handY; the pawn's
+      // world position is the lerp from there to its landing spot, plus a parabolic arc in y
+      const handX = x + mv.ahead;
+      MV.dx = (handX - o.x) * (1 - p);
+      MV.dy = (mv.handY - o.y) * (1 - p) + mv.arc * 4 * p * (1 - p);
+      MV.k = p;
       return MV;
     }
     const t = x / P.SPEED;

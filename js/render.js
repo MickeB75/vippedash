@@ -24,6 +24,7 @@
     willows: 6, farm: 9, hall: 6, villas: 9, home: 4, pines: 6, birches: 5, moose: 3,
     spruces: 6, tarn: 6, cranes: 4, deadtrees: 5, deer: 3, moosecalf: 4, foxrun: 2, rockhill: 9, firetower: 2, jakttorn: 2,
     whale: 15, reeftower: 7, shipwreck: 10, kelpforest: 8,
+    rookpiece: 4, knightpiece: 4, bishoppiece: 3.5, queenpiece: 4.5,
   };
   // 0..1: how much of x lies inside one of the listed areas, eased over `fade` blocks at each border
   function areaWeight(lvl, ids, x, fade = 12) {
@@ -88,6 +89,10 @@
         // a distant ridge of coral bumps and rock outcrops, fading into the murk
         far.push({ u, t: 'reefbg', h: 0.5 + rnd() * 1.2, w: 0.9 + rnd() * 1.4 });
         u += 0.3 + rnd() * 0.6;
+      } else if (kind === 'castle') {
+        // distant castle silhouettes on the horizon, level 4 "Schackmatt"
+        far.push({ u, t: 'castlesil', w: 1.0 + rnd() * 1.6, h: 1.0 + rnd() * 1.8 });
+        u += 0.5 + rnd() * 1.3;
       } else {
         const pine = kind === 'pine' || rnd() < 0.55;
         far.push({ u, t: pine ? 'pine' : 'birch', h: 0.8 + rnd() * 1.1 });
@@ -421,6 +426,12 @@
       } else if (inKind === 'whale') {
         this.drawWhale(ctx, camX, t);
         this.drawNear(ctx, camX, t, true, L);
+      } else if (inKind === 'rooktower') {
+        this.drawRooktower(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true, L);
+      } else if (inKind === 'cathedral') {
+        this.drawCathedral(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true, L);
       } else {
         this.drawHall(ctx, camX, t);
         this.drawNear(ctx, camX, t, true, L);
@@ -430,6 +441,7 @@
     this.drawGround(ctx, camX, t, inT, L);
     this.drawCorridors(ctx, camX, t, L);
     if (this.lvl.drops.length) this.drawHoles(ctx, camX, t, L);
+    if (this.lvl.boss) this.drawKing(ctx, camX, t, G, L);
     this.drawObjects(ctx, camX, t, G, L);
     this.drawTexts(ctx, camX, G, L);
     const here = G.s && (G.s.layer || 0) === L;
@@ -590,6 +602,20 @@
         ctx.quadraticCurveTo(x + w * 0.4, base - h, x + w * 0.55, base);
         ctx.closePath();
         ctx.fill();
+      } else if (f.t === 'castlesil') {
+        // a distant castle silhouette: a keep with battlements and two corner towers
+        const w = f.w * 50, h = f.h * 46;
+        ctx.fillRect(x - w / 2, base - h, w, h + 6);
+        const merlon = w / 6;
+        for (let k = 0; k < 6; k += 2) ctx.fillRect(x - w / 2 + k * merlon, base - h - 10, merlon, 10);
+        for (const dx of [-w / 2 - 4, w / 2 - 8]) {
+          ctx.fillRect(x + dx, base - h - 18, 12, h * 0.5 + 18);
+          ctx.beginPath();
+          ctx.moveTo(x + dx - 3, base - h - 18);
+          ctx.lineTo(x + dx + 6, base - h - 36);
+          ctx.lineTo(x + dx + 15, base - h - 18);
+          ctx.fill();
+        }
       }
     }
 
@@ -763,7 +789,7 @@
       return;
     }
     const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93', graves: '#332b22', fairground: '#5f3f2e',
-      lagoon: '#0e5a68', wrecked: '#0a4048', openwater: '#083048', trench: '#04101c', shore: '#0e6a70' }[style] || '#7dbb4e';
+      lagoon: '#0e5a68', wrecked: '#0a4048', openwater: '#083048', trench: '#04101c', shore: '#0e6a70', checker: '#241f38' }[style] || '#7dbb4e';
     ctx.fillStyle = T(base);
     ctx.fillRect(x0, mb - 6, w, GY - mb + 10);
     if (style === 'lagoon' || style === 'wrecked' || style === 'openwater' || style === 'trench' || style === 'shore') {
@@ -826,6 +852,24 @@
       for (let x = gridStart(x0, offM * BS, 30); x < x1; x += 30) {
         const i = Math.round((x + offM * BS) / 30);
         ctx.fillRect(x, mb - 3 - ((i * 5) & 3), 2, 5);
+      }
+    } else if (style === 'checker') {
+      // the giant chessboard itself, receding toward the horizon: several rows of a real (file x rank)
+      // checkerboard, each row taller and wider than the last (a simple perspective), scrolling with
+      // the mid-layer parallax
+      const rowHs = [3, 4, 5, 7, 9];
+      const rowWs = [14, 18, 24, 32, 44];
+      let rowY = mb - 6;
+      for (let r = 0; r < rowHs.length; r++) {
+        const rh = rowHs[r], cw = rowWs[r];
+        const start = gridStart(x0, offM * BS, cw) - cw;
+        for (let x = start; x < x1 + cw; x += cw) {
+          const i = Math.round((x + offM * BS) / cw);
+          ctx.fillStyle = T((i + r) & 1 ? '#d8d4c8' : '#332c46');
+          const a0 = Math.max(x0, x), a1 = Math.min(x1, x + cw);
+          if (a1 > a0) ctx.fillRect(a0, rowY, a1 - a0, rh);
+        }
+        rowY += rh;
       }
     } else if (style === 'fairground') {
       // dusty circus lot: striped tent tops and poles poking up from the trampled grass
@@ -1615,6 +1659,108 @@
     }
   };
 
+  // ------------------------------------------------------------------ inside the rook tower (level 4 "Schackmatt")
+  R.drawRooktower = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#241a30');
+    g.addColorStop(1, '#3a2a44');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const off = camX * BS * 0.42, step = 160;
+    const start = gridStart(0, off, step) - step;
+    for (let x = start; x < W + step; x += step) {
+      const i = Math.round((x + off) / step);
+      ctx.fillStyle = i & 1 ? '#3a2f42' : '#332838';
+      ctx.fillRect(x, 0, step, GY + 4);
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 2;
+      for (let r = 0; r < 8; r++) ctx.strokeRect(x + 4, 20 + r * 70, step - 8, 68);
+      // an arrow slit with a sliver of the twilight sky showing through
+      const sg = ctx.createLinearGradient(0, 60, 0, 340);
+      sg.addColorStop(0, '#caa8e8');
+      sg.addColorStop(1, '#5a3a78');
+      ctx.fillStyle = sg;
+      ctx.fillRect(x + step * 0.42, 70, step * 0.16, 260);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(x + step * 0.38, 60, step * 0.06, 280);
+      ctx.fillRect(x + step * 0.56, 60, step * 0.06, 280);
+      // a flickering torch bracket
+      const tx = x + step - 14, ty = 150;
+      const flick = 0.7 + 0.3 * Math.sin(t * 11 + i * 3);
+      const fg = ctx.createRadialGradient(tx, ty, 2, tx, ty, 60);
+      fg.addColorStop(0, 'rgba(255,190,90,' + (0.5 * flick).toFixed(3) + ')');
+      fg.addColorStop(1, 'rgba(255,190,90,0)');
+      ctx.fillStyle = fg;
+      ctx.fillRect(tx - 60, ty - 60, 120, 120);
+      ctx.fillStyle = '#2a2018';
+      ctx.fillRect(tx - 3, ty, 6, 20);
+      ctx.fillStyle = '#ffcf6a';
+      ctx.beginPath();
+      ctx.ellipse(tx, ty - 6 * flick, 5, 9 * flick, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+
+  // ------------------------------------------------------------------ inside the bishop's cathedral (level 4 "Schackmatt")
+  R.drawCathedral = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#1c1030');
+    g.addColorStop(1, '#341c46');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const off = camX * BS * 0.5, step = 180;
+    const start = gridStart(0, off, step) - step;
+    const glass = ['#6a1ea8', '#c9a227', '#1e6a9a', '#8a1050'];
+    for (let x = start; x < W + step; x += step) {
+      const i = Math.round((x + off) / step);
+      const wx = x + step * 0.5, ww = 64, wtop = 55, wh = 220;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(wx - ww / 2, wtop + wh);
+      ctx.lineTo(wx - ww / 2, wtop + ww / 2);
+      ctx.arc(wx, wtop + ww / 2, ww / 2, Math.PI, 0);
+      ctx.lineTo(wx + ww / 2, wtop + wh);
+      ctx.closePath();
+      ctx.clip();
+      const cols = [glass[i % 4], glass[(i + 1) % 4], glass[(i + 2) % 4]];
+      for (let p = 0; p < 3; p++) {
+        ctx.fillStyle = cols[p];
+        ctx.fillRect(wx - ww / 2 + (p * ww) / 3, wtop - 10, ww / 3, wh + 20);
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 2;
+      for (let yy = wtop; yy < wtop + wh; yy += 26) {
+        ctx.beginPath();
+        ctx.moveTo(wx - ww / 2, yy);
+        ctx.lineTo(wx + ww / 2, yy + 13);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.strokeStyle = '#100a18';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(wx - ww / 2, wtop + wh);
+      ctx.lineTo(wx - ww / 2, wtop + ww / 2);
+      ctx.arc(wx, wtop + ww / 2, ww / 2, Math.PI, 0);
+      ctx.lineTo(wx + ww / 2, wtop + wh);
+      ctx.stroke();
+      // the pillar beside it
+      ctx.fillStyle = '#241830';
+      ctx.fillRect(x + step - 30, 10, 28, GY - 10);
+      ctx.fillStyle = '#3a2848';
+      ctx.fillRect(x + step - 26, 10, 6, GY - 10);
+    }
+    // vaulted arches along the top
+    ctx.fillStyle = '#180e26';
+    ctx.beginPath();
+    ctx.moveTo(-10, 0);
+    ctx.lineTo(-10, 60);
+    for (let x = start; x < W + step; x += step) ctx.quadraticCurveTo(x + step * 0.5, 8, x + step, 60);
+    ctx.lineTo(W + 10, 0);
+    ctx.closePath();
+    ctx.fill();
+  };
+
   // ------------------------------------------------------------------ the hall of mirrors (level 4)
   R.drawMirrors = function (ctx, camX, t, G) {
     const g = ctx.createLinearGradient(0, 0, 0, GY);
@@ -1874,6 +2020,38 @@
           const x = i * 12 - camX * BS;
           if (x >= x0 && x + 5 <= x1) ctx.fillRect(x, GY + 14, 5, 4 + ((i * 7) & 3));
         }
+      } else if (st === 'board') {
+        // the giant marble chessboard: a real (file x rank) checkerboard of several rows, then a solid
+        // dark marble slab underneath filling all the way down to the bottom of the screen
+        const rows = 3, rowH = 27;
+        for (let i = Math.floor(camX + x0 / BS) - 1; i <= Math.ceil(camX + x1 / BS); i++) {
+          const x = (i - camX) * BS, a0 = Math.max(x0, x), a1 = Math.min(x1, x + BS);
+          if (a1 <= a0) continue;
+          for (let r = 0; r < rows; r++) {
+            const light = !!((i + r) & 1);
+            ctx.fillStyle = T(light ? '#e8e4da' : '#19141f');
+            ctx.fillRect(a0, GY + r * rowH, a1 - a0, rowH);
+            ctx.fillStyle = light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.04)';
+            ctx.fillRect(a0, GY + r * rowH, a1 - a0, rowH * 0.3);
+          }
+        }
+        // row seams
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        for (let r = 1; r < rows; r++) ctx.fillRect(x0, GY + r * rowH - 2, x1 - x0, 3);
+        // the marble slab edge, filling down to the bottom of the screen
+        const slabY = GY + rows * rowH;
+        const sg = ctx.createLinearGradient(0, slabY, 0, H);
+        sg.addColorStop(0, T('#2e2838'));
+        sg.addColorStop(1, T('#0e0c14'));
+        ctx.fillStyle = sg;
+        ctx.fillRect(x0, slabY, x1 - x0, H - slabY);
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(x0, slabY, x1 - x0, 3);
+        // gold inlay borders (top of the board, and the board-to-slab seam)
+        ctx.fillStyle = T('#e8c85a');
+        ctx.fillRect(x0, GY, x1 - x0, 3);
+        ctx.fillStyle = 'rgba(232,200,90,0.35)';
+        ctx.fillRect(x0, slabY, x1 - x0, 2);
       } else if (st === 'grass' || st === 'golden') {
         const top = st === 'golden' ? '#9fbf4a' : '#5fb04a', dirt = st === 'golden' ? '#7a5a36' : '#6b4a2f';
         ctx.fillStyle = T(dirt);
@@ -2459,6 +2637,42 @@
         }
         ctx.fillStyle = 'rgba(255,120,150,0.45)';
         ctx.fillRect(x0, y - 2, x1 - x0, 2);
+      } else if (c.style === 'rooktower') {
+        // the underside of the rook tower's stone ceiling, with square battlement notches
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#120c1a');
+        g.addColorStop(1, '#3a2c46');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.fillStyle = '#241a30';
+        const step2 = 44;
+        for (let x = gridStart(x0, camX * BS, step2); x < x1; x += step2) {
+          const a0 = Math.max(x0, x), a1 = Math.min(x1, x + step2 * 0.6);
+          if (a1 > a0) ctx.fillRect(a0, y - 14, a1 - a0, 14);
+        }
+        ctx.fillStyle = '#4a3a5a';
+        ctx.fillRect(x0, y - 4, x1 - x0, 4);
+        ctx.fillStyle = 'rgba(232,200,90,0.4)';
+        ctx.fillRect(x0, y - 2, x1 - x0, 2);
+      } else if (c.style === 'cathedral') {
+        // a stone groin-vault ceiling over the bishop's hall, tinted purple and gold
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#140a20');
+        g.addColorStop(1, '#3a1c46');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let x = gridStart(x0, camX * BS, 130) - 130; x < x1 + 130; x += 130) {
+          ctx.moveTo(x, y);
+          ctx.quadraticCurveTo(x + 65, y - 70, x + 130, y);
+        }
+        ctx.stroke();
+        ctx.fillStyle = '#1c1028';
+        ctx.fillRect(x0, y - 4, x1 - x0, 4);
+        ctx.fillStyle = 'rgba(232,200,90,0.4)';
+        ctx.fillRect(x0, y - 2, x1 - x0, 2);
       } else {
         // leafy canopy of the riverside trees
         const g = ctx.createLinearGradient(0, 0, 0, y);
@@ -2484,6 +2698,34 @@
         ctx.fillRect(x0, y - 2, x1 - x0, 2);
       }
     }
+  };
+
+  // ------------------------------------------------------------------ level 4 "Schackmatt": the king boss
+  // He is scenery only (no collision): a big chess king standing VD.KING_AHEAD blocks ahead of the player
+  // for the whole boss span, sliding in at x0 and toppling over once you reach x1 (the finish).
+  R.drawKing = function (ctx, camX, t, G, L) {
+    const boss = this.lvl.boss;
+    if (!boss || (G.s && (G.s.layer || 0) !== L)) return;
+    const px = G.s ? G.s.x : camX + PX;
+    const ahead = VD.KING_AHEAD || 15;
+    if (px < boss.x0 - 3 || px > boss.x1 + 8) return;
+    const slideIn = U.smooth(U.clamp((px - (boss.x0 - 3)) / 5, 0, 1));
+    const toppled = U.clamp((px - boss.x1) / 4, 0, 1);
+    const bx = px + ahead + (1 - slideIn) * 6;
+    // the arm swings in time with whichever pawn is currently mid-throw, if any
+    let armK = null;
+    for (const o of this.lvl.objs) {
+      if (o.kind !== 'pawn') continue;
+      const t0 = o.x - o.mv.trigger, t1 = t0 + o.mv.fall;
+      if (px >= t0 - 1 && px <= t1 + 1) {
+        armK = VD.Physics.moveOf(o, px).k;
+        break;
+      }
+    }
+    ctx.save();
+    ctx.globalAlpha = slideIn;
+    Art.king(ctx, sx(bx, camX), sy(0), BS, t, toppled, armK);
+    ctx.restore();
   };
 
   // ------------------------------------------------------------------ gameplay objects
@@ -2594,6 +2836,13 @@
               ctx.arc(bcx, bcy, BS * 0.4, 0, Math.PI * 2);
               ctx.fill();
             }
+          } else if (o.kind === 'pawn') {
+            // a pawn thrown by the level 4 "Schackmatt" king boss (see Builder.pawn(), physics.js moveOf)
+            const mv = VD.Physics.moveOf(o, px);
+            const pcx = sx(o.x + o.w / 2 + mv.dx, camX), pcy = sy(o.y + o.h / 2 + mv.dy);
+            const landX = o.x - o.mv.trigger + o.mv.fall;
+            const dust = mv.k >= 0.999 ? U.clamp(1 - (px - landX) / 3, 0, 1) : 0;
+            Art.pawnThrown(ctx, pcx, pcy, BS, mv.k, t, o.id, glow(o.x), dust);
           }
           break;
         case 'pad':

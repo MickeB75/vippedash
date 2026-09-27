@@ -47,14 +47,23 @@
     F4: parseMelody('D5 D5 . D5 F5 . D5 . | A#4 A#4 . A#4 D5 . A#4 . | G4 G4 . A#4 D5 . G5 . | A4 A4 . C#5 E5 . A5 .'),
     F5: parseMelody('A5 G5 F5 E5 D5 E5 F5 A5 | G5 F5 E5 D5 C5 D5 E5 G5 | F5 E5 D5 C5 A#4 C5 D5 F5 | E5 - A5 - C#6 - E6 -'),
     F6: parseMelody('A5 - G5 F5 - C5 F5 - | G5 - E5 C5 - G4 C5 - | F5 - A5 D6 - C6 A5 - | A#5 - A5 G5 - F5 D5 -'),
-    // the ocean song (level 4 "Djupet"), A minor: flowing verses, a dark sparse whale/trench, major at the surface
+    // the chess song (level 4 "Schackmatt"), D minor with a stately baroque feel: a harpsichord-like
+    // arpeggio, a flowing knight's theme, a rising theme up the tower, a leaping diagonal bishop's theme,
+    // a dense theme for the queen's hall, and a slow marching theme for the king
+    K1: parseMelody('D5 - F5 A5 - G5 F5 - | E5 - G5 A#5 - A5 G5 - | D5 - F5 A5 - G5 F5 - | E5 - C5 A4 - - . .'),
+    K2: parseMelody('D5 F5 A5 F5 D5 F5 A5 F5 | C5 E5 G5 E5 C5 E5 G5 E5 | A#4 D5 F5 D5 A#4 D5 F5 D5 | A4 C5 E5 C5 A4 - - -'),
+    K3: parseMelody('D5 - - - F5 - E5 - | D5 - - - A4 - - - | A#4 - - - D5 - C5 - | A4 - - - E5 - D5 -'),
+    K4: parseMelody('D5 A4 . D5 F5 C5 . F5 | E5 A#4 . E5 G5 D5 . G5 | D5 A4 . D5 F5 C5 . F5 | C5 G4 . C5 E5 A#4 A4 G4'),
+    K5: parseMelody('D5 F5 A5 D6 C6 A5 F5 D5 | C5 E5 G5 C6 A#5 G5 E5 C5 | A#4 D5 F5 A#5 A5 F5 D5 A#4 | A4 C5 E5 A5 G5 E5 C5 A4'),
+    K6: parseMelody('D5 - - D5 - - F5 - | E5 - - E5 - - G5 - | D5 - - D5 - - A5 - | G5 - - F5 - - D5 -'),
+    // the ocean song (level 5 "Djupet"), A minor: flowing verses, a dark sparse whale/trench, major at the surface
     O1: parseMelody('E5 - D5 C5 - D5 E5 - | G5 - E5 D5 - C5 D5 - | A5 - G5 E5 - D5 C5 - | B4 - D5 E5 - C5 A4 -'),
     O2: parseMelody('A5 - G5 F5 - E5 D5 - | C5 - E5 G5 - F5 D5 - | B4 - D5 F5 - E5 C5 - | A4 - C5 E5 - D5 B4 -'),
     O3: parseMelody('A4 - - - C5 - B4 - | D5 - - - E5 - D5 - | C5 - - - A4 - G4 - | B4 - - - D5 - C5 -'),
     O4: parseMelody('D5 . . . F5 . . . | . . A4 . . . C5 . | D5 . . . . . E5 . | . . C5 . . . A4 .'),
     O5: parseMelody('D5 D5 . D5 F5 . D5 . | A4 A4 . A4 D5 . A4 . | C5 C5 . E5 D5 . C5 . | B4 B4 . D5 C5 . A4 -'),
     O6: parseMelody('C6 - B5 A5 - G5 C6 - | E6 - D6 C6 - B5 G5 - | A5 - G5 E5 - D5 C5 - | G5 - E5 C5 - D5 E5 G5'),
-    // the nightmare song (level 4), C minor doom metal: original melodies, in the style of but not copied from any existing song
+    // the nightmare song (level 6), C minor doom metal: original melodies, in the style of but not copied from any existing song
     N1: parseMelody('C5 . . D#5 . G5 . . | G#4 . . C5 . D#5 . . | F4 . . G#4 . C5 . . | F#4 . . A#4 . C#5 . -'),
     N2: parseMelody('C5 - D#5 - . C5 D#5 - | C#5 - . D#5 - C5 . - | G4 - A#4 - C5 - D#5 - | F#4 - . G4 - F5 - -'),
     N3: parseMelody('C5 D#5 G5 . C6 . G5 D#5 | B4 D5 F5 . B4 D5 F5 . | G#4 C5 D#5 . G#5 . D#5 C5 | F#4 A#4 C#5 . F#5 . C#5 A#4'),
@@ -74,7 +83,7 @@
     E: [40, [56, 59, 64]], Em: [40, [55, 59, 64]], Dm: [38, [57, 62, 65]],
     Bb: [46, [58, 62, 65]], Gm: [43, [55, 58, 62]], A: [45, [57, 61, 64]],
     D: [38, [54, 57, 62]], B: [47, [54, 59, 63]],
-    // level 4 (doom metal, C minor): wide "5th under root" doom-chord voicings, root note kept low for the guitar/bass
+    // level 6 (doom metal, C minor): wide "5th under root" doom-chord voicings, root note kept low for the guitar/bass
     Cm: [36, [55, 60, 63]], Ab: [32, [51, 56, 60]], Fm: [41, [60, 65, 68]], Db: [37, [56, 61, 65]],
     Eb: [39, [58, 63, 67]], Gb: [42, [61, 66, 70]], Bdim: [35, [53, 59, 62]],
   };
@@ -94,6 +103,11 @@
     sewer: ['Em', 'Am', 'Em', 'B'],
     pipe: ['Am', 'Em', 'C', 'B'],
     harbor: ['G', 'D', 'Em', 'C'],
+    // the chess level ("Schackmatt"), D minor: a classic i-VII-III-V harmonic-minor cadence (A is the
+    // dominant of D minor) throughout, with Gm swapped in for colour and a heavier one for the king
+    chess: ['Dm', 'Bb', 'C', 'A'],
+    chess2: ['Dm', 'Gm', 'C', 'A'],
+    king: ['Dm', 'Bb', 'Gm', 'A'],
     // the ocean level ("Djupet"), A minor: a dive down and back up
     oceanA: ['Am', 'C', 'G', 'Em'],
     oceanB: ['Am', 'C', 'F', 'G'],
@@ -101,7 +115,7 @@
     abyssal: ['Dm', 'Dm', 'Am', 'Am'],
     trench: ['Dm', 'Bb', 'Am', 'Em'],
     surface: ['C', 'G', 'Am', 'F'],
-    // level 4: original doom-metal progressions in C minor, with Phrygian (Db) and tritone (Gb) colour
+    // level 6: original doom-metal progressions in C minor, with Phrygian (Db) and tritone (Gb) colour
     dirge: ['Cm', 'Ab', 'Fm', 'Gb'],
     doom: ['Cm', 'Db', 'Cm', 'Gb'],
     doom2: ['Cm', 'Eb', 'Fm', 'Gb'],
@@ -143,6 +157,23 @@
         [63, 65, { end: true }],
       ],
     },
+    // level 4 "Schackmatt": areas start at bars 0, 4, 13, 24, 36, 44, 55 (x/16, so they land exactly on
+    // the same bars as the forest); the finish is bar 64. Stately baroque harpsichord/pluck arpeggios
+    // throughout, building to a heavier marching drum pattern for the king.
+    chess: {
+      endChord: 'Dm',
+      phrase: 'section',
+      sections: [
+        [0, 4, { prog: 'chess', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true }],
+        [4, 13, { prog: 'chess', drums: 'main', bass: 'eighth', arp: 'up', lead: 'K1', tone: 'harpsichord' }],
+        [13, 24, { prog: 'chess2', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'K2', tone: 'harpsichord' }],
+        [24, 36, { prog: 'chess', drums: 'half', bass: 'long', arp: 'wave', lead: 'K3', pad: true, tone: 'harpsichord' }],
+        [36, 44, { prog: 'chess2', drums: 'drop', bass: 'octave', arp: 'wave', lead: 'K4', tone: 'harpsichord' }],
+        [44, 55, { prog: 'chess', drums: 'train', bass: 'eighth', arp: 'fast', lead: 'K5', tone: 'harpsichord' }],
+        [55, 64, { prog: 'king', drums: 'march', bass: 'octave', arp: 'up', lead: 'K6', tone: 'harpsichord' }],
+        [64, 66, { end: true }],
+      ],
+    },
     // level 2: the street 0, T-Centralen 3, the tracks 13, the tunnel 22, the floor caves in during bar 28,
     // the sewer 29, the pipe 41, the outlet 48, out in the sunshine 54; the finish is bar 58
     metro: {
@@ -161,7 +192,7 @@
         [58, 60, { end: true }],
       ],
     },
-    // level 4 "Djupet": areas start at bars 0, 13, 24, 36, 44, 55 (same bars as the forest, retimed);
+    // level 5 "Djupet": areas start at bars 0, 13, 24, 36, 44, 55 (same bars as the forest, retimed);
     // the finish is bar 64. A dive down (darker, sparser) and back up (major, at the surface).
     ocean: {
       endChord: 'C',
@@ -177,7 +208,7 @@
         [63, 65, { end: true }],
       ],
     },
-    // level 4 "Mardrömmen": doom metal in C minor, half-time (kick/snare every 8 steps, 78 BPM feel).
+    // level 6 "Mardrömmen": doom metal in C minor, half-time (kick/snare every 8 steps, 78 BPM feel).
     // areas: graveyard 0-8, convent 8-20, chapel 20-28, catacomb 28-40, circus 40-52, mirrors 52-58,
     // ghost train 58-66, tower 66-70, end 70-72.
     nightmare: {
@@ -261,7 +292,7 @@
     A.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = A.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    // reverb send (level 4): a convolver with a generated ~2.2s decaying-noise tail, built once and reused
+    // reverb send (level 6): a convolver with a generated ~2.2s decaying-noise tail, built once and reused
     // for the whole page. Its return goes straight to master (not the per-level music bus), so a tail
     // already ringing keeps playing smoothly through a crash/respawn instead of being cut off when
     // startMusic/stopMusic tear down and rebuild A.bus.
@@ -288,7 +319,7 @@
     g.gain.value = 0.55;
     g.connect(A.master);
     A.bus = g;
-    // doom guitar distortion bus (level 4): soft-clip waveshaper, then a highpass/lowpass "cabinet".
+    // doom guitar distortion bus (level 6): soft-clip waveshaper, then a highpass/lowpass "cabinet".
     // Rebuilt fresh every startMusic and connected only to this bus, so it stops with the music
     // (a crash/respawn just drops the reference; nothing here schedules sources that outlive A.bus).
     const dist = A.ctx.createWaveShaper();
@@ -415,7 +446,7 @@
   const crash = (t) => noise(t, 1.2, 0.22, 'highpass', 5000);
   const ride = (t, v = 1) => noise(t, 0.35, 0.1 * v, 'highpass', 7000, null, 0.6);
 
-  // ---- level 4: doom drums (bigger kick/snare with a reverb send) ----
+  // ---- level 6: doom drums (bigger kick/snare with a reverb send) ----
   function bigKick(t, v = 1) {
     const ctx = A.ctx;
     const o = ctx.createOscillator();
@@ -603,6 +634,12 @@
       if (s16 === 4 || s16 === 12) bigSnare(t, 1);
       if (s16 === 0) crash(t);
       if (s16 % 2 === 0) ride(t, 0.4);
+    } else if (d === 'march') {
+      // the king's stately march: a kick on every beat, a snare on 2 and 4, hats on the offbeats
+      if (beat) kick(t, s16 === 0 ? 1 : 0.85);
+      if (s16 === 4 || s16 === 12) snare(t, 0.9);
+      if (s16 % 4 === 2) hat(t, 0.7);
+      if (bar % 2 === 0 && s16 === 0) crash(t);
     } else if (d === 'sparse') {
       // a heartbeat "lub-dub" every 8 steps and nothing else
       if (s16 === 0) {
@@ -653,7 +690,7 @@
       if (s16 % 2 === 0) doomBass(t, root, STEP * 1.7, 0.2, { hold: 0.5 });
     }
 
-    // ---- church organ / choir / catacomb drone (level 4) ----
+    // ---- church organ / choir / catacomb drone (level 6) ----
     if (cfg.organ && s16 === 0) organChord(t, tri, STEP * 15.5);
     if (cfg.choir && s16 === 0) choirChord(t, tri, STEP * 15.5);
     if (cfg.drone && s16 === 0) droneNote(t, root, STEP * 15.5);
@@ -700,6 +737,10 @@
           const wobble = Math.sin(t * 7.3 + n.midi) * 12; // +-12 cents, deterministic so offline renders match
           voice('square', mtof(n.midi), t, dur, 0.085, { detune: wobble, lp: 3500, hold: 0.6 });
           voice('triangle', mtof(n.midi + 12), t, dur, 0.035, { detune: -wobble * 0.6, hold: 0.55 });
+        } else if (cfg.tone === 'harpsichord') {
+          // a bright, quickly-decaying pluck for the chess level's baroque feel
+          voice('square', mtof(n.midi), t, Math.min(dur, STEP * 1.4), 0.09, { attack: 0.002, hold: 0.16, release: 0.12, lp: 3800 });
+          voice('sawtooth', mtof(n.midi + 12), t, Math.min(dur, STEP * 1.1), 0.035, { attack: 0.001, hold: 0.1, release: 0.08, lp: 5200 });
         } else if (cfg.tone === 'reverse') {
           // the mirror hall: a slow swell attack and an abrupt stop, so it sounds backwards
           const swell = Math.min(dur * 0.85, 0.4);
@@ -766,7 +807,7 @@
         voice('square', 180, t, 0.12, 0.08, { dest, lp: 1200 });
         voice('square', 140, t + 0.12, 0.18, 0.08, { dest, lp: 1200 });
         break;
-      // ---- level 4: horror sound effects ----
+      // ---- level 6: horror sound effects ----
       case 'scare_nun': {
         // a dissonant shriek: a cluster of detuned saws sliding upward, plus a noise burst and reverb
         const base = 640;
