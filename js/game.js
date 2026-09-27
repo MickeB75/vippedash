@@ -634,10 +634,7 @@
     G.state = 'gameover';
     AU.stopMusic(0.1);
     AU.sfx('gameover');
-    const lost = Math.min(10, G.coins);
-    addCoins(-lost);
     $('goSub').textContent = 'Your health ran out after ' + G.deaths + (G.deaths === 1 ? ' crash' : ' crashes');
-    $('goCoins').textContent = lost > 0 ? '−' + lost + ' coins  (you have ' + G.coins + ')' : 'No coins to lose';
     show('gameover', true);
   }
 

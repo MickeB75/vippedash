@@ -245,7 +245,6 @@ html, body {
 .rtotal span { font-size: calc(var(--u) * 18px); color: #aab6d8; }
 .gameover { background: rgba(40, 0, 6, 0.92); border-color: #7a0010; }
 .gotitle { color: #ff2a3a; text-shadow: 0 calc(var(--u) * 4px) calc(var(--u) * 8px) rgba(0, 0, 0, 0.6); }
-.gocoins { color: #ffb3b3; font-family: system-ui, sans-serif; font-size: calc(var(--u) * 18px); margin: 0; }
 .btn {
   font: inherit;
   font-size: calc(var(--u) * 24px);

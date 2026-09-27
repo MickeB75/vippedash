@@ -147,7 +147,7 @@ Level 3 has its own soundtrack in E minor: a train rhythm on the tracks, a drum 
 
 A dark horror level with blood, jump scares, bloody nuns, creepy clowns and strobe lights, rated 16+ (the menu card shows a red 16+ badge and a ⚡ for flashing lights). It is hard in other ways than tight jumps too: darkness where only your lantern shines, strobe light where you only see the level in the flashes, moving hazards, running upside down on the ceiling, a mirrored screen, and jump scares that distract you. The last stretch, from the ghost train to the finish, has no checkpoint.
 
-It is also the only level with a **health bar**. You start with 100 health, and each crash costs health and restarts you from the last checkpoint as usual. Health is not refilled at checkpoints. When it runs out, "DU DOG!" appears, you lose 10 coins (never below 0), and you start the level over from the beginning with full health.
+It is also the only level with a **health bar**. You start with 100 health, and each crash costs health and restarts you from the last checkpoint as usual. Health is not refilled at checkpoints. When it runs out, "DU DOG!" appears and you start the level over from the beginning with full health. You don't lose any coins.
 
 | Section | Where | What happens |
 | --- | --- | --- |
