@@ -1566,7 +1566,7 @@
     },
     {
       id: 'nightmare', num: 4, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
-      difficulty: 5, diffName: 'Nightmare', reward: 250, health: 100, age: 16, strobe: true,
+      difficulty: 5, diffName: 'Nightmare', reward: 250, health: 135, age: 16, strobe: true,
       winTitle: 'Du överlevde natten!',
       winSub: 'Past the graves, the bloody nuns, the catacombs and the clowns, and out before the bell struck one.',
       build: buildNightmare, theme: NIGHTMARE_THEME,
