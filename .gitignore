@@ -1,9 +1,9 @@
 # Python venv used once to convert the reference photos (not needed by the game)
 .venv/
 
-# Private reference photos of Vincent and Alfred (only used to design the characters, not by the game)
-Vincent/
-Alfred/
+# Private reference photos used to design the characters (not used by the game)
+ref-vippe/
+ref-affelito/
 
 # Built single-file game (python tools/build_single.py)
 dist/

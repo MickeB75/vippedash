@@ -70,21 +70,21 @@
     galaxy: { name: 'Galaxy', main: '#2d1b66', dark: '#0a0622', trim: '#c8b8ff', frame: '#b69cff', pattern: 'stars', hat: 'orbit', price: 800 },
     rainbow: { name: 'Rainbow', main: '#ff4d4d', dark: '#402060', trim: '#ffffff', pattern: 'rainbow', hat: 'propeller', price: 1000 },
     gold: { name: 'King Vippe', main: '#f2c230', dark: '#7a5200', trim: '#fff6c8', pattern: 'gold', hat: 'crown', price: 1500 },
-    // ---- Affelito (char: 'alfred'): the trucker cap is his thing, so most of his skins come with one ----
-    afTee: { char: 'alfred', name: 'Black tee', main: '#1c1c22', dark: '#050507', trim: '#ffffff', pattern: 'sleeves', hat: 'cap', cap: { front: '#c9a46b', mesh: '#1f2b47', brim: '#b58f58', badge: 'patch' }, price: 0 },
-    afHoodie: { char: 'alfred', name: 'Grey hoodie', main: '#d6d6d1', dark: '#6f6f6a', trim: '#f4f4f0', frame: '#8a8a86', pattern: 'hoodie', hat: 'cap', cap: { front: '#22304f', mesh: '#22304f', brim: '#22304f', badge: 'star' }, price: 0 },
-    afFleece: { char: 'alfred', name: 'Blue fleece', main: '#1ea2d8', dark: '#0b4f73', trim: '#e23a3a', pattern: 'fleece', hat: 'cap', cap: { front: '#f4f4f4', mesh: '#1b1b20', brim: '#1b1b20', badge: 'bolt' }, price: 0 },
-    afCamo: { char: 'alfred', name: 'Pixel camo', main: '#5a7a3c', dark: '#1f2a17', trim: '#c9ccd2', pattern: 'pixel', hat: 'patchwork', price: 150 },
-    afCowboy: { char: 'alfred', name: 'Cowboy', main: '#c07a36', dark: '#4a2a10', trim: '#f2e3c2', pattern: 'sheriff', hat: 'cowboy', price: 200 },
-    afNinja: { char: 'alfred', name: 'Ninja', main: '#26262e', dark: '#0a0a0e', trim: '#d3122f', frame: '#d3122f', pattern: 'ninja', hat: 'headband', price: 300 },
-    afPirate: { char: 'alfred', name: 'Pirate', main: '#c62a2a', dark: '#4a0c0c', trim: '#f2d27a', pattern: 'sailor', hat: 'tricorn', price: 350 },
-    afModo: { char: 'alfred', name: 'MODO Affelito', main: '#c8102e', dark: '#4f070c', trim: '#ffffff', pattern: 'modo', hat: 'cap', cap: { front: '#ffffff', mesh: '#d3202c', brim: '#d3202c', badge: 'modo' }, price: 400 },
-    afGoalie: { char: 'alfred', name: 'Goalie', main: '#2a2d34', dark: '#0c0d10', trim: '#ff8a1f', pattern: 'goalie', hat: 'goalie', price: 450 },
-    afRobot: { char: 'alfred', name: 'Robot', main: '#9aa6b2', dark: '#3a434d', trim: '#5cf0ff', frame: '#c9d2da', pattern: 'robot', hat: 'robot', noHair: true, price: 600 },
-    afAstro: { char: 'alfred', name: 'Astronaut', main: '#eef1f5', dark: '#5b6675', trim: '#ff7a1f', pattern: 'astro', hat: 'bubble', price: 800 },
-    afDragon: { char: 'alfred', name: 'Dragon', main: '#2fa05a', dark: '#0f3d22', trim: '#ffd34d', pattern: 'scales', hat: 'dragon', noHair: true, price: 1000 },
-    afFire: { char: 'alfred', name: 'Fire', main: '#b3200f', dark: '#3a0603', trim: '#ffd23a', frame: '#ff8a1f', pattern: 'fire', hat: 'flames', noHair: true, price: 1500 },
-    afDiamond: { char: 'alfred', name: 'Diamond', main: '#7fdcff', dark: '#1a4f7a', trim: '#ffffff', frame: '#bff2ff', pattern: 'diamond', hat: 'cap', cap: { front: '#eafcff', mesh: '#8fe3ff', brim: '#bff2ff', badge: 'gem' }, price: 2000 },
+    // ---- Affelito (char: 'affelito'): the trucker cap is his thing, so most of his skins come with one ----
+    afTee: { char: 'affelito', name: 'Black tee', main: '#1c1c22', dark: '#050507', trim: '#ffffff', pattern: 'sleeves', hat: 'cap', cap: { front: '#c9a46b', mesh: '#1f2b47', brim: '#b58f58', badge: 'patch' }, price: 0 },
+    afHoodie: { char: 'affelito', name: 'Grey hoodie', main: '#d6d6d1', dark: '#6f6f6a', trim: '#f4f4f0', frame: '#8a8a86', pattern: 'hoodie', hat: 'cap', cap: { front: '#22304f', mesh: '#22304f', brim: '#22304f', badge: 'star' }, price: 0 },
+    afFleece: { char: 'affelito', name: 'Blue fleece', main: '#1ea2d8', dark: '#0b4f73', trim: '#e23a3a', pattern: 'fleece', hat: 'cap', cap: { front: '#f4f4f4', mesh: '#1b1b20', brim: '#1b1b20', badge: 'bolt' }, price: 0 },
+    afCamo: { char: 'affelito', name: 'Pixel camo', main: '#5a7a3c', dark: '#1f2a17', trim: '#c9ccd2', pattern: 'pixel', hat: 'patchwork', price: 150 },
+    afCowboy: { char: 'affelito', name: 'Cowboy', main: '#c07a36', dark: '#4a2a10', trim: '#f2e3c2', pattern: 'sheriff', hat: 'cowboy', price: 200 },
+    afNinja: { char: 'affelito', name: 'Ninja', main: '#26262e', dark: '#0a0a0e', trim: '#d3122f', frame: '#d3122f', pattern: 'ninja', hat: 'headband', price: 300 },
+    afPirate: { char: 'affelito', name: 'Pirate', main: '#c62a2a', dark: '#4a0c0c', trim: '#f2d27a', pattern: 'sailor', hat: 'tricorn', price: 350 },
+    afModo: { char: 'affelito', name: 'MODO Affelito', main: '#c8102e', dark: '#4f070c', trim: '#ffffff', pattern: 'modo', hat: 'cap', cap: { front: '#ffffff', mesh: '#d3202c', brim: '#d3202c', badge: 'modo' }, price: 400 },
+    afGoalie: { char: 'affelito', name: 'Goalie', main: '#2a2d34', dark: '#0c0d10', trim: '#ff8a1f', pattern: 'goalie', hat: 'goalie', price: 450 },
+    afRobot: { char: 'affelito', name: 'Robot', main: '#9aa6b2', dark: '#3a434d', trim: '#5cf0ff', frame: '#c9d2da', pattern: 'robot', hat: 'robot', noHair: true, price: 600 },
+    afAstro: { char: 'affelito', name: 'Astronaut', main: '#eef1f5', dark: '#5b6675', trim: '#ff7a1f', pattern: 'astro', hat: 'bubble', price: 800 },
+    afDragon: { char: 'affelito', name: 'Dragon', main: '#2fa05a', dark: '#0f3d22', trim: '#ffd34d', pattern: 'scales', hat: 'dragon', noHair: true, price: 1000 },
+    afFire: { char: 'affelito', name: 'Fire', main: '#b3200f', dark: '#3a0603', trim: '#ffd23a', frame: '#ff8a1f', pattern: 'fire', hat: 'flames', noHair: true, price: 1500 },
+    afDiamond: { char: 'affelito', name: 'Diamond', main: '#7fdcff', dark: '#1a4f7a', trim: '#ffffff', frame: '#bff2ff', pattern: 'diamond', hat: 'cap', cap: { front: '#eafcff', mesh: '#8fe3ff', brim: '#bff2ff', badge: 'gem' }, price: 2000 },
   };
   // =====================================================================
   // CHARACTERS — everything that differs between playable characters lives here.
@@ -126,7 +126,7 @@
       iris: '#6d9fc4', irisRing: null, brow: '#4a2c18', arch: 0.06, grinTilt: 0,
       topHair: hair,
     },
-    alfred: {
+    affelito: {
       name: 'Affelito', hair: '#8a5a2e', first: 'afTee',
       skin: '#f4caa6', face: { x: -0.36, y: -0.38, w: 0.72, h: 0.76, r: 0.16 },
       iris: '#8fa674', irisRing: '#566b42', brow: '#5e3f22', arch: 0.03, grinTilt: -0.13,

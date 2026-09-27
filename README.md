@@ -1,6 +1,6 @@
 # VippeDash
 
-A Geometry Dash–style runner starring **Vippe** (Vincent). There are four levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **3 · Vilda skogen** (hard, about 1:37) runs through the wild forest, and **4 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
+A Geometry Dash–style runner starring **Vippe**. There are four levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **3 · Vilda skogen** (hard, about 1:37) runs through the wild forest, and **4 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
 
 ## Play
 
@@ -113,7 +113,7 @@ The shop has two tabs, one per character. The shop opens on the tab of the chara
 | Tiger (ears and whiskers) | 350 | | Rainbow (propeller cap) | 1000 |
 | Moose (antlers) | 400 | | King Vippe (gold crown) | 1500 |
 
-**Affelito** (Alfred: straight light-brown hair swept to the side, hazel eyes, a lopsided grin and nearly always a trucker cap) has 14 skins. Black tee, grey hoodie and blue fleece are free. The others cost coins:
+**Affelito** (straight light-brown hair swept to the side, hazel eyes, a lopsided grin and nearly always a trucker cap) has 14 skins. Black tee, grey hoodie and blue fleece are free. The others cost coins:
 
 | Skin | Coins | | Skin | Coins |
 | --- | --- | --- | --- | --- |
@@ -360,5 +360,5 @@ Each skill carries the checklist for that job. See `CLAUDE.md` in the project fo
 
 ## Notes
 
-- The `Vincent/` and `Alfred/` photos were only used as reference for the character designs. They are not used in the game and are git-ignored so they stay private.
+- The `ref-vippe/` and `ref-affelito/` photos were only used as reference for the character designs. They are not used in the game and are git-ignored so they stay private.
 - `.venv/` holds Python and Pillow, used once to convert the HEIC photos. The game doesn't need it, it is git-ignored, and it can be deleted.

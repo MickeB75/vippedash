@@ -6,7 +6,7 @@ description: Lägger till en helt ny spelbar karaktär i VippeDash (ansikte, hå
 Uppdrag: $ARGUMENTS
 
 Det här är det största av de fem hantverken: en ny post i `Art.CHARS` med egna ritfunktioner, en hel
-uppsättning skins, en ny shop-flik och en README-uppdatering. Bygg på mönstret från `alfred` (näst nyaste
+uppsättning skins, en ny shop-flik och en README-uppdatering. Bygg på mönstret från `affelito` (näst nyaste
 karaktären), inte `vippe` (den allra första, med fler specialfall).
 
 ## 1. Opus läser och planerar (innan någon subagent startas)
@@ -21,13 +21,13 @@ exakt varje fält och hook en karaktär kan/måste ha:
 - Skins taggas med `char: '<id>'` i `Art.SKINS`; shop-fliken och dess etikett byggs automatiskt av
   `js/game.js` från `Object.keys(Art.CHARS)` — ingen kod i game.js behöver ändras för fliken själv.
 
-**Om användaren bifogar referensfoton** (som de git-ignorerade `Vincent/`/`Alfred/`-mapparna): de är
-privata. Lägg **aldrig** in dem i git — lägg till mappnamnet i `.gitignore` (samma mönster som `Vincent/`
-och `Alfred/`) om det inte redan finns, och nämn det i rapporten till användaren.
+**Om användaren bifogar referensfoton** (som de git-ignorerade `ref-vippe/`/`ref-affelito/`-mapparna): de är
+privata. Lägg **aldrig** in dem i git — lägg till mappnamnet i `.gitignore` (samma mönster som `ref-vippe/`
+och `ref-affelito/`) om det inte redan finns, och nämn det i rapporten till användaren.
 
 Bestäm (fråga bara om genuint oklart):
 - **Karaktärens id** (kort, gemener, t.ex. förnamn), **namn** (visas på shop-fliken).
-- **Utseende**: hårfärg/-stil, ögonfärg, ansiktsform — jämför mot `vippe`/`alfred` så den nya karaktären
+- **Utseende**: hårfärg/-stil, ögonfärg, ansiktsform — jämför mot `vippe`/`affelito` så den nya karaktären
   känns distinkt, inte en färgad kopia.
 - **Skins**: 3 gratis (som Vippe/Affelito) + betalskins med samma prisstege som de befintliga karaktärerna
   (150, 200, 300, 350, 400/450, 600, 800, 1000, 1500[, 2000]). En av de tre gratis-skinsen blir `first`.
@@ -61,7 +61,7 @@ flikarna faktiskt klipps eller överlappar.
 2. **Shop-fliken**: `python tools/shot.py "index.html?debug&shop&skin=<first-skin-id>" --realtime 2500` —
    kolla att den nya fliken syns, ser rätt ut och inte trycker undan de andra.
 3. **Före/efter-koll att inget annat ändrades**: ta en referens-PNG av de befintliga karaktärerna INNAN du
-   delegerar (`python tools/shot.py "tools/skins.html?char=vippe&t=0"` och samma för `alfred`), och en till
+   delegerar (`python tools/shot.py "tools/skins.html?char=vippe&t=0"` och samma för `affelito`), och en till
    efteråt — filerna ska vara byte-identiska (samma frysta tid → samma pixlar). Jämför t.ex. med
    `sha256sum` på båda PNG-filerna, eller bara ögna igenom dem sida vid sida.
 4. `python tools/verify.py` — en ny karaktär rör aldrig fysik/hitboxar, men kör som sanity-check.

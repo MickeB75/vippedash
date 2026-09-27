@@ -14,9 +14,9 @@ Läs kommentarblocket direkt ovanför `Art.CHARS` i `js/art.js` (rad ~90–121) 
 (rad ~59–88) innan du planerar — det dokumenterar exakt vilka fält en skin kan ha.
 
 Bestäm:
-- **Vilken karaktär** ('vippe' eller 'alfred') — om uppdraget bara säger ett namn som "polis" utan
+- **Vilken karaktär** ('vippe' eller 'affelito') — om uppdraget bara säger ett namn som "polis" utan
   karaktär, välj den som saknar en liknande skin, annars fråga.
-- **`char`-fältet**: utelämna det för Vippe-skins, sätt `char: 'alfred'` för Affelito.
+- **`char`-fältet**: utelämna det för Vippe-skins, sätt `char: 'affelito'` för Affelito.
 - **Utseende**: vilket `pattern` (kropp) och `hat` (huvudbonad) den ska ha. Återanvänd ett befintligt
   `pattern`/`hat`-namn om det redan passar (t.ex. `hat: 'cap'` med en ny `cap: {front, mesh, brim, badge}`
   för en ny Affelito-keps-skin), annars planera ett nytt `case` i `bodyPattern()`/`hat()`/`truckerCap()`
