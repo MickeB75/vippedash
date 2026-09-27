@@ -89,6 +89,26 @@ Paste the new version of `tools/stats-sheet.gs` into the same Apps Script projec
 
 The web app URL is public, since it's right there in the game's code, so in principle anyone could post fake rows to your sheet. The script validates everything it receives, which is good enough for a hobby game.
 
+## Topplista
+
+VippeDash keeps a **leaderboard** for every level. Players choose a name (the first time they win a level, or any time via the 👤 chip in the menu). Names are unique (case-insensitive), 2–12 characters long, and filtered against a word list in the Apps Script (`BANNED_ANYWHERE` and `BANNED_EXACT` at the top of `tools/stats-sheet.gs` — you can extend it).
+
+Each level has a **top 10**: ranked by fewest crashes first, then shortest time. One row per player and level (their best run). The data lives in the same Google Sheet as the statistics, in tabs called **Spelare** (players) and **Topplista** (leaderboard), via the same Apps Script web app. After changing `tools/stats-sheet.gs`, paste it into the Apps Script editor again and redeploy with **Distribuera → Hantera distributioner → ✏️ → Ny version** to keep the same `/exec` URL.
+
+### Moderation
+
+Write anything in the **"dold"** (hidden) column of a row in **Topplista** to hide that result from the public lists. Do the same in **Spelare** to hide that player entirely (their name stays reserved so no one else can take it). Delete a row in **Spelare** to free up the name. Changes show within about 30 seconds (the server caches data briefly).
+
+### How it works
+
+The player identity is the same random per-device ID as the statistics, stored in `localStorage`. The name follows the browser or app, not the person: the GitHub Pages site, the installed app and a single emailed file each have their own unique ID.
+
+Debug and testing URL parameters:
+- `?lbmock` – fake in-memory server with no network, for UI work and screenshots
+- `?lbmock=offline` – fake network failure, for testing offline behavior
+- `?lbtest` – real server, but the rows are marked platform "test" and never show up in the public lists
+- On `localhost` the leaderboard is off unless you use `?lbtest` or `?lbmock`; debug and bot runs are never submitted in normal play
+
 ## Coins and the shop
 
 You win coins every time you finish a level:

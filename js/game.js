@@ -64,7 +64,7 @@
       const best = store.get('best', 0), wins = store.get('wins', 0);
       if (best || wins) p.home = { best, wins };
     }
-    for (const L of VD.LEVELS) p[L.id] = Object.assign({ best: 0, wins: 0, fewest: null }, p[L.id]);
+    for (const L of VD.LEVELS) p[L.id] = Object.assign({ best: 0, wins: 0, fewest: null, bestRun: null }, p[L.id]);
     return p;
   }
   function saveProgress() {
@@ -102,6 +102,13 @@
 
   function bindInput() {
     addEventListener('keydown', (e) => {
+      const tag = e.target && e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') {
+        // typing in a text field (the name dialog): let it type normally, only forward Escape/Enter
+        if ((e.code === 'Escape' || e.code === 'Enter' || e.code === 'NumpadEnter') && VD.Board) VD.Board.key(e);
+        return;
+      }
+      if (VD.Board && VD.Board.isOpen()) return void VD.Board.key(e);
       if (G.freeze) G.freeze = false; // any key unfreezes a ?freeze debug start
       if (JUMP.has(e.code)) e.preventDefault();
       if (e.repeat) return;
@@ -125,6 +132,7 @@
         const n = /^Digit(\d)$/.exec(e.code);
         if (n && VD.LEVELS[+n[1] - 1]) return pickLevel(VD.LEVELS[+n[1] - 1].id);
         if (e.code === 'KeyS') return openShop();
+        if (e.code === 'KeyT' && VD.Board) return VD.Board.openBoard(G.levelDef.id);
         if (G.debug && e.code === 'KeyC') {
           addCoins(500);
           return refreshMenu();
@@ -143,6 +151,8 @@
       if (G.debug) debugKey(e);
     });
     addEventListener('keyup', (e) => {
+      const tag = e.target && e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return; // let text fields keep their normal keyup behaviour
       if (JUMP.has(e.code)) e.preventDefault(); // Space must never "click" a focused button
       keysDown.delete(e.code);
       updateHeld();
@@ -311,6 +321,12 @@
     refreshMenu();
     // shop: open the shop on the tab of the skin being worn (with skin=, that skin's character); menu only
     if ('shop' in q && G.state === 'menu') openShop();
+    // leaderboard: jump straight to the board (on a given level) or the name dialog, for screenshots
+    if ('board' in q && VD.Board) {
+      if (VD.LEVELS.some((L) => L.id === q.board)) VD.Board.openBoard(q.board);
+      else console.warn('VippeDash debug: unknown level "' + q.board + '" for board=');
+    }
+    if ('namedlg' in q && VD.Board) VD.Board.openName();
   }
 
   // ------------------------------------------------------------------ UI
@@ -349,7 +365,7 @@
         '<span class="linfo"><b>' + L.name + badges + '</b><small>' + L.route + '</small>' +
         '<span class="lmeta"><span class="diff d' + L.difficulty + '">' + '★'.repeat(L.difficulty) + ' ' + L.diffName + '</span>' +
         '<span class="lcoins"><i class="coin"></i>' + lo.total + '–' + r.total + '</span></span></span>' +
-        '<span class="lprog"><b></b><small></small></span>';
+        '<span class="lprog"><b></b><small></small><span class="lrank"></span></span>';
       b.onclick = () => pickLevel(L.id);
       box.appendChild(b);
     }
@@ -388,14 +404,20 @@
     for (const b of document.querySelectorAll('.lvl')) {
       const p = G.progress[b.dataset.id];
       b.classList.toggle('on', b.dataset.id === G.levelDef.id);
-      const big = b.querySelector('.lprog b'), small = b.querySelector('.lprog small');
+      const big = b.querySelector('.lprog b'), small = b.querySelector('.lprog small'), rank = b.querySelector('.lrank');
       big.className = p.wins ? 'done' : '';
       big.textContent = p.wins ? '✔ ' + p.wins : p.best + '%';
       small.textContent = p.wins ? (p.wins === 1 ? 'win' : 'wins') : 'best';
+      if (rank) {
+        const r = VD.Board ? VD.Board.rankOf(b.dataset.id) : null;
+        rank.textContent = r && r <= 10 ? '🏆 #' + r : '';
+      }
     }
     $('coinsMenu').textContent = G.coins;
     $('skinName').textContent = skinLabel(G.skin);
+    if (VD.Board) VD.Board.refreshChip();
   }
+  G.refreshMenu = refreshMenu; // so leaderboard.js can ask the menu to redraw after a GET updates ranks
   // "Affelito · Black tee", but just "King Vippe" when the skin name already says who it is
   function skinLabel(id) {
     const name = Art.SKINS[id].name, who = Art.CHARS[Art.charOf(id)].name;
@@ -587,6 +609,8 @@
     G.camV = G.camVT = 0;
     G.s = null;
     refreshMenu();
+    // a name that came back "taken" (e.g. after a queued registration was flushed) needs fixing
+    if (VD.Board && VD.Board.nameStatus && VD.Board.nameStatus() === 'taken') VD.Board.openName();
   };
   G.nextLevel = function () {
     const i = VD.LEVELS.indexOf(G.levelDef);
@@ -650,10 +674,15 @@
     p.best = 100;
     p.wins++;
     if (p.fewest == null || G.deaths < p.fewest) p.fewest = G.deaths;
+    G.finalTime = G.runTime; // needed below (and by showWin/countUp) before addCoins used to be the last writer
+    const t = Math.round(G.finalTime * 10); // tenths of a second, what the leaderboard stores
+    const cheat = G.debug || G.bot || G.god;
+    const newBest = !p.bestRun || G.deaths < p.bestRun.c || (G.deaths === p.bestRun.c && t < p.bestRun.t);
+    if (!cheat) p.bestRun = { c: G.deaths, t: t }; // never pollute the local best with a debug/bot/god run
     saveProgress();
-    G.finalTime = G.runTime;
     G.flash = 0.5;
     if (VD.Stats) VD.Stats.log('win', G.levelDef.id);
+    if (VD.Board) VD.Board.onWin(G.levelDef.id, G.deaths, t, newBest);
   }
 
   function showWin() {
@@ -676,6 +705,7 @@
     $('next').classList.toggle('hidden', !hasNext);
     $('again').classList.toggle('big', !hasNext);
     show('win', true);
+    if (VD.Board) VD.Board.renderWin(def.id);
     // count the coins up
     G.countUp = { shown: 0, t: 0 };
   }

@@ -148,7 +148,9 @@
     }
   }
 
-  VD.Stats = { log: log };
+  // endpoint/id/platform/off are exposed so js/leaderboard.js can reuse the same visitor id and
+  // on/off logic instead of duplicating it. No behaviour change here otherwise.
+  VD.Stats = { log: log, endpoint: ENDPOINT, id: visitorId, platform: platform, off: isOff };
   if (dryRun) VD.Stats.sent = [];
 
   // G.start always runs when a level begins (menu PLAY, restart, next level, debug warp...).

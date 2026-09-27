@@ -313,6 +313,134 @@ h2 { margin: 0 0 calc(var(--u) * 6px); font-weight: normal; font-size: calc(var(
   line-height: 1;
 }
 
+/* ---------- name chip + shop/board button row (main menu) ---------- */
+.herobtns { display: flex; gap: calc(var(--u) * 8px); }
+.btn.small { min-width: calc(var(--u) * 140px); font-size: calc(var(--u) * 18px); padding: calc(var(--u) * 8px) calc(var(--u) * 16px); }
+.btn.big.small { font-size: calc(var(--u) * 22px); min-width: calc(var(--u) * 140px); }
+.btn.shopbtn.small { min-width: calc(var(--u) * 150px); font-size: calc(var(--u) * 20px); padding: calc(var(--u) * 8px) calc(var(--u) * 14px); }
+.namechip {
+  min-width: 0;
+  width: auto;
+  display: inline-block;
+  margin: 0;
+  padding: calc(var(--u) * 4px) calc(var(--u) * 14px);
+  font-size: calc(var(--u) * 15px);
+  border-radius: calc(var(--u) * 20px);
+  background: rgba(0, 0, 0, 0.35);
+  border: calc(var(--u) * 2px) solid rgba(255, 255, 255, 0.2);
+  color: #cfd8f0;
+}
+.namechip:hover { background: rgba(255, 255, 255, 0.15); }
+
+/* ---------- level cards: leaderboard rank line ---------- */
+.lrank { font-family: system-ui, sans-serif; font-size: calc(var(--u) * 13px); color: #ffd634; min-height: 1.1em; }
+
+/* ---------- top-10 board overlay ---------- */
+.boardpanel { min-width: calc(var(--u) * 640px); max-width: calc(var(--u) * 760px); padding-top: calc(var(--u) * 18px); padding-bottom: calc(var(--u) * 18px); }
+.boardhead { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.boardhead h2 { margin: 0; font-size: calc(var(--u) * 44px); color: #ffd634; -webkit-text-stroke: calc(var(--u) * 2px) #6b3a00; }
+.boardtabs { display: flex; gap: calc(var(--u) * 4px); padding: calc(var(--u) * 4px); border-radius: calc(var(--u) * 16px); background: rgba(0, 0, 0, 0.3); }
+.boardtab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--u) * 46px);
+  height: calc(var(--u) * 46px);
+  padding: 0;
+  border-radius: 50%;
+  border: calc(var(--u) * 3px) solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+.boardtab:hover { filter: brightness(1.15); }
+.boardtab.on { border-color: #ffd634; }
+.boardtab .lnum { width: 100%; height: 100%; font-size: calc(var(--u) * 22px); color: #fff; }
+.boardlist { display: flex; flex-direction: column; gap: calc(var(--u) * 4px); width: 100%; max-height: calc(var(--u) * 390px); overflow-y: auto; margin: calc(var(--u) * 4px) 0; }
+.brow {
+  display: grid;
+  grid-template-columns: calc(var(--u) * 56px) 1fr calc(var(--u) * 130px) calc(var(--u) * 100px);
+  align-items: center;
+  gap: calc(var(--u) * 10px);
+  padding: calc(var(--u) * 6px) calc(var(--u) * 14px);
+  border-radius: calc(var(--u) * 12px);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: calc(var(--u) * 18px);
+  text-align: left;
+}
+.brow.me { border: calc(var(--u) * 2px) solid #ffd634; background: rgba(255, 214, 52, 0.16); }
+.brank { font-size: calc(var(--u) * 20px); color: #aab6d8; text-align: center; }
+.bname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bcrash, .btime { font-family: system-ui, sans-serif; font-size: calc(var(--u) * 14px); color: #cfd8f0; text-align: right; }
+.bsep { grid-column: 1 / -1; border-top: calc(var(--u) * 2px) dashed rgba(255, 255, 255, 0.25); margin: calc(var(--u) * 2px) 0; padding: 0; background: none; }
+.boardempty { font-family: system-ui, sans-serif; font-size: calc(var(--u) * 16px); color: #aab6d8; padding: calc(var(--u) * 20px) 0; }
+.brow.noname { grid-template-columns: 1fr auto; }
+.brow.noname .bname { color: #aab6d8; font-style: italic; }
+.boardfoot { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: calc(var(--u) * 2px); gap: calc(var(--u) * 10px); }
+.boardstatus { margin: 0; font-family: system-ui, sans-serif; font-size: calc(var(--u) * 13px); color: #aab6d8; text-align: left; }
+.boardfootbtns { display: flex; gap: calc(var(--u) * 8px); flex: none; }
+
+/* ---------- name dialog ---------- */
+/* these two open on top of other screens: near-opaque, so the menu/win panel behind doesn't show through */
+.boardpanel, .namepanel { background: rgba(10, 16, 40, 0.96); }
+.namepanel { min-width: calc(var(--u) * 380px); }
+.nameinput {
+  font: inherit;
+  font-size: calc(var(--u) * 26px);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  border: calc(var(--u) * 3px) solid rgba(255, 255, 255, 0.25);
+  border-radius: calc(var(--u) * 14px);
+  padding: calc(var(--u) * 8px) calc(var(--u) * 16px);
+  width: 100%;
+  text-align: center;
+  outline: none;
+}
+.nameinput:focus { border-color: #ffd634; }
+.namehint { margin: 0; font-family: system-ui, sans-serif; font-size: calc(var(--u) * 13px); color: #aab6d8; }
+.nameerror { margin: 0; min-height: 1.2em; font-family: system-ui, sans-serif; font-size: calc(var(--u) * 14px); color: #ff6b5e; }
+.namestatus { margin: 0; min-height: 1.2em; font-family: system-ui, sans-serif; font-size: calc(var(--u) * 14px); color: #aab6d8; }
+.namebtns { display: flex; gap: calc(var(--u) * 10px); }
+/* on a touch phone the keyboard covers the bottom half, so the dialog sits at the top instead */
+@media (pointer: coarse) {
+  #nameDlg { align-items: flex-start; }
+  #nameDlg .panel { margin-top: calc(var(--u) * 24px); }
+}
+/* while typing, hide the "turn your phone" hint so it can't cover the keyboard/dialog */
+html.typing #rotate { display: none !important; }
+
+/* ---------- win screen: right-hand top-10 column ---------- */
+.winpanel { flex-direction: row; align-items: flex-start; gap: calc(var(--u) * 24px); max-width: calc(var(--u) * 980px); }
+.wincol { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 10px); }
+.winboard {
+  flex: none;
+  align-self: stretch;
+  width: calc(var(--u) * 300px);
+  padding: calc(var(--u) * 14px);
+  border-radius: calc(var(--u) * 18px);
+  background: rgba(0, 0, 0, 0.3);
+  border: calc(var(--u) * 2px) solid rgba(255, 255, 255, 0.15);
+  gap: calc(var(--u) * 8px);
+}
+.wbtitle { font-size: calc(var(--u) * 18px); color: #ffd634; text-align: center; }
+.wbstatus { margin: 0; font-family: system-ui, sans-serif; font-size: calc(var(--u) * 14px); color: #dfe8ff; text-align: center; display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 8px); }
+.wbprompt { margin: 0; font-size: calc(var(--u) * 20px); color: #ffd634; }
+.skiplink { color: #aab6d8; font-family: system-ui, sans-serif; font-size: calc(var(--u) * 14px); text-decoration: underline; cursor: pointer; }
+.wblist { display: flex; flex-direction: column; gap: calc(var(--u) * 4px); width: 100%; }
+.winboard .brow { font-size: calc(var(--u) * 14px); grid-template-columns: calc(var(--u) * 30px) 1fr calc(var(--u) * 76px) calc(var(--u) * 64px); padding: calc(var(--u) * 4px) calc(var(--u) * 8px); gap: calc(var(--u) * 6px); }
+.winboard .brank { font-size: calc(var(--u) * 14px); }
+.winboard .bcrash, .winboard .btime { font-size: calc(var(--u) * 11px); }
+.winboard .boardempty { font-size: calc(var(--u) * 13px); padding: calc(var(--u) * 10px) 0; }
+.spinner {
+  display: inline-block;
+  width: calc(var(--u) * 14px);
+  height: calc(var(--u) * 14px);
+  border-radius: 50%;
+  border: calc(var(--u) * 3px) solid rgba(255, 255, 255, 0.25);
+  border-top-color: #ffd634;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ---------- phones: "turn your phone" hint in portrait (js/mobile.js pauses the run) ---------- */
 #rotate { display: none; }
 @media (orientation: portrait) and (pointer: coarse) {

@@ -22,7 +22,11 @@
             <h1 class="logo"><span class="a">Vippe</span><span class="b">Dash</span></h1>
             <canvas id="hero" width="240" height="260"></canvas>
             <p id="skinName" class="skinname"></p>
-            <button id="shopBtn" class="btn shopbtn">🛒&nbsp; Shop</button>
+            <button id="nameChip" class="btn namechip"></button>
+            <div class="herobtns">
+              <button id="shopBtn" class="btn shopbtn small">🛒&nbsp; Shop</button>
+              <button id="boardBtn" class="btn shopbtn small">🏆&nbsp; Top 10</button>
+            </div>
             <button id="play" class="btn big">▶&nbsp; PLAY</button>
           </div>
           <div class="levelbox">
@@ -49,6 +53,38 @@
       </div>
     </div>
 
+    <div id="board" class="overlay hidden">
+      <div class="panel boardpanel">
+        <div class="boardhead">
+          <h2>🏆 Top 10</h2>
+          <div id="boardTabs" class="boardtabs"></div>
+        </div>
+        <p id="boardSub" class="sub"></p>
+        <div id="boardList" class="boardlist"></div>
+        <div class="boardfoot">
+          <p id="boardStatus" class="boardstatus"></p>
+          <div class="boardfootbtns">
+            <button id="boardBack" class="btn small">←&nbsp; Back</button>
+            <button id="boardName" class="btn small">✏️&nbsp; Your name</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="nameDlg" class="overlay hidden">
+      <div class="panel small namepanel">
+        <h2>Your name</h2>
+        <input id="nameInput" class="nameinput" type="text" maxlength="12" autocomplete="off" autocapitalize="words" enterkeyhint="done" spellcheck="false">
+        <p class="namehint">2–12 letters. Everyone can see it on the top lists.</p>
+        <p id="nameError" class="nameerror"></p>
+        <p id="nameStatus" class="namestatus"></p>
+        <div class="namebtns">
+          <button id="nameSave" class="btn big small">✓&nbsp; Save</button>
+          <button id="nameCancel" class="btn small">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <div id="pause" class="overlay hidden">
       <div class="panel small">
         <h2>Paused</h2>
@@ -60,14 +96,17 @@
     </div>
 
     <div id="win" class="overlay hidden">
-      <div class="panel">
-        <h2 id="winTitle" class="wintitle"></h2>
-        <p id="winSub" class="sub"></p>
-        <div id="stats" class="stats"></div>
-        <div id="reward" class="reward"></div>
-        <button id="next" class="btn big">▶&nbsp; Next level</button>
-        <button id="again" class="btn">↺&nbsp; Play again</button>
-        <button id="winMenu" class="btn">Main menu</button>
+      <div class="panel winpanel">
+        <div class="wincol">
+          <h2 id="winTitle" class="wintitle"></h2>
+          <p id="winSub" class="sub"></p>
+          <div id="stats" class="stats"></div>
+          <div id="reward" class="reward"></div>
+          <button id="next" class="btn big">▶&nbsp; Next level</button>
+          <button id="again" class="btn">↺&nbsp; Play again</button>
+          <button id="winMenu" class="btn">Main menu</button>
+        </div>
+        <div id="winBoard" class="wincol winboard"></div>
       </div>
     </div>
 
@@ -102,6 +141,7 @@
 <script src="js/game.js"></script>
 <script src="js/mobile.js"></script>
 <script src="js/stats.js"></script>
+<script src="js/leaderboard.js"></script>
 <script>
   // offline support for the installed app; skipped when opened as a file
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js');

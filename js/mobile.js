@@ -58,10 +58,12 @@
     history.pushState({ vippedash: 1 }, '');
     guarded = true;
   }
+  VD.guardBack = guardBack; // leaderboard.js calls this when it opens the board or the name dialog
   document.getElementById('shopBtn').addEventListener('click', guardBack);
   addEventListener('popstate', () => {
     guarded = false;
-    if (G.shopOpen) document.getElementById('shopBack').click();
+    if (VD.Board && VD.Board.isOpen()) VD.Board.close();
+    else if (G.shopOpen) document.getElementById('shopBack').click();
     else if (G.state === 'play' || G.state === 'dead') {
       if (G.state === 'dead') pauseOnRespawn = true;
       else G.pause();

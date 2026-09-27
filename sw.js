@@ -21,6 +21,7 @@ const FILES = [
   'js/game.js',
   'js/mobile.js',
   'js/stats.js',
+  'js/leaderboard.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',
