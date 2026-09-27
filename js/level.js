@@ -939,7 +939,7 @@
     b.half(56);
     b.spike(60, 0, 'urchin');
     b.spikes(64, 3, 0, 'urchin');
-    b.pad(76);
+    b.pad(77);
     // a reef shark lying in the current: its back is a platform, its jaws are not
     b.shark(80, 5, 'left');
     b.spikes(88, 2, 0, 'urchin');
