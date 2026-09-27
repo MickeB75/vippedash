@@ -653,6 +653,7 @@
     saveProgress();
     G.finalTime = G.runTime;
     G.flash = 0.5;
+    if (VD.Stats) VD.Stats.log('win', G.levelDef.id);
   }
 
   function showWin() {

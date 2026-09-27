@@ -60,6 +60,35 @@ This works because the app is a PWA: `manifest.json` names the app and its icons
 
 The installed app, the e-mailed file and the browser each keep their own coins and progress.
 
+## Statistics
+
+VippeDash can log simple, anonymous usage so you can see how the game is actually being played. Each logged event records a date/time, which event it was (game opened, a level started, a level cleared), which level, which platform (GitHub Pages, installed app, opened from a file, LAN, or a test run) and the game's version, plus a random id stored in the browser so repeat visits from the same browser or install can be told apart. No names, no cookies and no IP addresses are logged — the logging endpoint (a Google Apps Script web app) never even sees the player's IP. Nothing is logged from a `localhost` browser tab (so normal development doesn't pollute the numbers), in `?debug` mode, or from the headless tools used to verify levels. If the game is offline when an event happens, it's queued and sent the next time it's online. Opening the game with `index.html?statstest` is a dry run: events are printed to the browser console instead of being sent anywhere.
+
+### One-time setup
+
+1. Go to [sheets.new](https://sheets.new) and name the new spreadsheet "VippeDash statistik".
+2. Open **Tillägg → Apps Script**, replace the contents of `Code.gs` (`Kod.gs` in Swedish) with the contents of `tools/stats-sheet.gs`, and save.
+3. Open **Distribuera → Ny distribution**, choose type **Webbapp**, set **Kör som: Jag** and **Vem har åtkomst: Alla**, then click **Distribuera**. Authorize the script when asked — Google shows an "unverified app" warning for your own script, which is expected; click **Avancerat → Gå till … (osäkert)** to continue.
+4. Copy the web app URL (it ends in `/exec`) and paste it into `ENDPOINT` at the top of `js/stats.js`, then commit and push.
+5. Open the web app URL in a browser. It should show "VippeDash-statistik: igång" — that confirms the deployment works.
+
+### Reading the numbers
+
+Open the sheet. The **Per dag** tab updates automatically whenever you open it (or run **VippeDash → Uppdatera Per dag** from the menu), and has one row per day:
+
+- **besökare** – distinct visitors that day
+- **nya** – visitors whose very first-ever event was that day
+- **spelare** – distinct visitors who started at least one level that day
+- **startade `<level>`** / **klarade `<level>`** – how many runs of that level were started (every PLAY, restart or "Play again"; respawning at a checkpoint doesn't count) and how many times it was cleared that day
+
+To get a CSV, open the **Per dag** tab and use **Arkiv → Ladda ned → Kommaseparerade värden (.csv)**. The raw, one-row-per-event log is in the **Logg** tab.
+
+### Updating the script later
+
+Paste the new version of `tools/stats-sheet.gs` into the same Apps Script project, then **Distribuera → Hantera distributioner → ✏️ → Version: Ny version**, so the web app URL (and therefore `ENDPOINT` in `js/stats.js`) doesn't need to change.
+
+The web app URL is public, since it's right there in the game's code, so in principle anyone could post fake rows to your sheet. The script validates everything it receives, which is good enough for a hobby game.
+
 ## Coins and the shop
 
 You win coins every time you finish a level:
