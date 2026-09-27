@@ -47,6 +47,13 @@
     F4: parseMelody('D5 D5 . D5 F5 . D5 . | A#4 A#4 . A#4 D5 . A#4 . | G4 G4 . A#4 D5 . G5 . | A4 A4 . C#5 E5 . A5 .'),
     F5: parseMelody('A5 G5 F5 E5 D5 E5 F5 A5 | G5 F5 E5 D5 C5 D5 E5 G5 | F5 E5 D5 C5 A#4 C5 D5 F5 | E5 - A5 - C#6 - E6 -'),
     F6: parseMelody('A5 - G5 F5 - C5 F5 - | G5 - E5 C5 - G4 C5 - | F5 - A5 D6 - C6 A5 - | A#5 - A5 G5 - F5 D5 -'),
+    // the ocean song (level 4 "Djupet"), A minor: flowing verses, a dark sparse whale/trench, major at the surface
+    O1: parseMelody('E5 - D5 C5 - D5 E5 - | G5 - E5 D5 - C5 D5 - | A5 - G5 E5 - D5 C5 - | B4 - D5 E5 - C5 A4 -'),
+    O2: parseMelody('A5 - G5 F5 - E5 D5 - | C5 - E5 G5 - F5 D5 - | B4 - D5 F5 - E5 C5 - | A4 - C5 E5 - D5 B4 -'),
+    O3: parseMelody('A4 - - - C5 - B4 - | D5 - - - E5 - D5 - | C5 - - - A4 - G4 - | B4 - - - D5 - C5 -'),
+    O4: parseMelody('D5 . . . F5 . . . | . . A4 . . . C5 . | D5 . . . . . E5 . | . . C5 . . . A4 .'),
+    O5: parseMelody('D5 D5 . D5 F5 . D5 . | A4 A4 . A4 D5 . A4 . | C5 C5 . E5 D5 . C5 . | B4 B4 . D5 C5 . A4 -'),
+    O6: parseMelody('C6 - B5 A5 - G5 C6 - | E6 - D6 C6 - B5 G5 - | A5 - G5 E5 - D5 C5 - | G5 - E5 C5 - D5 E5 G5'),
     // the nightmare song (level 4), C minor doom metal: original melodies, in the style of but not copied from any existing song
     N1: parseMelody('C5 . . D#5 . G5 . . | G#4 . . C5 . D#5 . . | F4 . . G#4 . C5 . . | F#4 . . A#4 . C#5 . -'),
     N2: parseMelody('C5 - D#5 - . C5 D#5 - | C#5 - . D#5 - C5 . - | G4 - A#4 - C5 - D#5 - | F#4 - . G4 - F5 - -'),
@@ -87,6 +94,13 @@
     sewer: ['Em', 'Am', 'Em', 'B'],
     pipe: ['Am', 'Em', 'C', 'B'],
     harbor: ['G', 'D', 'Em', 'C'],
+    // the ocean level ("Djupet"), A minor: a dive down and back up
+    oceanA: ['Am', 'C', 'G', 'Em'],
+    oceanB: ['Am', 'C', 'F', 'G'],
+    current: ['Am', 'Dm', 'Am', 'Em'],
+    abyssal: ['Dm', 'Dm', 'Am', 'Am'],
+    trench: ['Dm', 'Bb', 'Am', 'Em'],
+    surface: ['C', 'G', 'Am', 'F'],
     // level 4: original doom-metal progressions in C minor, with Phrygian (Db) and tritone (Gb) colour
     dirge: ['Cm', 'Ab', 'Fm', 'Gb'],
     doom: ['Cm', 'Db', 'Cm', 'Gb'],
@@ -145,6 +159,22 @@
         [48, 54, { prog: 'metro', drums: 'train', bass: 'eighth', arp: 'up', lead: 'M7' }],
         [54, 58, { prog: 'harbor', drums: 'drop', bass: 'octave', arp: 'up', lead: 'M8', tone: 'flute' }],
         [58, 60, { end: true }],
+      ],
+    },
+    // level 4 "Djupet": areas start at bars 0, 13, 24, 36, 44, 55 (same bars as the forest, retimed);
+    // the finish is bar 64. A dive down (darker, sparser) and back up (major, at the surface).
+    ocean: {
+      endChord: 'C',
+      phrase: 'section',
+      sections: [
+        [0, 4, { prog: 'oceanA', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true }],
+        [4, 13, { prog: 'oceanA', drums: 'main', bass: 'eighth', arp: 'wave', lead: 'O1', tone: 'flute', drips: true }],
+        [13, 24, { prog: 'oceanB', drums: 'drop', bass: 'octave', arp: 'up', lead: 'O2', drips: true }],
+        [24, 36, { prog: 'current', drums: 'half', bass: 'long', arp: 'wave', lead: 'O3', pad: true, tone: 'flute' }],
+        [36, 44, { prog: 'abyssal', drums: 'sparse', bass: 'long', arp: 'wave', lead: 'O4', pad: true, tone: 'pluck', drips: true }],
+        [44, 55, { prog: 'trench', drums: 'sparse', bass: 'octave', arp: 'fast', lead: 'O5', tone: 'pluck', drips: true }],
+        [55, 63, { prog: 'surface', drums: 'drop', bass: 'octave', arp: 'up', lead: 'O6', tone: 'flute', drips: true }],
+        [63, 65, { end: true }],
       ],
     },
     // level 4 "Mardrömmen": doom metal in C minor, half-time (kick/snare every 8 steps, 78 BPM feel).

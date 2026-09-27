@@ -1,6 +1,6 @@
 # VippeDash
 
-A Geometry Dash–style runner starring **Vippe**. There are four levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **3 · Vilda skogen** (hard, about 1:37) runs through the wild forest, and **4 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
+A Geometry Dash–style runner starring **Vippe**. There are five levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **3 · Vilda skogen** (hard, about 1:37) runs through the wild forest, **4 · Djupet** (very hard, about 1:38) dives through **Korallrevet › Manetsvärmen › Valens buk › Ytan**, and **5 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
 
 ## Play
 
@@ -20,7 +20,7 @@ Then open <http://localhost:8765>.
 | Hold to keep jumping or keep flying | hold any of the above |
 | Pause | **Esc** / **P** / ⏸ button |
 | Mute | **M** / 🔊 button |
-| Pick a level in the menu | click it, or **1** / **2** / **3** / **4** |
+| Pick a level in the menu | click it, or **1** / **2** / **3** / **4** / **5** |
 | Open the shop | **Shop** button or **S** |
 | Switch between Vippe and Affelito in the shop | click the tab, or **←** / **→** |
 
@@ -93,11 +93,11 @@ The web app URL is public, since it's right there in the game's code, so in prin
 
 You win coins every time you finish a level:
 
-| | Level 1 (easy) | Level 2 (medium) | Level 3 (hard) | Level 4 (nightmare) |
-| --- | --- | --- | --- | --- |
-| Level cleared | 50 | 100 | 150 | 250 |
-| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 50 | up to 100 | up to 150 | up to 250 |
-| First time you beat the level | 50 | 100 | 150 | 250 |
+| | Level 1 (easy) | Level 2 (medium) | Level 3 (hard) | Level 4 (very hard) | Level 5 (nightmare) |
+| --- | --- | --- | --- | --- | --- |
+| Level cleared | 50 | 100 | 150 | 200 | 250 |
+| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 50 | up to 100 | up to 150 | up to 200 | up to 250 |
+| First time you beat the level | 50 | 100 | 150 | 200 | 250 |
 
 So a harder level and fewer crashes give more coins. The coin total is shown at the top right of the menu.
 
@@ -172,7 +172,22 @@ A little longer than level 2 and harder: triple spikes, hedgehogs (they're spike
 
 Level 3 has its own folk-style soundtrack in D minor that ends in a major key when you reach the clearing.
 
-## Level 4: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
+## Level 4: Djupet (≈ 1:38, 9 checkpoints)
+
+Longer than level 3 and harder: a deep-sea dive with half-jumps, a shark, an eel, a cave-in that shifts you to a deeper layer, flying-bike mode through jellyfish swarms, floorball mode inside a whale with an irregular rhythm, and the longest stretch without a checkpoint.
+
+| Section | Where | What happens |
+| --- | --- | --- |
+| **Korallrevet** | a warm, sunny coral reef | Sea urchins and low fast hops, a reef shark in the current (jump over its jaws, land on its back), and a rising staircase of coral pillars over a stream. |
+| **Vraket** | a shipwreck on the seafloor | Deck planks too high to reach without a jump pad, a bioluminescent eel darting up from a floor gap, and a rising chain of bubbles through a cargo hold. At the end, the floor caves in—you fall to a deeper water layer. |
+| **Manetsvärmen** | a swarm of jellyfish in deeper water | **Flying-bike mode**: weave through dense clusters of jellyfish and coral spikes, with a lone anglerfish breaking the pattern. |
+| **Valens buk** | inside a whale, looking up at its teeth | Jump over a row of teeth as you swim in through the mouth, then tumble around inside. **Floorball mode** with an irregular rhythm and orb-assisted flips over wider gaps. |
+| **Djuphavet** | the darkest, tightest, longest stretch | Eels darting up from holes in the sea floor, sharks to jump over, kelp platforms over a deep chasm. No checkpoint midway. |
+| **Ytan** | swimming toward the light and surface | A final rising chain of bubbles straight to the goal. |
+
+Level 4 has its own ambient soundtrack in A minor: flowing and ethereal in the reef and wreck, darker and sparser in the whale and deep sea, brightening toward major as you reach the surface.
+
+## Level 5: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
 
 A dark horror level with blood, jump scares, bloody nuns, creepy clowns and strobe lights, rated 16+ (the menu card shows a red 16+ badge and a ⚡ for flashing lights). It is hard in other ways than tight jumps too: darkness where only your lantern shines, strobe light where you only see the level in the flashes, moving hazards, running upside down on the ceiling, a mirrored screen, and jump scares that distract you. The last stretch, from the ghost train to the finish, has no checkpoint.
 
@@ -271,7 +286,17 @@ b.hole(454, 7);              // a hole in the floor: fall through it to the laye
 
 `b.hole()` splits the level into two floors, one above the other. Everything placed after the hole is on the lower floor. When you fall in, the physics moves you up by one screen (15 blocks) and onto the lower floor, so the fall looks continuous and the camera follows you down.
 
-Level 4 adds:
+Level 4 (Djupet) adds:
+
+```js
+b.half(27);                  // a low, fast hop (level 1 only until now)
+b.shark(78, 5, 'left');      // a shark in the current: back is a platform, jaws (facing you) are a hazard
+b.eel(721);                  // an eel darting up out of a hole in the sea floor
+b.rail(233, 3, 'eel');       // rail()'s touch-and-die mechanic, reskinned as a glowing eel in a floor gap
+b.hole(364, 8, 16);          // the floor caves in — the rest of the level plays out one layer deeper
+```
+
+Level 5 adds:
 
 ```js
 b.nun(x, y, { bob, beats, phase });      // a bloody nun bobbing up and down in time with the music
@@ -333,7 +358,7 @@ The hash (or query string) also accepts URL parameters to drop straight into a s
 
 | Parameter | Effect |
 | --- | --- |
-| `level=<id>` | Start that level directly, skipping the menu. Ids: `home`, `forest`, `metro`, `nightmare` |
+| `level=<id>` | Start that level directly, skipping the menu. Ids: `home`, `forest`, `metro`, `ocean`, `nightmare` |
 | `cp=<n>` | Start at checkpoint *n* (0 = the start) |
 | `x=<blocks>` | Start at any x position. The bot plays from the checkpoint before it up to x, so the mode, gravity and floor are right |
 | `skin=<id>` | Wear any skin for this session only (not saved; coins and owned skins untouched) |

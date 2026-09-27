@@ -118,6 +118,7 @@ html, body {
 }
 .lvl.d2 .lnum { background: #2ea84a; }
 .lvl.d3 .lnum { background: #d2412f; }
+.lvl.d4 .lnum { background: #a8241c; }
 .lvl.d5 .lnum { background: #7a0010; }
 .linfo { flex: 1; display: flex; flex-direction: column; gap: calc(var(--u) * 2px); }
 .linfo b { font-weight: normal; font-size: calc(var(--u) * 28px); line-height: 1; }
@@ -128,6 +129,7 @@ html, body {
 .diff { color: #7dff9a; }
 .diff.d2 { color: #ffb347; }
 .diff.d3 { color: #ff6b5e; }
+.diff.d4 { color: #ff3f4a; }
 .diff.d5 { color: #ff2a3a; }
 .lcoins { color: #ffd634; display: inline-flex; align-items: center; gap: calc(var(--u) * 5px); }
 .lprog { flex: none; display: flex; flex-direction: column; align-items: center; min-width: calc(var(--u) * 70px); }

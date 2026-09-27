@@ -23,6 +23,7 @@
     cottage: 5, barn: 6, church: 6, mounds: 10, oldchurch: 5, cityrow: 8, castle: 10, stadium: 7, cathedral: 11,
     willows: 6, farm: 9, hall: 6, villas: 9, home: 4, pines: 6, birches: 5, moose: 3,
     spruces: 6, tarn: 6, cranes: 4, deadtrees: 5, deer: 3, moosecalf: 4, foxrun: 2, rockhill: 9, firetower: 2, jakttorn: 2,
+    whale: 15, reeftower: 7, shipwreck: 10, kelpforest: 8,
   };
   // 0..1: how much of x lies inside one of the listed areas, eased over `fade` blocks at each border
   function areaWeight(lvl, ids, x, fade = 12) {
@@ -83,6 +84,10 @@
         const sparse = kind === 'sparse';
         far.push({ u, t: 'spruce', h: sparse ? 0.6 + rnd() * 0.7 : 1.0 + rnd() * 1.3 });
         u += sparse ? 0.5 + rnd() * 1.2 : 0.16 + rnd() * 0.3;
+      } else if (kind === 'reef') {
+        // a distant ridge of coral bumps and rock outcrops, fading into the murk
+        far.push({ u, t: 'reefbg', h: 0.5 + rnd() * 1.2, w: 0.9 + rnd() * 1.4 });
+        u += 0.3 + rnd() * 0.6;
       } else {
         const pine = kind === 'pine' || rnd() < 0.55;
         far.push({ u, t: pine ? 'pine' : 'birch', h: 0.8 + rnd() * 1.1 });
@@ -110,6 +115,7 @@
       if (fill === 'mixed') type = rnd() < 0.5 ? 'pine1' : 'birch1';
       else if (fill === 'spruce') type = rnd() < 0.75 ? 'spruce1' : 'pine1';
       else if (fill === 'dead') type = rnd() < 0.6 ? 'dead1' : 'pine1';
+      else if (fill === 'kelp') type = 'kelp1';
       h = 90 + rnd() * 60;
       if (type === 'spruce1') h += 40;
       mid.push({ u: uu, t: type, hw: 1.5, d: { h } });
@@ -142,6 +148,9 @@
     // flocks of birds for the forest sky: [start offset, height, size, count]
     this.flocks = [];
     if (th.flocks) for (let i = 0; i < 4; i++) this.flocks.push({ o: i * 0.27 + rnd() * 0.1, y: 70 + rnd() * 150, s: 0.7 + rnd() * 0.5, n: 3 + Math.floor(rnd() * 5), sp: 0.035 + rnd() * 0.02 });
+    // schools of fish drifting through the ocean background, in place of bird flocks
+    this.fishSchools = [];
+    if (th.fish) for (let i = 0; i < 5; i++) this.fishSchools.push({ o: i * 0.21 + rnd() * 0.1, y: 90 + rnd() * 320, s: 0.6 + rnd() * 0.5, n: 4 + Math.floor(rnd() * 6), sp: 0.03 + rnd() * 0.025 });
     // stars
     const sr = U.rng(99);
     this.stars = [];
@@ -409,6 +418,9 @@
       } else if (inKind === 'ghosttrain') {
         this.drawGhosttrain(ctx, camX, t);
         this.drawNear(ctx, camX, t, true, L);
+      } else if (inKind === 'whale') {
+        this.drawWhale(ctx, camX, t);
+        this.drawNear(ctx, camX, t, true, L);
       } else {
         this.drawHall(ctx, camX, t);
         this.drawNear(ctx, camX, t, true, L);
@@ -569,6 +581,15 @@
           ctx.fill();
         }
         ctx.fillRect(x + 14, base - 46, 90, 50);
+      } else if (f.t === 'reefbg') {
+        // a low bump of distant coral / rock, rounded rather than pointed like the treelines
+        const w = f.w * 46, h = f.h * 40;
+        ctx.beginPath();
+        ctx.moveTo(x - w * 0.55, base);
+        ctx.quadraticCurveTo(x - w * 0.4, base - h, x, base - h * 1.08);
+        ctx.quadraticCurveTo(x + w * 0.4, base - h, x + w * 0.55, base);
+        ctx.closePath();
+        ctx.fill();
       }
     }
 
@@ -588,12 +609,14 @@
       else if (m.t === 'birch1') Art.birchTree(ctx, x, mb + 2, m.d.h);
       else if (m.t === 'spruce1') Art.spruceTree(ctx, x, mb + 2, m.d.h);
       else if (m.t === 'dead1') Art.deadSnag(ctx, x, mb + 2, m.d.h * 0.8);
+      else if (m.t === 'kelp1') Art.kelpSilhouette(ctx, x, mb + 2, m.d.h);
       else if (Art.mid[m.t]) Art.mid[m.t](ctx, x, mb + 2, m.d, t, FONT);
     }
     // light haze pushes the scenery back behind the gameplay layer
     ctx.fillStyle = U.rgba(sky.bot, 0.16);
     ctx.fillRect(0, 0, W, GY);
     if (th.flocks) this.drawFlocks(ctx, camX, t, sky);
+    if (th.fish) this.drawFishSchool(ctx, camX, t, sky);
     if (th.mist) this.drawMist(ctx, camX, t, areaWeight(this.lvl, th.mist, center, 24));
     if (th.beams) this.drawBeams(ctx, camX, t, areaWeight(this.lvl, th.beams, center, 24) * (1 - sky.dark));
     // the regional train racing along the railway towards Storvreta
@@ -623,6 +646,33 @@
         ctx.quadraticCurveTo(bx - w * 0.4, by - 3 * f.s, bx, by);
         ctx.quadraticCurveTo(bx + w * 0.4, by - 3 * f.s, bx + w, by - flap);
         ctx.stroke();
+      }
+    }
+  };
+  // small schools of fish drifting through the ocean background, in place of the forest's bird flocks
+  R.drawFishSchool = function (ctx, camX, t, sky) {
+    ctx.fillStyle = U.rgba(U.mixHex('#1a3a42', sky.bot, 0.4), 0.75);
+    for (const f of this.fishSchools) {
+      const span = W + 500;
+      const x0 = (((t * f.sp + f.o) * span - camX * 3) % span + span) % span - 250;
+      for (let i = 0; i < f.n; i++) {
+        const row = Math.ceil(i / 2), side = i % 2 ? -1 : 1;
+        const bx = x0 - row * 20 * f.s, by = f.y + row * 14 * f.s * side + Math.sin(t * 1.1 + i) * 4;
+        const wig = Math.sin(t * 8 + i * 1.4 + f.o * 10) * 4 * f.s;
+        const len = 11 * f.s;
+        ctx.beginPath();
+        ctx.moveTo(bx - len, by);
+        ctx.quadraticCurveTo(bx - len * 0.3, by - len * 0.32, bx + len * 0.35, by);
+        ctx.quadraticCurveTo(bx - len * 0.3, by + len * 0.32, bx - len, by);
+        ctx.closePath();
+        ctx.fill();
+        // tail flicking side to side
+        ctx.beginPath();
+        ctx.moveTo(bx - len, by);
+        ctx.lineTo(bx - len * 1.5, by - len * 0.3 + wig);
+        ctx.lineTo(bx - len * 1.5, by + len * 0.3 + wig);
+        ctx.closePath();
+        ctx.fill();
       }
     }
   };
@@ -712,9 +762,21 @@
       }
       return;
     }
-    const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93', graves: '#332b22', fairground: '#5f3f2e' }[style] || '#7dbb4e';
+    const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93', graves: '#332b22', fairground: '#5f3f2e',
+      lagoon: '#0e5a68', wrecked: '#0a4048', openwater: '#083048', trench: '#04101c', shore: '#0e6a70' }[style] || '#7dbb4e';
     ctx.fillStyle = T(base);
     ctx.fillRect(x0, mb - 6, w, GY - mb + 10);
+    if (style === 'lagoon' || style === 'wrecked' || style === 'openwater' || style === 'trench' || style === 'shore') {
+      // rising bubbles drifting up through the underwater background band
+      ctx.fillStyle = 'rgba(210,250,255,0.4)';
+      for (let x = gridStart(x0, offM * BS, 34); x < x1; x += 34) {
+        const i = Math.round((x + offM * BS) / 34);
+        const bob = (t * 14 + i * 37) % 60;
+        ctx.beginPath();
+        ctx.arc(x + ((i * 11) % 20), mb + 4 - bob, 1.6 + Math.abs(i % 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
     if (style === 'forest') {
       // mossy forest floor with blueberry bushes
       ctx.fillStyle = T('#2f5528');
@@ -978,6 +1040,57 @@
       ctx.beginPath();
       ctx.ellipse(x, y + 2, 4, 6, 0, 0, Math.PI * 2);
       ctx.fill();
+    }
+  };
+
+  // ------------------------------------------------------------------ inside the whale (level 4, ocean)
+  R.drawWhale = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#1c0509');
+    g.addColorStop(1, '#3a1018');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    // the fleshy wall breathing slowly in and out
+    const breathe = Math.sin(t * 0.6) * 6;
+    for (let layer = 0; layer < 2; layer++) {
+      const off = camX * BS * (0.3 + layer * 0.25), step = 150 - layer * 26;
+      ctx.fillStyle = layer ? '#4a1620' : '#33101a';
+      const start = -((off % step) + step) % step - step;
+      for (let x = start; x < W + step; x += step) {
+        const i = Math.floor((x + off) / step);
+        const h = 100 + U.hash(i * 1.7 + layer * 9) * 150 + breathe;
+        ctx.beginPath();
+        ctx.moveTo(x - step * 0.2, GY);
+        ctx.quadraticCurveTo(x + step * 0.1, GY - h, x + step * 0.5, GY - h * (0.9 + 0.1 * U.hash(i)));
+        ctx.quadraticCurveTo(x + step * 0.9, GY - h, x + step * 1.2, GY);
+        ctx.fill();
+        // an arching rib hanging from the roof
+        const hh = 50 + U.hash(i * 2.3 + layer) * 100 + breathe;
+        ctx.fillStyle = '#e8d8c4';
+        ctx.beginPath();
+        ctx.moveTo(x + step * 0.12, 0);
+        ctx.quadraticCurveTo(x + step * 0.3, hh, x + step * 0.5, hh * 1.08);
+        ctx.quadraticCurveTo(x + step * 0.7, hh, x + step * 0.88, 0);
+        ctx.lineTo(x + step * 0.78, 0);
+        ctx.quadraticCurveTo(x + step * 0.62, hh * 0.8, x + step * 0.5, hh * 0.86);
+        ctx.quadraticCurveTo(x + step * 0.38, hh * 0.8, x + step * 0.22, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = layer ? '#4a1620' : '#33101a';
+      }
+    }
+    // bioluminescent motes drifting in the throat
+    for (let i = 0; i < 36; i++) {
+      const x = ((U.hash(i * 5.1) * W * 1.5 - camX * BS * 0.45) % (W * 1.5) + W * 1.5) % (W * 1.5) - W * 0.25;
+      const y = 30 + U.hash(i * 2.9) * 420;
+      ctx.fillStyle = 'rgba(140,255,210,' + (0.3 + 0.35 * Math.sin(t * 2 + i)) + ')';
+      ctx.fillRect(x, y, 2.5, 2.5);
+    }
+    // a slow pulse of red light, like a heartbeat felt from inside
+    const pulse = Math.max(0, Math.sin(t * 1.1)) * 0.12;
+    if (pulse > 0.01) {
+      ctx.fillStyle = 'rgba(180,20,40,' + pulse + ')';
+      ctx.fillRect(0, 0, W, GY);
     }
   };
 
@@ -1691,6 +1804,76 @@
         ctx.fillRect(x0, GY, x1 - x0, 6);
         ctx.fillStyle = 'rgba(143,243,255,0.35)';
         ctx.fillRect(x0, GY, x1 - x0, 2);
+      } else if (st === 'seabed') {
+        // sandy sea floor with coral rubble, darkening automatically with the ambient light (Art.TL)
+        ctx.fillStyle = T('#0e3a44');
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = 'rgba(0,0,0,0.16)';
+        for (let i = Math.floor(camX + x0 / BS); i <= Math.ceil(camX + x1 / BS); i++) {
+          if (i & 1) continue;
+          const x = (i - camX) * BS, a0 = Math.max(x0, x), a1 = Math.min(x1, x + BS);
+          if (a1 > a0) ctx.fillRect(a0, GY + 36, a1 - a0, BS);
+        }
+        // rubble + rocks
+        ctx.fillStyle = T('#3a6a5c');
+        for (let i = Math.floor(camX / 3 + x0 / 144) - 1; i <= Math.ceil(camX / 3 + x1 / 144); i++) {
+          const x = i * 144 - camX * BS + ((i * 53) % 60);
+          if (x < x0 - 30 || x > x1) continue;
+          Art.rr(ctx, x, GY + 24 + ((i * 17) % 60), 22, 7, 3);
+          ctx.fill();
+        }
+        ctx.fillStyle = T('#1f7a68');
+        ctx.fillRect(x0, GY, x1 - x0, 12);
+        ctx.fillStyle = T('#3fd0a8');
+        ctx.fillRect(x0, GY, x1 - x0, 4);
+        // little tufts of sand-grass / coral polyps along the edge
+        ctx.fillStyle = T('#1f7a68');
+        for (let i = Math.floor(camX * 4 + x0 / 12); i <= Math.ceil(camX * 4 + x1 / 12); i++) {
+          const x = i * 12 - camX * BS;
+          if (x >= x0 && x + 6 <= x1) {
+            ctx.beginPath();
+            ctx.ellipse(x + 3, GY + 12, 5, 3 + ((i * 7) & 3), 0, 0, Math.PI);
+            ctx.fill();
+          }
+        }
+      } else if (st === 'ribcage') {
+        // the floor of the whale's belly: pale bone ribs curving up out of dark flesh
+        ctx.fillStyle = '#2a0e14';
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = '#e8d8c4';
+        for (let i = Math.floor(camX * 2 + x0 / 30) - 1; i <= Math.ceil(camX * 2 + x1 / 30); i++) {
+          const x = i * 30 - camX * BS;
+          if (x + 10 < x0 || x > x1) continue;
+          const a0 = Math.max(x0, x), a1 = Math.min(x1, x + 12);
+          if (a1 > a0) {
+            ctx.beginPath();
+            ctx.ellipse((a0 + a1) / 2, GY + 8, (a1 - a0) / 2, 14, 0, Math.PI, 0);
+            ctx.fill();
+          }
+        }
+        ctx.fillStyle = '#6e2230';
+        ctx.fillRect(x0, GY, x1 - x0, 5);
+        ctx.fillStyle = 'rgba(255,120,150,0.4)';
+        ctx.fillRect(x0, GY, x1 - x0, 2);
+      } else if (st === 'shallows') {
+        // bright sandy shallows near the surface
+        ctx.fillStyle = T('#d8c48a');
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = 'rgba(255,255,255,0.14)';
+        for (let i = Math.floor(camX + x0 / BS); i <= Math.ceil(camX + x1 / BS); i++) {
+          if (i & 1) continue;
+          const x = (i - camX) * BS, a0 = Math.max(x0, x), a1 = Math.min(x1, x + BS);
+          if (a1 > a0) ctx.fillRect(a0, GY + 36, a1 - a0, BS);
+        }
+        ctx.fillStyle = T('#4fd8c8');
+        ctx.fillRect(x0, GY, x1 - x0, 12);
+        ctx.fillStyle = T('#c9fff0');
+        ctx.fillRect(x0, GY, x1 - x0, 4);
+        ctx.fillStyle = T('#e8dca0');
+        for (let i = Math.floor(camX * 4 + x0 / 12); i <= Math.ceil(camX * 4 + x1 / 12); i++) {
+          const x = i * 12 - camX * BS;
+          if (x >= x0 && x + 5 <= x1) ctx.fillRect(x, GY + 14, 5, 4 + ((i * 7) & 3));
+        }
       } else if (st === 'grass' || st === 'golden') {
         const top = st === 'golden' ? '#9fbf4a' : '#5fb04a', dirt = st === 'golden' ? '#7a5a36' : '#6b4a2f';
         ctx.fillStyle = T(dirt);
@@ -2227,6 +2410,55 @@
         }
         ctx.fillStyle = '#100a16';
         ctx.fillRect(x0, y - 4, x1 - x0, 4);
+      } else if (c.style === 'jelly') {
+        // a canopy of drifting jellyfish bells, glowing softly overhead
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, Art.T('#062028'));
+        g.addColorStop(1, Art.T('#0f3a44'));
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        for (let x = gridStart(x0, camX * BS, 46); x < x1 + 46; x += 46) {
+          const i = Math.round((x + camX * BS) / 46);
+          const bob = Math.sin(t * 1.4 + i) * 4;
+          const bx = U.clamp(x + 23, x0, x1), by = y - 8 + bob;
+          ctx.fillStyle = 'rgba(160,230,255,0.3)';
+          ctx.beginPath();
+          ctx.ellipse(bx, by, 16, 10, 0, Math.PI, 0);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(200,245,255,0.5)';
+          ctx.lineWidth = 1.5;
+          for (let k = -2; k <= 2; k++) {
+            ctx.beginPath();
+            ctx.moveTo(bx + k * 5, by);
+            ctx.lineTo(bx + k * 5 + Math.sin(t * 2 + i + k) * 3, by + 16 + Math.abs(k) * 2);
+            ctx.stroke();
+          }
+        }
+        ctx.fillStyle = 'rgba(150,240,255,0.4)';
+        ctx.fillRect(x0, y - 2, x1 - x0, 2);
+      } else if (c.style === 'rib') {
+        // the inside of the whale's throat: pale arching ribs against dark red flesh
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#170408');
+        g.addColorStop(1, '#3a1018');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.fillStyle = '#e8d8c4';
+        for (let x = gridStart(x0, camX * BS, 40); x < x1 + 40; x += 40) {
+          const i = Math.round((x + camX * BS) / 40);
+          const len = y - (6 + ((i * 13) % 10));
+          ctx.beginPath();
+          ctx.moveTo(U.clamp(x + 4, x0, x1), 0);
+          ctx.quadraticCurveTo(U.clamp(x + 14, x0, x1), len * 0.5, U.clamp(x + 20, x0, x1), len);
+          ctx.quadraticCurveTo(U.clamp(x + 26, x0, x1), len * 0.5, U.clamp(x + 36, x0, x1), 0);
+          ctx.lineTo(U.clamp(x + 30, x0, x1), 0);
+          ctx.quadraticCurveTo(U.clamp(x + 24, x0, x1), len * 0.4, U.clamp(x + 20, x0, x1), len * 0.5);
+          ctx.quadraticCurveTo(U.clamp(x + 16, x0, x1), len * 0.4, U.clamp(x + 10, x0, x1), 0);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255,120,150,0.45)';
+        ctx.fillRect(x0, y - 2, x1 - x0, 2);
       } else {
         // leafy canopy of the riverside trees
         const g = ctx.createLinearGradient(0, 0, 0, y);
@@ -2276,7 +2508,7 @@
         const wf = AH && AH.water && AH.water[o.style];
         if (wf) wf(ctx, x0, x1, ys, H, t);
         else Art.water(ctx, x0, x1, ys, H, t, o.style || WATER_STYLE[this.theme.ground[this.areaIn(L, o.x).id]]);
-      } else if (o.kind === 'rail') Art.rail(ctx, sx(o.x, camX), sx(o.x + o.w, camX), GY, t, this.theme.ground[this.areaIn(L, o.x).id]);
+      } else if (o.kind === 'rail') Art.rail(ctx, sx(o.x, camX), sx(o.x + o.w, camX), GY, t, o.style || this.theme.ground[this.areaIn(L, o.x).id]);
     }
     // checkpoints
     for (const cp of lvl.checkpoints) {
@@ -2312,6 +2544,8 @@
             else Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
           } else if (o.kind === 'croc') Art.crocHead(ctx, x, y, w, h, o.dir, t, o.id, glow(o.x));
           else if (o.kind === 'snapper') Art.snapper(ctx, x, y, w, h, t, o.id, glow(o.x));
+          else if (o.kind === 'shark') Art.sharkHead(ctx, x, y, w, h, o.dir, t, o.id, glow(o.x));
+          else if (o.kind === 'eel') Art.eel(ctx, x, y, w, h, t, o.id, glow(o.x));
           else if (o.kind === 'nun') {
             const mv = VD.Physics.moveOf(o, px);
             const ncx = sx(o.x + o.w / 2 + mv.dx, camX), ncy = sy(o.y + o.h / 2 + mv.dy);

@@ -58,9 +58,10 @@
       return this.add({ t: 'haz', kind: 'bird', x, y, w: 1, h: 1, style, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.25, hy1: y + 0.7, dmg: 12 });
     }
     // ---- level 2: the subway and the sewers ----
-    // a stretch of live third rail: touch it and you're out (like water)
-    rail(x, w) {
-      return this.add({ t: 'haz', kind: 'rail', x, y: 0, w, h: 0.3, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28, dmg: 10 });
+    // a stretch of live third rail: touch it and you're out (like water). `style` re-skins it visually
+    // (e.g. 'eel' for a bioluminescent eel embedded in the ocean floor) without changing the hitbox.
+    rail(x, w, style) {
+      return this.add({ t: 'haz', kind: 'rail', x, y: 0, w, h: 0.3, style, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28, dmg: 10 });
     }
     // a parked metro train: too tall to jump onto from the ground, so use a pad or a step
     train(x, w) {
@@ -81,6 +82,19 @@
     // blocks further down (15 = exactly one screen, so the two layers sit right on top of each other)
     hole(x, w, shift = 15) {
       this.drops.push({ x0: x, x1: x + w, shift, depth: 1.5 });
+    }
+    // ---- level 4 "Djupet" (the ocean): a shark lying on the sea floor and an eel darting from a hole ----
+    // a shark lying in the current. Its back is a platform, its jaws are not — same idea as croc(), a
+    // separate style so art.js can draw a shark instead of a crocodile. dir 'left': jaws face you (jump
+    // over them onto its back); 'right': land on the tail, jump off before the jaws.
+    shark(x, w, dir = 'left') {
+      const left = dir === 'left', hx = left ? x : x + w - SHARK_HEAD;
+      this.block(left ? x + SHARK_HEAD - 0.1 : x, 0, w - SHARK_HEAD + 0.1, SHARK_BACK, left ? 'sharkL' : 'sharkR');
+      return this.add({ t: 'haz', kind: 'shark', dir, x: hx, y: 0, w: SHARK_HEAD, h: 1.3, hx0: hx + (left ? 0.1 : 0.3), hx1: hx + SHARK_HEAD - (left ? 0.3 : 0.1), hy0: 0, hy1: 1.05, dmg: 12 });
+    }
+    // an eel darting straight up out of a hole in the sea floor, jaws snapping — same idea as snapper()
+    eel(x) {
+      return this.add({ t: 'haz', kind: 'eel', x, y: 0, w: 1, h: 1.8, hx0: x + 0.3, hx1: x + 0.7, hy0: 0, hy1: 1.4, dmg: 10 });
     }
     pad(x, y = 0, color = 'yellow') {
       return this.add({ t: 'pad', x: x + 0.1, y, w: 0.8, h: 0.25, color });
@@ -163,6 +177,7 @@
   }
 
   const CROC_HEAD = 1.4, CROC_BACK = 0.75;
+  const SHARK_HEAD = 1.5, SHARK_BACK = 0.85;
 
   class Level {
     constructor(b, def) {
@@ -890,6 +905,342 @@
   }
 
   // ======================================================================
+  // LEVEL 4 — Djupet (the deep). Harder than the forest, easier than the nightmare: no health bar, no
+  // age gate, no jump scares. Genuinely different tools than the forest ever touches: b.half() for low
+  // fast hops, b.shark()/b.eel() (new, croc()/snapper() reinterpreted), b.rail() reskinned as a live eel
+  // in a floor gap, and a real b.hole() layer-drop partway through the wreck that puts the rest of the
+  // level (jellyfish swarm onward) on a deeper floor — the forest never changes floors. A coral reef ->
+  // a sunken wreck that caves in -> a jellyfish swarm by ship -> straight through a whale's mouth by
+  // ball, irregular rhythm and orb-assisted flips -> the darkest, longest, tightest unbroken stretch in
+  // the deep trench -> up into the sunlit shallows.
+  // ======================================================================
+  function buildOcean() {
+    const b = new Builder();
+
+    // ============ AREAS (same six boundaries as Vilda skogen so the length matches; content is new) ============
+    b.area('reef', -60, 'KORALLREVET', 'Into the warm shallows');
+    b.area('wreck', 208, 'VRAKET', 'Down into the sunken wreck');
+    b.area('swarm', 384, 'MANETSVÄRMEN', 'Hold to swim — weave through the jellyfish!');
+    b.area('whale', 576, 'VALENS BUK', 'Tap to flip — swum right into a whale!');
+    b.area('deep', 704, 'DJUPHAVET', 'Into the darkest trench');
+    b.area('surface', 880, 'YTAN', 'Swim for the light!');
+
+    // ============ KORALLREVET (0 – 208) ============
+    b.checkpoint(0);
+    b.text(12, 4.6, 'Level 4 · Djupet', 0.55);
+    b.text(12, 3.9, 'Sea urchins are spiky too!', 0.4);
+    b.spike(22, 0, 'urchin');
+    b.half(27); // a low, fast hop — the forest never uses this
+    b.half(31);
+    b.spikes(36, 2, 0, 'urchin');
+    b.block(44, 0, 2, 1, 'coral');
+    b.spikes(46, 3); // an adjacent triple right off the coral's edge
+    b.block(52, 0, 2, 2, 'coral');
+    b.half(56);
+    b.spike(60, 0, 'urchin');
+    b.spikes(64, 3, 0, 'urchin');
+    b.pad(74);
+    // a reef shark lying in the current: its back is a platform, its jaws are not
+    b.shark(78, 5, 'left');
+    b.spikes(87, 2, 0, 'urchin');
+    // a RISING staircase of coral pillars over the current — not a flat stepping-stone hop
+    b.block(94, 0, 2, 1, 'coral');
+    b.water(96, 3, 'current');
+    b.block(99, 0, 2, 2, 'coral');
+    b.water(101, 3, 'current');
+    b.block(104, 0, 2, 3, 'coral');
+    b.water(106, 2, 'current');
+    b.block(108, 0, 2, 4, 'coral');
+    b.spikes(112, 2);
+
+    b.checkpoint(120);
+    b.text(129, 5.6, 'Stay low under the jellyfish!', 0.45);
+    b.bird(127, 1.35, 'jellyfish');
+    b.bird(128.5, 1.55, 'jellyfish');
+    b.bird(130, 1.35, 'jellyfish');
+    b.spike(136, 0, 'urchin');
+    b.half(142);
+    b.half(146);
+    b.spikes(150, 3, 0, 'urchin');
+    b.block(160, 0, 3, 1, 'coral');
+    b.spikes(163, 3);
+    b.shark(172, 5, 'right');
+    b.spikes(180, 2, 0, 'urchin');
+    b.half(186);
+    b.half(190);
+    b.spikes(194, 3, 0, 'urchin');
+    b.spikes(202, 2);
+
+    // ============ VRAKET (208 – 384) — ends with the floor caving in ============
+    b.checkpoint(208);
+    b.spikes(212, 2, 0, 'urchin');
+    // the hull deck is too tall to jump onto without the pad
+    b.pad(218);
+    b.block(222, 0, 4, 3.2, 'hull');
+    b.spikes(228, 2);
+    // a bioluminescent eel embedded in a gap in the deck — rail()'s mechanic, restyled
+    b.rail(233, 3, 'eel');
+    b.spikes(239, 2, 0, 'urchin');
+    b.block(245, 0, 3, 1, 'hull');
+    b.spikes(249, 3);
+    // a RISING bubble chain up through a cargo shaft — vertical, not the forest's flat arc
+    b.text(260, 5.8, 'Bubble shaft — ride it up!', 0.45);
+    b.spikes(258, 14);
+    b.orb(260, 2);
+    b.orb(264, 3.2);
+    b.orb(268, 4.4);
+    b.orb(271, 5.6);
+    b.block(275, 0, 3, 2, 'hull');
+
+    b.checkpoint(284);
+    b.shark(288, 5, 'left');
+    b.spikes(296, 2, 0, 'urchin');
+    b.rail(301, 3, 'eel');
+    b.pad(307);
+    b.block(311, 0, 3, 4, 'hull');
+    b.spikes(317, 3);
+    b.half(324);
+    b.half(328);
+    b.spikes(332, 2, 0, 'urchin');
+    b.shark(338, 5, 'right');
+    b.spikes(346, 3);
+    b.text(352, 5.4, 'The sea floor is giving way…', 0.45);
+    b.spike(356, 0, 'urchin');
+    // the wreck's hold gives way beneath you — everything from here on is one floor deeper
+    b.hole(364, 8, 16);
+
+    // ============ MANETSVÄRMEN — ship, on the deeper floor (384 – 576) ============
+    // small, frequent jellyfish/coral clusters instead of a few big ones — a denser weave
+    b.checkpoint(384);
+    b.spikes(386, 2, 0, 'urchin');
+    b.portal(392, 'ship', { ceil: 9 });
+    b.corridor(392, 566, 9, 'jelly');
+    b.text(396, 5.4, 'HOLD to swim — dodge the jellyfish!', 0.45);
+    b.water(398, 160, 'current');
+    b.thorny(404, 0, 1, 2, 'coralspike');
+    b.thorny(408, 7, 1, 2, 'jellytentacle');
+    b.bird(412, 4, 'jellyfish');
+    b.thorny(416, 0, 1, 2.5, 'coralspike');
+    b.thorny(420, 6.5, 1, 2.5, 'jellytentacle');
+    b.bird(425, 2.5, 'anglerfish'); // an anglerfish this early breaks the jellyfish pattern on purpose
+    b.thorny(430, 0, 1, 3, 'coralspike');
+    b.thorny(434, 6, 1, 3, 'jellytentacle');
+    b.bird(438, 4.5, 'jellyfish');
+    b.thorny(442, 0, 1, 2, 'coralspike');
+    b.thorny(446, 7, 1, 2, 'jellytentacle');
+    b.bird(450, 3, 'jellyfish');
+    b.thorny(454, 0, 1, 2.5, 'coralspike');
+    b.thorny(458, 6.5, 1, 2.5, 'jellytentacle');
+    b.bird(462, 4, 'jellyfish');
+
+    b.checkpoint(468, 'ship', 4.15, 9);
+    b.thorny(474, 0, 1, 3, 'coralspike');
+    b.thorny(478, 6, 1, 3, 'jellytentacle');
+    b.bird(482, 2.5, 'jellyfish');
+    b.thorny(486, 0, 1, 2, 'coralspike');
+    b.thorny(490, 7, 1, 2, 'jellytentacle');
+    b.bird(494, 4, 'anglerfish');
+    b.thorny(498, 0, 1, 2.5, 'coralspike');
+    b.thorny(502, 6.5, 1, 2.5, 'jellytentacle');
+    b.bird(506, 3, 'jellyfish');
+    b.thorny(510, 0, 1, 3, 'coralspike');
+    b.thorny(514, 6, 1, 3, 'jellytentacle');
+    b.thorny(519, 0, 1, 2, 'coralspike');
+    b.thorny(523, 7, 1, 2, 'jellytentacle');
+    b.bird(528, 4.5, 'jellyfish');
+    b.thorny(533, 0, 1, 2.5, 'coralspike');
+    b.thorny(537, 6.5, 1, 2.5, 'jellytentacle');
+    b.thorny(543, 0, 1, 3, 'coralspike');
+    b.thorny(547, 6, 1, 3, 'jellytentacle');
+    b.thorny(553, 0, 1, 2, 'coralspike');
+    b.thorny(557, 7, 1, 2, 'jellytentacle');
+    b.portal(566, 'cube', { y: 3 });
+
+    // ============ VALENS BUK — ball, straight through the whale's mouth (576 – 704) ============
+    b.checkpoint(576);
+    // the jaws: a row of teeth you hop over just before the whale swallows you whole
+    b.spikes(582, 3, 0, 'tooth');
+    b.portal(590, 'ball', { ceil: 6 });
+    b.corridor(590, 696, 6, 'rib');
+    b.text(596, 4.3, 'TAP to flip — through the whale!', 0.45);
+    // an IRREGULAR gut-like rhythm, not the bear cave's steady "every 5 blocks": short groups, a tight
+    // triple, orb-assisted flips through the wider gaps — the bear cave never uses orbs at all
+    b.spikes(598, 2, 0, 'rib');
+    b.spikesDown(603, 2, 6, 'rib');
+    b.spikes(608, 1, 0, 'rib');
+    b.spikesDown(611, 3, 6, 'rib');
+    b.block(617, 0, 3, 2, 'rib');
+    b.spikes(623, 3, 0, 'rib');
+    b.spikesDown(628, 2, 6, 'rib');
+    b.orb(633, 3.2);
+    b.spikesDown(635, 3, 6, 'rib');
+    b.spikes(641, 2, 0, 'rib');
+    b.block(647, 4, 3, 2, 'rib');
+    b.spikesDown(653, 2, 6, 'rib');
+    b.spikes(656, 3, 0, 'rib');
+    b.spikesDown(662, 2, 6, 'rib');
+    b.orb(667, 3.5);
+    b.spikes(669, 3, 0, 'rib');
+    b.spikesDown(675, 2, 6, 'rib');
+    b.spikes(679, 2, 0, 'rib');
+    b.spikesDown(684, 3, 6, 'rib');
+    b.spikes(690, 3, 0, 'rib');
+    b.portal(696, 'cube', { y: 2 });
+
+    // ============ DJUPHAVET (704 – 880), no checkpoint before the surface — the hardest, tightest, ============
+    // ============ longest unbroken stretch in the level ============
+    b.checkpoint(704);
+    b.text(708, 5.4, 'Into the dark deep…', 0.45);
+    b.spikes(714, 3, 0, 'urchin');
+    b.eel(721); // an eel darting out of a hole in the floor — new, the forest never has this
+    b.spikes(726, 2, 0, 'urchin');
+    b.block(732, 0, 2, 1, 'kelp');
+    b.water(734, 4, 'current');
+    b.block(738, 0, 3, 2, 'kelp');
+    b.spikes(746, 3, 0, 'urchin'); // a tight triple
+    b.shark(754, 5, 'left');
+    b.spikes(762, 3);
+    b.eel(770);
+    b.spikes(776, 3, 0, 'urchin');
+    b.orb(778, 3.4);
+    b.spikes(784, 2);
+    b.block(790, 0, 3, 2, 'glowstone');
+    b.spike(791, 2);
+    b.spikes(797, 3, 0, 'urchin');
+    b.eel(805);
+    b.spikes(810, 2);
+    b.shark(816, 5, 'right');
+    b.spikes(826, 3, 0, 'urchin'); // another tight triple, with clearance off the shark's tail
+    b.block(833, 0, 3, 2, 'glowstone');
+    b.spikes(838, 3);
+    b.eel(846);
+    b.spikes(851, 3, 0, 'urchin');
+    b.water(856, 13, 'current');
+    b.block(858, 1.5, 3, 0.5, 'kelp');
+    b.block(864, 2.5, 3, 0.5, 'kelp');
+    b.spikes(873, 3);
+
+    // ============ YTAN (880 – finish) ============
+    b.checkpoint(880);
+    b.spikes(884, 2, 0, 'urchin');
+    b.pad(890);
+    b.block(894, 0, 3, 2.5, 'dolphin');
+    b.spikes(898, 3);
+    b.spike(906, 0, 'urchin');
+    b.spikes(910, 2, 0, 'urchin');
+    b.half(916);
+    b.half(920);
+    b.spikes(924, 3);
+    b.block(932, 0, 2, 1.3, 'coral');
+    b.spikes(938, 2);
+    // a RISING bubble chain to finish — vertical, not the forest's flat arc: you're swimming for the surface
+    b.text(946, 5.8, 'Rise to the light!', 0.45);
+    b.spikes(944, 16);
+    b.orb(946, 2);
+    b.orb(950, 3.2);
+    b.orb(954, 4.4);
+    b.orb(958, 5.6);
+    b.orb(962, 6.4);
+    b.spike(968, 0, 'urchin');
+    b.spikes(974, 2, 0, 'urchin');
+    b.pad(980);
+    b.block(984, 0, 3, 2, 'coral');
+    b.spikes(989, 3);
+    b.orb(994, 2.5);
+    b.spikes(998, 2, 0, 'urchin');
+    b.spikes(1004, 3);
+    b.finish(1024);
+
+    // ============ NEAR SCENERY ============
+    const reefLife = (x0, x1, seed) => {
+      // alternate coral clumps and swaying kelp, with small ground life in between
+      const r = VD.U.rng(seed);
+      for (let x = x0; x < x1; x += 6 + Math.floor(r() * 6)) {
+        const k = r();
+        b.deco(k < 0.45 ? 'coral' : k < 0.8 ? 'kelp' : 'seaweed', x);
+        const g = r();
+        if (g < 0.7) b.deco(g < 0.35 ? 'starfish' : 'bubbles', x + 2 + Math.floor(r() * 2));
+      }
+    };
+    b.deco('trailsign', 4, { text: 'Djupet' });
+    reefLife(10, 44, 111);
+    b.deco('fishschool', 46);
+    reefLife(62, 100, 112);
+    b.deco('starfish', 101);
+    b.deco('fishschool', 134);
+    reefLife(140, 166, 113);
+    b.deco('bubbles', 171);
+    b.deco('fishschool', 178);
+    b.deco('bubbles', 184);
+    reefLife(206, 240, 114);
+    b.deco('octopus', 241);
+    b.deco('fishschool', 250);
+    reefLife(266, 276, 115);
+    b.deco('porthole', 278);
+    reefLife(286, 330, 116);
+    b.deco('octopus', 348);
+    reefLife(352, 372, 117);
+    b.deco('trailsign', 381, { text: 'Manetsvärmen' });
+    b.deco('bubbles', 388);
+    for (let x = 398; x < 556; x += 13) b.deco('bubbles', x + (x % 3));
+    for (const x of [408, 446, 482, 520, 546]) b.deco('fishschool', x);
+    b.deco('bioglow', 552, { inside: true });
+    // inside the whale
+    b.deco('bioglow', 610, { inside: true });
+    b.deco('bioglow', 648, { inside: true });
+    b.deco('bioglow', 686, { inside: true });
+    b.deco('bubbles', 712);
+    reefLife(716, 720, 118);
+    b.deco('bubbles', 727);
+    b.deco('bioglow', 741);
+    b.deco('fishschool', 751);
+    reefLife(756, 790, 119);
+    b.deco('bioglow', 792);
+    b.deco('starfish', 809);
+    reefLife(812, 836, 120);
+    b.deco('bioglow', 838);
+    reefLife(846, 874, 121);
+    b.deco('trailsign', 878, { text: 'Ytan' });
+    b.deco('seaweed', 881);
+    b.deco('kelp', 886);
+    b.deco('fishschool', 910.5);
+    b.deco('kelp', 922);
+    b.deco('starfish', 930.5);
+    b.deco('fishschool', 942);
+    b.deco('kelp', 958);
+    b.deco('coral', 970);
+    b.deco('seaweed', 988);
+    b.deco('bubbles', 996);
+    b.deco('finish', 1024);
+
+    // ============ MID-LAYER LANDMARKS ============
+    b.landmark('reeftower', 22);
+    b.landmark('kelpforest', 64);
+    b.landmark('reeftower', 104);
+    b.landmark('kelpforest', 168);
+    b.landmark('reeftower', 216);
+    b.landmark('shipwreck', 262);
+    b.landmark('reeftower', 300);
+    b.landmark('kelpforest', 352);
+    b.landmark('kelpforest', 404);
+    b.landmark('kelpforest', 446);
+    // the whale looms well before its mouth, out in the current
+    b.landmark('whale', 492);
+    b.landmark('kelpforest', 526);
+    b.landmark('kelpforest', 566);
+    b.landmark('kelpforest', 716);
+    b.landmark('reeftower', 764);
+    b.landmark('kelpforest', 806);
+    b.landmark('reeftower', 850);
+    b.landmark('reeftower', 902);
+    b.landmark('kelpforest', 940);
+    b.landmark('reeftower', 978);
+    b.landmark('kelpforest', 1010);
+
+    return b;
+  }
+
+  // ======================================================================
   // LEVEL 2 — Tunnelbanan (the Stockholm subway). The step up after level 1: surf the
   // parked trains over the live rail, fly through the tunnel, and halfway through the floor caves in and
   // you drop into the sewers, where crocodiles lurk in the dirty water.
@@ -1497,6 +1848,33 @@
     flocks: true, // flocks of birds crossing the sky
     song: 'forest',
   };
+  const OCEAN_THEME = {
+    // a dive down and back up: bright turquoise shallows -> dimmer wreck & current -> near-black in the
+    // whale and the trench -> back up into golden-turquoise light at the surface
+    sky: [
+      { x: -100, top: '#0e6f8a', bot: '#4fd0d6', far: '#0a4a5c', dark: 0.05, sun: 0.2 },
+      { x: 200, top: '#0a5878', bot: '#3aa8ba', far: '#0a4050', dark: 0.15, sun: 0.32 },
+      { x: 380, top: '#083a56', bot: '#256f8a', far: '#082e40', dark: 0.32, sun: 0.44 },
+      { x: 560, top: '#041c30', bot: '#123c52', far: '#041824', dark: 0.5, sun: 0.58 },
+      { x: 620, top: '#020814', bot: '#0a1c2c', far: '#020810', dark: 0.72, sun: 0.7 },
+      { x: 720, top: '#020610', bot: '#081824', far: '#020610', dark: 0.78, sun: 0.75 },
+      { x: 860, top: '#04283c', bot: '#0e4a5e', far: '#03202e', dark: 0.5, sun: 0.6 },
+      { x: 960, top: '#0d6a82', bot: '#5adcd0', far: '#0a4a54', dark: 0.18, sun: 0.34 },
+      { x: 1100, top: '#12a0b0', bot: '#8ff0d8', far: '#0e6a70', dark: 0.04, sun: 0.16 },
+    ],
+    field: { reef: 'lagoon', wreck: 'wrecked', swarm: 'openwater', whale: 'trench', deep: 'trench', surface: 'shore' },
+    ground: { reef: 'seabed', wreck: 'seabed', swarm: 'seabed', whale: 'ribcage', deep: 'seabed', surface: 'shallows' },
+    glow: { reef: '#bdfff2', wreck: '#8fe0ea', swarm: '#7fd8ff', whale: '#ff9ab0', deep: '#6fe0ff', surface: '#fff6c4' },
+    far: { default: 'reef' },
+    farExtra: [],
+    midFill: { whale: null, default: 'kelp' },
+    midStep: [3, 5],
+    indoor: { whale: 'whale' },
+    beams: ['reef'], // sunbeams slanting down through the shallows
+    mist: ['deep'], // murky haze in the trench
+    fish: true, // schools of fish drifting across the background, instead of bird flocks
+    song: 'ocean',
+  };
   const METRO_THEME = {
     // you only see the sky at the start (Sergels torg in the afternoon) and at the end (Riddarfjärden at sunset)
     sky: [
@@ -1565,7 +1943,14 @@
       build: buildForest, theme: FOREST_THEME,
     },
     {
-      id: 'nightmare', num: 4, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
+      id: 'ocean', num: 4, name: 'Djupet', route: 'Korallrevet › Manetsvärmen › Valens buk › Ytan',
+      difficulty: 4, diffName: 'Very Hard', reward: 200,
+      winTitle: 'Djupets mästare!',
+      winSub: 'Past the urchins, through the wreck, over the current, straight through a whale and up into the light.',
+      build: buildOcean, theme: OCEAN_THEME,
+    },
+    {
+      id: 'nightmare', num: 5, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
       difficulty: 5, diffName: 'Nightmare', reward: 250, health: 135, age: 16, strobe: true,
       winTitle: 'Du överlevde natten!',
       winSub: 'Past the graves, the bloody nuns, the catacombs and the clowns, and out before the bell struck one.',
