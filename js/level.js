@@ -2008,18 +2008,15 @@
     b.spikes(1048, 2, 0);
     b.spike(1052, 0);
 
-    // ============ KLOCKTORNET (1056 – 1120), no checkpoint — the hardest cube stretch ============
-    b.block(1056, 0, 2, 1, 'tomb');
-    b.spikes(1060, 2, 0, 'fence');
-    b.block(1065, 0, 2, 1, 'tomb');
-    b.spikes(1068, 3, 0, 'fence'); // tight triple
-    b.nun(1076, 1.2, { bob: 1.0, beats: 4, phase: 0.5 }); // down
-    b.jack(1084, { beats: 2, phase: 0.8, rise: 0.8 }); // open — jump clear over
-    b.spikes(1090, 5);
-    b.orb(1092, 2); // an orb over the spike row
-    b.spikes(1100, 2, 0, 'fence');
-    b.block(1108, 0, 2, 1, 'tomb');
-    b.spikes(1112, 2, 0, 'fence'); // last tight spot before the finish
+    // ============ KLOCKTORNET (1056 – 1120), no checkpoint — a plain run of single, double and triple spikes ============
+    b.spikes(1060, 3, 0, 'fence');
+    b.spikes(1068, 2, 0, 'fence');
+    b.spike(1075, 0, 'fence');
+    b.spikes(1082, 3, 0, 'fence');
+    b.spikes(1090, 2, 0, 'fence');
+    b.spike(1097, 0, 'fence');
+    b.spikes(1104, 3, 0, 'fence');
+    b.spikes(1112, 2, 0, 'fence');
     b.finish(1120);
     b.scare(1126, 'final');
 
