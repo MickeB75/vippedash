@@ -20,11 +20,5 @@ desktop.ini
 shots/
 __pycache__/
 
-# Private photos and map for planning the Stratusvägen level (only the plan is tracked)
-stratusvagen-plan/foton/
-stratusvagen-plan/*.zip
-stratusvagen-plan/*.png
-stratusvagen-plan/ref-66/
-stratusvagen-plan/ref-62/
-stratusvagen-plan/ref-50/
-stratusvagen-plan/ref-15/
+# Planning notes, photos and reference pictures for the Stratusvägen level (local only)
+stratusvagen-plan/
