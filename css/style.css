@@ -244,6 +244,7 @@ html, body {
 .rline { display: flex; justify-content: space-between; font-size: calc(var(--u) * 20px); color: #dfe8ff; }
 .rline b { font-weight: normal; color: #ffd634; }
 .rline.none b { color: #8a93a8; }
+.rline.unlocked { justify-content: center; color: #ff6a7a; }
 .rtotal { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 10px); margin-top: calc(var(--u) * 4px); font-size: calc(var(--u) * 34px); color: #ffd634; }
 .rtotal .coin { width: calc(var(--u) * 32px); height: calc(var(--u) * 32px); }
 .rtotal span { font-size: calc(var(--u) * 18px); color: #aab6d8; }

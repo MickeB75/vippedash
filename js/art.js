@@ -55,7 +55,8 @@
   // =====================================================================
   // CHARACTER — Vippe: curly brown hair, blue-grey eyes, big goofy faces
   // =====================================================================
-  // price 0 = owned from the start; the rest are bought in the shop with coins
+  // price 0 = owned from the start; the rest are bought in the shop with coins; a skin
+  // with `unlock: '<levelId>'` instead of a price is unlocked by beating that level
   Art.SKINS = {
     red: { name: 'Red jersey', main: '#d3122f', dark: '#6e0716', trim: '#ffffff', price: 0 },
     black: { name: 'Black hoodie', main: '#2a2a31', dark: '#0b0b0f', trim: '#dcdcdc', frame: '#e8e8e8', price: 0 },
@@ -70,11 +71,11 @@
     galaxy: { name: 'Galaxy', main: '#2d1b66', dark: '#0a0622', trim: '#c8b8ff', frame: '#b69cff', pattern: 'stars', hat: 'orbit', price: 800 },
     rainbow: { name: 'Rainbow', main: '#ff4d4d', dark: '#402060', trim: '#ffffff', pattern: 'rainbow', hat: 'propeller', price: 1000 },
     gold: { name: 'King Vippe', main: '#f2c230', dark: '#7a5200', trim: '#fff6c8', pattern: 'gold', hat: 'crown', price: 1500 },
+    scary: { name: 'Scary Vippe', main: '#15111c', dark: '#050308', trim: '#e8e0c8', frame: '#7a0010', pattern: 'scary', hat: 'horns', unlock: 'nightmare' },
     // ---- Affelito (char: 'affelito'): the trucker cap is his thing, so most of his skins come with one ----
     afTee: { char: 'affelito', name: 'Black tee', main: '#1c1c22', dark: '#050507', trim: '#ffffff', pattern: 'sleeves', hat: 'cap', cap: { front: '#c9a46b', mesh: '#1f2b47', brim: '#b58f58', badge: 'patch' }, price: 0 },
     afHoodie: { char: 'affelito', name: 'Grey hoodie', main: '#d6d6d1', dark: '#6f6f6a', trim: '#f4f4f0', frame: '#8a8a86', pattern: 'hoodie', hat: 'cap', cap: { front: '#22304f', mesh: '#22304f', brim: '#22304f', badge: 'star' }, price: 0 },
     afFleece: { char: 'affelito', name: 'Blue fleece', main: '#1ea2d8', dark: '#0b4f73', trim: '#e23a3a', pattern: 'fleece', hat: 'cap', cap: { front: '#f4f4f4', mesh: '#1b1b20', brim: '#1b1b20', badge: 'bolt' }, price: 0 },
-    afCamo: { char: 'affelito', name: 'Pixel camo', main: '#5a7a3c', dark: '#1f2a17', trim: '#c9ccd2', pattern: 'pixel', hat: 'patchwork', price: 150 },
     afCowboy: { char: 'affelito', name: 'Cowboy', main: '#c07a36', dark: '#4a2a10', trim: '#f2e3c2', pattern: 'sheriff', hat: 'cowboy', price: 200 },
     afNinja: { char: 'affelito', name: 'Ninja', main: '#26262e', dark: '#0a0a0e', trim: '#d3122f', frame: '#d3122f', pattern: 'ninja', hat: 'headband', price: 300 },
     afPirate: { char: 'affelito', name: 'Pirate', main: '#c62a2a', dark: '#4a0c0c', trim: '#f2d27a', pattern: 'sailor', hat: 'tricorn', price: 350 },
@@ -85,6 +86,7 @@
     afDragon: { char: 'affelito', name: 'Dragon', main: '#2fa05a', dark: '#0f3d22', trim: '#ffd34d', pattern: 'scales', hat: 'dragon', noHair: true, price: 1000 },
     afFire: { char: 'affelito', name: 'Fire', main: '#b3200f', dark: '#3a0603', trim: '#ffd23a', frame: '#ff8a1f', pattern: 'fire', hat: 'flames', noHair: true, price: 1500 },
     afDiamond: { char: 'affelito', name: 'Diamond', main: '#7fdcff', dark: '#1a4f7a', trim: '#ffffff', frame: '#bff2ff', pattern: 'diamond', hat: 'cap', cap: { front: '#eafcff', mesh: '#8fe3ff', brim: '#bff2ff', badge: 'gem' }, price: 2000 },
+    afScary: { char: 'affelito', name: 'Scary Affelito', main: '#efe9dc', dark: '#241d24', trim: '#c0081a', frame: '#6a1a8a', pattern: 'clown', hat: 'cap', cap: { front: '#2a0a0a', mesh: '#161616', brim: '#4a0a0a', badge: 'skull', clownHair: true }, unlock: 'nightmare' },
   };
   // =====================================================================
   // CHARACTERS — everything that differs between playable characters lives here.
@@ -137,13 +139,6 @@
   const CAMO = [
     [-0.42, -0.3, 0.2, 0.13, 0], [0.38, -0.36, 0.18, 0.12, 1], [-0.44, 0.18, 0.16, 0.2, 2], [0.42, 0.12, 0.17, 0.21, 0],
     [-0.1, 0.46, 0.24, 0.1, 1], [0.26, 0.44, 0.14, 0.09, 2], [-0.36, 0.44, 0.1, 0.08, 0], [0.46, -0.05, 0.08, 0.1, 2],
-  ];
-  // [x, y, w, h, colour] blocks for Affelito's pixel camo
-  const PIXEL = [
-    [-0.5, -0.5, 0.14, 0.12, 0], [-0.5, -0.22, 0.1, 0.16, 1], [-0.46, 0.02, 0.12, 0.1, 3], [-0.5, 0.2, 0.14, 0.12, 2],
-    [0.36, -0.46, 0.14, 0.1, 1], [0.4, -0.2, 0.1, 0.14, 3], [0.36, 0.04, 0.14, 0.12, 2], [0.4, 0.26, 0.1, 0.12, 0],
-    [-0.36, 0.38, 0.16, 0.12, 0], [-0.12, 0.4, 0.12, 0.1, 2], [0.06, 0.38, 0.14, 0.12, 4], [0.24, 0.4, 0.12, 0.1, 3],
-    [-0.5, 0.38, 0.1, 0.12, 4], [0.44, -0.04, 0.06, 0.06, 0], [-0.4, -0.34, 0.06, 0.08, 2],
   ];
   const RAINBOW = ['#ff4d4d', '#ff9a2e', '#ffe23a', '#4fd65a', '#3aa8ff', '#8a5cff'];
   // body pattern, drawn clipped to the rounded cube
@@ -235,6 +230,55 @@
         ctx.fill();
         break;
       }
+      case 'scary': {
+        // his face covers x ±0.36, y -0.3..0.38, so only the side edges and the chin strip
+        // show — bones hug the very edge (x > 0.36s) and blood hangs off the chin (y > 0.38s)
+        // so neither gets clipped away, and everything is sized to still read at 56px there
+        const glowA = 0.5 + 0.5 * Math.sin(now * 3);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,20,40,' + (0.45 + 0.4 * glowA).toFixed(2) + ')';
+        ctx.lineWidth = s * 0.06;
+        ctx.shadowColor = '#ff1428';
+        ctx.shadowBlur = s * 0.18;
+        rr(ctx, -h + s * 0.02, -h + s * 0.02, s - s * 0.04, s - s * 0.04, s * 0.14);
+        ctx.stroke();
+        ctx.restore();
+        // chunky bone-white segments stacked down each visible side edge, upright so they
+        // stay clear of the face instead of reaching under it
+        const boneMain = '#f2ecd6', boneDark = '#8a8270';
+        for (const sd of [-1, 1]) {
+          for (let i = 0; i < 4; i++) {
+            const y = (-0.4 + i * 0.24) * s, x = sd * 0.455 * s;
+            ctx.fillStyle = boneMain;
+            rr(ctx, x - 0.05 * s, y - 0.09 * s, 0.1 * s, 0.18 * s, 0.045 * s);
+            ctx.fill();
+            ctx.lineWidth = s * 0.02;
+            ctx.strokeStyle = boneDark;
+            ctx.stroke();
+            for (const ey of [-0.09, 0.09]) {
+              circle(ctx, x, y + ey * s, 0.058 * s);
+              ctx.fillStyle = boneMain;
+              ctx.fill();
+              ctx.stroke();
+            }
+          }
+        }
+        // big blood drips hanging off the chin, the one strip that's always fully visible
+        ctx.fillStyle = '#f2001f';
+        const drips = [[-0.34, 0], [-0.1, 0.55], [0.14, 0.2], [0.36, 0.8]];
+        for (const [dx, ph] of drips) {
+          const topY = 0.32 * s;
+          const cycle = (now * 0.24 + ph) % 1.7;
+          const len = Math.min(cycle, 1) * 0.4 * s;
+          rr(ctx, dx * s - 0.044 * s, topY, 0.088 * s, len, 0.04 * s);
+          ctx.fill();
+          if (cycle < 1) {
+            circle(ctx, dx * s, topY + len, 0.065 * s);
+            ctx.fill();
+          }
+        }
+        break;
+      }
       // ---- Affelito ---- (his face covers x ±0.36, y -0.38..0.38, so patterns show at the sides and the hem)
       case 'sleeves':
         // three white stripes down each side, like his football shirt
@@ -267,13 +311,6 @@
         }
         ctx.setLineDash([]);
         ctx.globalAlpha = 1;
-        break;
-      case 'pixel':
-        // blocky camo, like his old rain jacket
-        for (const [x, y, w, hh, c] of PIXEL) {
-          ctx.fillStyle = ['#2f4a22', '#8fa36a', '#c9ccd2', '#1c2414', '#6f8750'][c];
-          ctx.fillRect(x * s, y * s, w * s, hh * s);
-        }
         break;
       case 'sheriff':
         // leather vest and a sheriff's star
@@ -418,6 +455,36 @@
         ctx.lineTo((p + 0.15) * s * 2, -h);
         ctx.lineTo(p * s * 2, -h);
         ctx.fill();
+        break;
+      }
+      case 'clown': {
+        // big dirty white/purple harlequin diamonds — sized so a whole diamond (not a sliver)
+        // still lands on the visible edges at 56px — plus blood splatter and a ruffled collar,
+        // the circus killer clowns from Mardrömmen
+        for (let r = -2; r <= 2; r++) {
+          for (let c = -2; c <= 2; c++) {
+            ctx.save();
+            ctx.translate(c * s * 0.32, r * s * 0.32);
+            ctx.rotate(Math.PI / 4);
+            ctx.fillStyle = (r + c) % 2 === 0 ? '#f2ece0' : '#6a1a8a';
+            ctx.fillRect(-s * 0.17, -s * 0.17, s * 0.34, s * 0.34);
+            ctx.strokeStyle = 'rgba(15,8,20,0.4)';
+            ctx.lineWidth = s * 0.012;
+            ctx.strokeRect(-s * 0.17, -s * 0.17, s * 0.34, s * 0.34);
+            ctx.restore();
+          }
+        }
+        ctx.fillStyle = '#e8001f';
+        for (let i = 0; i < 6; i++) {
+          const x = (U.hash(i * 4.3) - 0.5) * s, y = (U.hash(i * 8.9) - 0.5) * s;
+          circle(ctx, x, y, s * (0.03 + 0.035 * U.hash(i * 2.1)));
+          ctx.fill();
+        }
+        ctx.fillStyle = k.trim; // ruffled collar
+        for (let i = -3; i <= 3; i++) {
+          circle(ctx, i * s * 0.15, 0.42 * s, s * 0.09);
+          ctx.fill();
+        }
         break;
       }
       default:
@@ -653,38 +720,45 @@
         });
         break;
       }
+      case 'horns': {
+        // big glowing devil-red horns curling back from the forehead, well clear of the eyes —
+        // bright red (not brown) with a pulsing glow so they pop against the curly hair at 48-56px
+        const glow = 0.5 + 0.5 * Math.sin(now * 3.2);
+        for (const sd of [-1, 1]) {
+          ctx.save();
+          ctx.shadowColor = '#ff1a2e';
+          ctx.shadowBlur = s * (0.12 + 0.09 * glow);
+          ctx.beginPath();
+          ctx.moveTo(sd * 0.14 * s, -0.54 * s);
+          ctx.quadraticCurveTo(sd * 0.42 * s, -0.76 * s, sd * 0.27 * s, -1.1 * s);
+          ctx.quadraticCurveTo(sd * 0.16 * s, -0.86 * s, sd * 0.05 * s, -0.6 * s);
+          ctx.closePath();
+          ctx.fillStyle = '#d3122f';
+          ctx.fill();
+          ctx.lineWidth = s * 0.032;
+          ctx.strokeStyle = '#3a0008';
+          ctx.stroke();
+          ctx.restore();
+          // lighter highlight stripe down the outer curve
+          ctx.beginPath();
+          ctx.moveTo(sd * 0.22 * s, -0.62 * s);
+          ctx.quadraticCurveTo(sd * 0.35 * s, -0.8 * s, sd * 0.24 * s, -1.02 * s);
+          ctx.lineWidth = s * 0.02;
+          ctx.strokeStyle = 'rgba(255,160,160,0.85)';
+          ctx.lineCap = 'round';
+          ctx.stroke();
+          // blood welling up and dripping off the tip
+          const drip = Math.abs(Math.sin(now * 1.6 + sd));
+          ctx.fillStyle = '#7a0010';
+          circle(ctx, sd * 0.27 * s, -1.1 * s + drip * 0.08 * s, 0.045 * s);
+          ctx.fill();
+        }
+        break;
+      }
       // ---- Affelito ----
       case 'cap':
         truckerCap(ctx, s, k.cap, now);
         break;
-      case 'patchwork': {
-        // dark beanie covered in colourful patches
-        ctx.beginPath();
-        ctx.moveTo(-0.54 * s, -0.42 * s);
-        ctx.bezierCurveTo(-0.56 * s, -1.14 * s, 0.56 * s, -1.14 * s, 0.54 * s, -0.42 * s);
-        ctx.closePath();
-        ctx.fillStyle = '#34363d';
-        ctx.fill();
-        ctx.save();
-        ctx.clip();
-        for (const [x, y, c, r] of PATCHES) {
-          ctx.save();
-          ctx.translate(x * s, y * s);
-          ctx.rotate(r);
-          ctx.fillStyle = c;
-          ctx.fillRect(-0.065 * s, -0.05 * s, 0.13 * s, 0.1 * s);
-          ctx.restore();
-        }
-        ctx.restore();
-        ctx.lineWidth = s * 0.03;
-        ctx.strokeStyle = '#15161a';
-        ctx.stroke();
-        rr(ctx, -0.56 * s, -0.52 * s, 1.12 * s, 0.15 * s, 0.05 * s);
-        ctx.fillStyle = '#2a2c32';
-        ctx.fill();
-        ctx.stroke();
-        break;
-      }
       case 'cowboy': {
         ctx.beginPath();
         ctx.moveTo(-0.34 * s, -0.48 * s);
@@ -978,14 +1052,36 @@
         break;
     }
   }
-  const PATCHES = [
-    [-0.4, -0.62, '#f2f2f2', 0.2], [-0.2, -0.78, '#e0873a', -0.3], [0.04, -0.66, '#9aa7b5', 0.1], [0.26, -0.8, '#d9443a', 0.4],
-    [0.42, -0.6, '#e8d9b0', -0.2], [-0.06, -0.9, '#4fb3a9', 0.3], [0.18, -0.58, '#f2f2f2', -0.4], [-0.28, -0.52, '#c96b3a', 0.5],
-    [-0.44, -0.8, '#6a8fb5', -0.1], [0.44, -0.84, '#f2f2f2', 0.2], [0.1, -1.0, '#e0873a', 0],
-  ];
   // Affelito's trucker cap, seen from the front: mesh back, foam front panel with a badge, curved peak.
-  // c = { front, mesh, brim, badge: 'patch' | 'star' | 'bolt' | 'modo' | 'gem' }
+  // c = { front, mesh, brim, badge: 'patch' | 'star' | 'bolt' | 'modo' | 'gem' | 'skull', clownHair? }
   function truckerCap(ctx, s, c, now) {
+    if (c.clownHair) {
+      // frizzy killer-clown hair tufts bursting out from under the cap on both sides — the
+      // orange used for the clowns' hair in js/horror.js — big enough to read past the cap at 56px
+      const tuftMain = '#d4530f', tuftDark = '#7a2c05', tuftLight = '#ff9a4a';
+      const puffs = [[-0.07, -0.6, 0.16], [0.1, -0.46, 0.18], [-0.02, -0.3, 0.17], [0.12, -0.14, 0.14], [-0.1, -0.04, 0.13]];
+      for (const sd of [-1, 1]) {
+        const cx = sd * 0.63 * s;
+        for (const [ox, oy, r] of puffs) {
+          circle(ctx, cx + sd * ox * s, oy * s, r * s + s * 0.028);
+          ctx.fillStyle = tuftDark;
+          ctx.fill();
+        }
+        for (const [ox, oy, r] of puffs) {
+          circle(ctx, cx + sd * ox * s, oy * s, r * s);
+          ctx.fillStyle = tuftMain;
+          ctx.fill();
+        }
+        ctx.strokeStyle = tuftLight;
+        ctx.lineCap = 'round';
+        ctx.lineWidth = s * 0.03;
+        for (const [ox, oy, r] of puffs) {
+          ctx.beginPath();
+          ctx.arc(cx + sd * ox * s - r * s * 0.15, oy * s - r * s * 0.1, r * s * 0.55, Math.PI * 1.05, Math.PI * 1.75);
+          ctx.stroke();
+        }
+      }
+    }
     const crown = (x0, x1, top) => {
       ctx.beginPath();
       ctx.moveTo(x0 * s, -0.5 * s);
@@ -1094,6 +1190,38 @@
         ctx.stroke();
         break;
       }
+      case 'skull': {
+        // bone-white skull with pulsing, glowing red eyes
+        ctx.fillStyle = '#f2f0e6';
+        circle(ctx, 0, by - 0.03 * s, 0.1 * s);
+        ctx.fill();
+        rr(ctx, -0.065 * s, by + 0.01 * s, 0.13 * s, 0.08 * s, 0.02 * s);
+        ctx.fill();
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = s * 0.012;
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(i * 0.042 * s, by + 0.02 * s);
+          ctx.lineTo(i * 0.042 * s, by + 0.09 * s);
+          ctx.stroke();
+        }
+        const glow = 0.5 + 0.5 * Math.sin(now * 4);
+        ctx.save();
+        ctx.shadowColor = '#ff1414';
+        ctx.shadowBlur = s * (0.1 + 0.09 * glow);
+        ctx.fillStyle = 'rgba(255,20,20,' + (0.5 + 0.4 * glow).toFixed(2) + ')';
+        for (const sdx of [-0.035, 0.035]) {
+          circle(ctx, sdx * s, by - 0.04 * s, 0.03 * s);
+          ctx.fill();
+        }
+        ctx.restore();
+        ctx.fillStyle = '#1a1a1a';
+        for (const sdx of [-0.035, 0.035]) {
+          circle(ctx, sdx * s, by - 0.04 * s, 0.014 * s);
+          ctx.fill();
+        }
+        break;
+      }
     }
     // the peak
     ctx.beginPath();
@@ -1131,6 +1259,17 @@
         ctx.closePath();
         ctx.fill();
       }
+    }
+    if (c.badge === 'skull') {
+      // blood splattered across the brim, with one drip slowly lengthening off the edge
+      ctx.fillStyle = '#e8001f';
+      circle(ctx, -0.2 * s, -0.28 * s, 0.05 * s);
+      ctx.fill();
+      circle(ctx, 0.28 * s, -0.32 * s, 0.032 * s);
+      ctx.fill();
+      const drip = ((now * 0.35) % 1) * 0.13 * s;
+      rr(ctx, -0.215 * s, -0.28 * s, 0.03 * s, 0.08 * s + drip, 0.015 * s);
+      ctx.fill();
     }
   }
   // flickering flames instead of hair (Fire skin)

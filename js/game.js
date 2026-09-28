@@ -29,8 +29,9 @@
     G.coins = store.get('coins', 0);
     G.owned = store.get('owned', []);
     G.skin = store.get('skin', 'red');
+    G.progress = loadProgress(); // before owns(): level-unlocked skins need it
+    refundRemovedSkins();
     if (!Art.SKINS[G.skin] || !owns(G.skin)) G.skin = 'red';
-    G.progress = loadProgress();
     AU.muted = store.get('muted', false);
     G.strobeOn = store.get('strobe', true);
     G.debug = /debug/.test(location.hash + location.search);
@@ -70,8 +71,20 @@
   function saveProgress() {
     store.set('progress', G.progress);
   }
+  // skins with `unlock: '<levelId>'` can't be bought: they're yours once you've beaten that level
   function owns(id) {
-    return Art.SKINS[id].price === 0 || G.owned.indexOf(id) >= 0;
+    const k = Art.SKINS[id];
+    if (k.unlock) return G.progress[k.unlock].wins > 0;
+    return k.price === 0 || G.owned.indexOf(id) >= 0;
+  }
+  // skins taken out of the shop give their coins back to anyone who had bought them
+  const REMOVED_SKINS = { afCamo: 150 };
+  function refundRemovedSkins() {
+    const gone = G.owned.filter((id) => REMOVED_SKINS[id]);
+    if (!gone.length) return;
+    for (const id of gone) addCoins(REMOVED_SKINS[id]);
+    G.owned = G.owned.filter((id) => !REMOVED_SKINS[id]);
+    store.set('owned', G.owned);
   }
   function addCoins(n) {
     G.coins = Math.max(0, G.coins + n);
@@ -453,7 +466,7 @@
       G.skin = id;
       store.set('skin', id);
       AU.sfx('click');
-    } else if (G.coins >= k.price) {
+    } else if (!k.unlock && G.coins >= k.price) {
       addCoins(-k.price);
       G.owned.push(id);
       store.set('owned', G.owned);
@@ -483,14 +496,16 @@
     for (const b of document.querySelectorAll('.card')) {
       const id = b.dataset.skin, k = Art.SKINS[id], mine = owns(id);
       b.classList.toggle('hidden', b.dataset.char !== G.shopTab);
-      const state = id === G.skin ? 'wearing' : mine ? 'owned' : G.coins >= k.price ? 'buy' : 'locked';
+      const state = id === G.skin ? 'wearing' : mine ? 'owned' : !k.unlock && G.coins >= k.price ? 'buy' : 'locked';
       b.classList.remove('wearing', 'owned', 'buy', 'locked');
       b.classList.add(state);
       const btn = b.querySelector('.cbtn');
+      const lvl = k.unlock && VD.levelDef(k.unlock);
       if (state === 'wearing') btn.textContent = '✓ Wearing';
       else if (state === 'owned') btn.textContent = 'Wear';
+      else if (lvl) btn.textContent = '🔒 Level ' + lvl.num; // the full "Beat level 6 Mardrömmen" is too long for the button
       else btn.innerHTML = '<i class="coin"></i>' + k.price;
-      b.title = state === 'locked' ? 'You need ' + (k.price - G.coins) + ' more coins' : k.name;
+      b.title = state !== 'locked' ? k.name : lvl ? 'Beat level ' + lvl.num + ' ' + lvl.name + ' to unlock' : 'You need ' + (k.price - G.coins) + ' more coins';
     }
   }
   // skin previews are redrawn every frame while the shop is open, so rainbow / gold / galaxy shimmer
@@ -700,6 +715,7 @@
       line('Level ' + def.num + ' cleared (' + def.diffName + ')', r.base) +
       line(G.deaths === 0 ? 'No crashes — perfect run!' : 'Crash bonus (' + G.deaths + (G.deaths === 1 ? ' crash' : ' crashes') + ')', r.bonus) +
       (r.first ? line('First time beating this level!', r.first) : '') +
+      (r.first ? unlockedLine(def.id) : '') +
       '<div class="rtotal"><i class="coin"></i><b id="rewardTotal">+0</b><span id="rewardNow"></span></div>';
     const hasNext = VD.LEVELS.indexOf(def) + 1 < VD.LEVELS.length;
     $('next').classList.toggle('hidden', !hasNext);
@@ -708,6 +724,11 @@
     if (VD.Board) VD.Board.renderWin(def.id);
     // count the coins up
     G.countUp = { shown: 0, t: 0 };
+  }
+  // "🔓 Unlocked: Scary Vippe & Scary Affelito" under the reward, for the skins this level unlocks
+  function unlockedLine(levelId) {
+    const names = Object.keys(Art.SKINS).filter((id) => Art.SKINS[id].unlock === levelId).map((id) => Art.SKINS[id].name);
+    return names.length ? '<div class="rline unlocked"><span>🔓 Unlocked: ' + names.join(' & ') + '</span></div>' : '';
   }
   function updateCountUp(dt) {
     const c = G.countUp;

@@ -123,7 +123,7 @@ So a harder level and fewer crashes give more coins. The coin total is shown at 
 
 The shop has two tabs, one per character. The shop opens on the tab of the character you are wearing.
 
-**Vippe** (curly brown hair) has 13 skins. Red jersey, black hoodie and blue & black are free. The others cost coins:
+**Vippe** (curly brown hair) has 14 skins. Red jersey, black hoodie and blue & black are free. The last one is unlocked by beating level 6 Mardrömmen. The others cost coins:
 
 | Skin | Coins | | Skin | Coins |
 | --- | --- | --- | --- | --- |
@@ -132,17 +132,20 @@ The shop has two tabs, one per character. The shop opens on the tab of the chara
 | Fox (fox ears) | 300 | | Galaxy (orbiting stars) | 800 |
 | Tiger (ears and whiskers) | 350 | | Rainbow (propeller cap) | 1000 |
 | Moose (antlers) | 400 | | King Vippe (gold crown) | 1500 |
+| | | | Scary Vippe (devil horns, bones and blood) | beat Mardrömmen |
 
-**Affelito** (straight light-brown hair swept to the side, hazel eyes, a lopsided grin and nearly always a trucker cap) has 14 skins. Black tee, grey hoodie and blue fleece are free. The others cost coins:
+**Affelito** (straight light-brown hair swept to the side, hazel eyes, a lopsided grin and nearly always a trucker cap) has 14 skins. Black tee, grey hoodie and blue fleece are free. The last one is unlocked by beating level 6 Mardrömmen. The others cost coins:
 
 | Skin | Coins | | Skin | Coins |
 | --- | --- | --- | --- | --- |
-| Pixel camo (patchwork beanie) | 150 | | Robot (metal dome, blinking antenna) | 600 |
 | Cowboy (cowboy hat, sheriff star) | 200 | | Astronaut (glass space helmet) | 800 |
 | Ninja (headband) | 300 | | Dragon (hood with horns) | 1000 |
 | Pirate (tricorn, eye patch) | 350 | | Fire (flames for hair) | 1500 |
 | MODO Affelito (MoDo cap and jersey) | 400 | | Diamond (diamond cap) | 2000 |
-| Goalie (hockey helmet and cage) | 450 | | | |
+| Goalie (hockey helmet and cage) | 450 | | Scary Affelito (killer clown, skull cap) | beat Mardrömmen |
+| Robot (metal dome, blinking antenna) | 600 | | | |
+
+Unlocked skins can't be bought with coins; the shop card shows a lock until you've beaten the level. Anyone who bought Pixel camo (removed from the shop) gets its 150 coins back.
 
 Coins, skins and progress are saved in the browser (`localStorage`), so they stay on that device and browser.
 

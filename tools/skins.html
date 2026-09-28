@@ -203,7 +203,7 @@
           cell.innerHTML =
             '<div class="skin-id">' + skinId + '</div>' +
             '<div class="skin-name">' + k.name + '</div>' +
-            '<div class="skin-price">' + (k.price ? k.price + ' coins' : 'free') + '</div>';
+            '<div class="skin-price">' + (k.unlock ? 'beat ' + k.unlock : k.price ? k.price + ' coins' : 'free') + '</div>';
         } else if (col.kind === 'cube') {
           cell.appendChild(makeCubeTile(col.size, col.expr, skinId, col.look));
         } else if (col.kind === 'ship') {
