@@ -2780,7 +2780,7 @@
       }
       case 'house': {
         const cols = ['#ecc877', '#e7a27a', '#f0dca8', '#d98f7a'];
-        const c = cols[seed % cols.length];
+        const c = cols[Math.abs(seed) % cols.length];
         ctx.fillStyle = TL(c);
         ctx.fillRect(x + 1, y + 10, w - 2, h - 10);
         ctx.strokeStyle = TL('#4a3322');
@@ -3339,7 +3339,7 @@
       case 'banner': {
         // a heavy chess banner hanging from the ceiling — thorny, its stiff bottom edge is the hazard
         const cols = ['#5a1090', '#7a1a40'];
-        ctx.fillStyle = TL(cols[seed % 2]);
+        ctx.fillStyle = TL(cols[Math.abs(seed) % 2]);
         ctx.beginPath();
         ctx.moveTo(x + 2, y);
         ctx.lineTo(x + w - 2, y);
@@ -3354,14 +3354,14 @@
         ctx.fillStyle = TL('#f2cf4a');
         rr(ctx, x + w * 0.3, y + h * 0.25, w * 0.4, w * 0.4, 4);
         ctx.fill();
-        ctx.fillStyle = TL(cols[seed % 2]);
+        ctx.fillStyle = TL(cols[Math.abs(seed) % 2]);
         ctx.fillRect(x - 2, y - 6, w + 4, 8);
         break;
       }
       // ---- Stratusvägen (level 8 "Stratusvägens alla helgon") ----
       case 'car': {
         const cols = ['#8a1a24', '#1c3a6e', '#2a2a30', '#5a5f66', '#175a3a'];
-        const body = TL(cols[seed % cols.length]);
+        const body = TL(cols[Math.abs(seed) % cols.length]);
         const wheelY = y + h - Math.min(10, h * 0.16);
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();

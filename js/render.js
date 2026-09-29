@@ -3304,7 +3304,7 @@
     const rnd = U.rng(seed);
     if (kind === 'shed') {
       const w = BS * 2.1, h = BS * 1.5, x0 = cx - w / 2, y0 = farKerbY - h;
-      ctx.fillStyle = Art.TL(HOUSE_WOOD[seed % HOUSE_WOOD.length]);
+      ctx.fillStyle = Art.TL(HOUSE_WOOD[Math.abs(seed) % HOUSE_WOOD.length]);
       ctx.fillRect(x0, y0, w, h);
       ctx.strokeStyle = 'rgba(0,0,0,0.2)';
       ctx.lineWidth = 1;
@@ -3642,7 +3642,7 @@
     function house(s, sgn, seed, num) {
       const hw = 1.9, wallH = 3.1, roofH = 2.0, d0 = 6.5, d1 = 11.5;
       const zf = sgn * d0, zb = sgn * d1;
-      const wall = HOUSE_WOOD[seed % HOUSE_WOOD.length];
+      const wall = HOUSE_WOOD[Math.abs(seed) % HOUSE_WOOD.length];
       const roof = '#24252c';
       faces.push({ p: [[s - hw, 0, zf], [s + hw, 0, zf], [s + hw, wallH, zf], [s - hw, wallH, zf]], c: wall, wallDetail: true });
       faces.push({ p: [[s - hw, wallH, zf], [s + hw, wallH, zf], [s, wallH + roofH, zf]], c: roof });
