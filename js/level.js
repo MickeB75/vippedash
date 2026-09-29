@@ -13,6 +13,14 @@
       this.areas = [];
       this.texts = [];
       this.drops = [];
+      this.speeds = []; // Stratusvägen: real speed-up zones, see speed() below (always an array, empty by default)
+      // Stratusvägen: data-only markers for the render agent (always arrays/empty by default elsewhere) —
+      // camera swing zones, the rocket-skateboard ride zone, background/foreground house numbers, and the
+      // fixed "people" (throwers) along the street. No drawing happens yet; see swing()/board()/house()/person().
+      this.swings = [];
+      this.boards = [];
+      this.houses = [];
+      this.people = [];
       this.nextId = 1;
       this.finishX = 0;
       // level 6: screen effects (always present, empty by default) and jump-scare markers
@@ -52,12 +60,62 @@
     half(x, y = 0, style) {
       return this.add({ t: 'haz', kind: 'half', x, y, w: 1, h: 0.5, style, hx0: x + 0.38, hx1: x + 0.62, hy0: y, hy1: y + 0.32, dmg: 10 });
     }
+    // Stratusvägen: a speed bump — a low obstacle spanning the whole street (no `lane`, so it applies in
+    // both lanes, unlike the lane-tagged hazards below), just a little hop to clear. Lower and wider than
+    // half(): a real jump clears it with a lot of room to spare.
+    bump(x, y = 0) {
+      return this.add({ t: 'haz', kind: 'bump', x, y, w: 1, h: 0.25, hx0: x + 0.1, hx1: x + 0.9, hy0: y, hy1: y + 0.22, dmg: 8 });
+    }
     water(x, w, style) {
       return this.add({ t: 'haz', kind: 'water', x, y: 0, w, h: 0.3, style, hx0: x + 0.1, hx1: x + w - 0.1, hy0: -1, hy1: 0.28, dmg: 10 });
     }
     // a crow (or a pigeon, a gull) hovering at (x, y); its hitbox is smaller than the drawing
     bird(x, y, style) {
       return this.add({ t: 'haz', kind: 'bird', x, y, w: 1, h: 1, style, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.25, hy1: y + 0.7, dmg: 12 });
+    }
+    // a coin (candy or a football — Stratusvägen's only pickups, 1 each). Physics ignores t: 'coin'
+    // entirely (it never appears in step()'s solid/haz/pad/orb checks); game.js collects it on overlap.
+    // opts.lane places it in lane 0/1 (see lane() below); opts.mv lets it be thrown from a fixed point,
+    // like a hazard (see lob() below) — { type: 'throw', hx, hy, trigger, fall, arc }. There's no safety
+    // rule for a thrown coin the way there is for lob()'s hazards: trigger === fall lands it exactly when
+    // the player reaches its catch point (x, y), which is also where it's bucketed for lvl.query (see the
+    // long comment above pawn()) — game.js applies the same mv offset used for hazards before testing the
+    // overlap, so it's found and collected correctly regardless of how far the throw has progressed yet.
+    coin(x, y, opts = {}) {
+      return this.add({ t: 'coin', x, y, w: 1, h: 1, style: opts.style || 'candy', lane: opts.lane, mv: opts.mv });
+    }
+    // tags any gameplay object with a lane (0 near, 1 far — see physics.js's 'lane' player mode) and
+    // returns it, so e.g. b.lane(b.block(...), 1) reads naturally. An object without a lane always
+    // interacts, exactly as before; one with a lane only interacts while the player is close enough to
+    // that lane (see P.LANE_HIT in physics.js).
+    lane(o, lane) {
+      o.lane = lane;
+      return o;
+    }
+    // a real speed-up zone: the run speed is P.SPEED * mult from x0 to x1 (still on the beat — see
+    // physics.js speedAt()/timeAt() and the comment on Level.speeds below). Zones must be added in
+    // increasing x0 order and must not overlap.
+    speed(x0, x1, mult) {
+      this.speeds.push({ x0, x1, mult });
+    }
+    // ---- Stratusvägen: data-only markers for a later render pass (no drawing yet) ----
+    // a zone where the camera swings/pans for a cinematic beat (e.g. rounding a street corner)
+    swing(x0, x1) {
+      this.swings.push({ x0, x1 });
+    }
+    // the rocket-skateboard ride zone, from where Vippe hops on to the finish
+    board(x0, x1) {
+      this.boards.push({ x0, x1 });
+    }
+    // a house number along the street: row 'far' (background row, behind the road) or 'near' (foreground
+    // kerb mailbox). Purely a scenery marker for now — the render agent draws the actual houses/mailboxes.
+    house(x, num, row) {
+      this.houses.push({ x, num, row });
+    }
+    // a fixed person along the street (a thrower or other named character) — id, x and whatever the art
+    // agent will need to draw them (handY/footY, mood, ...) via opts. Layout only needs the position.
+    person(id, x, opts = {}) {
+      this.people.push(Object.assign({ id, x }, opts));
     }
     // ---- level 2: the subway and the sewers ----
     // a stretch of live third rail: touch it and you're out (like water). `style` re-skins it visually
@@ -107,8 +165,8 @@
     portal(x, mode, opts = {}) {
       return this.add({ t: 'portal', x, y: opts.y == null ? 0 : opts.y, w: 1, h: 3, mode, ceil: opts.ceil == null ? null : opts.ceil, grav: opts.grav || null });
     }
-    checkpoint(x, mode = 'cube', y = 0, ceil = null) {
-      this.checkpoints.push({ x, mode, y, ceil, index: this.checkpoints.length });
+    checkpoint(x, mode = 'cube', y = 0, ceil = null, lane = 0) {
+      this.checkpoints.push({ x, mode, y, ceil, lane, index: this.checkpoints.length });
     }
     corridor(x0, x1, ceil, style) {
       this.corridors.push({ x0, x1, ceil, style });
@@ -136,6 +194,21 @@
         t: 'haz', kind: 'pawn', x, y, w: 1, h: 1.3,
         hx0: x + 0.25, hx1: x + 0.75, hy0: y, hy1: y + 1.0, dmg: 10,
         mv: { type: 'throw', trigger, fall, arc, ahead: KING_AHEAD, handY: KING_HAND_Y },
+      });
+    }
+    // ---- Stratusvägen: a hazard thrown from a fixed thrower standing at from = [hx, hy] (mv.type
+    // 'throw' in physics.js moveOf, with mv.hx set — see the comment there), landing at (x, y). `kind`
+    // is 'zucchini' (lying on the ground) or 'dumbbell'. Same safety rule and the same reasoning as
+    // pawn() above: trigger - fall must be >= 4, so the flight always finishes (and the object settles
+    // at its static x, y) well before the player is within 4 blocks of it — its static x, used to bucket
+    // it into a query() column, stays a valid stand-in for where its hitbox actually is once reachable.
+    lob(x, y = 0, { kind = 'zucchini', from, trigger = 14, fall = 8, arc = 3, lane } = {}) {
+      if (trigger - fall < 4) throw new Error('lob(): trigger - fall must be >= 4');
+      const [hx, hy] = from;
+      return this.add({
+        t: 'haz', kind: 'lob', style: kind, x, y, w: 1, h: 0.8,
+        hx0: x + 0.2, hx1: x + 0.8, hy0: y, hy1: y + 0.6, dmg: 10, lane,
+        mv: { type: 'throw', trigger, fall, arc, hx, hy },
       });
     }
     // ---- level 6: the nightmare (bloody nuns, clowns, moving hazards) ----
@@ -231,6 +304,15 @@
       // holes in the floor split the level into layers: everything past a hole is on the layer below it
       this.drops = b.drops.sort((a, c) => a.x0 - c.x0);
       this.drops.forEach((d, i) => (d.layer = i));
+      // Stratusvägen's speed-up zones (see Builder.speed(), physics.js speedAt()/timeAt()) — always an
+      // array, empty by default, sorted by x0 so timeAt() can walk it in one O(zones) pass
+      this.speeds = (b.speeds || []).slice().sort((a, c) => a.x0 - c.x0);
+      // Stratusvägen: data-only markers for the render agent (see Builder.swing()/board()/house()/person());
+      // always arrays, empty by default on every other level
+      this.swings = b.swings || [];
+      this.boards = b.boards || [];
+      this.houses = b.houses || [];
+      this.people = b.people || [];
       for (const list of [this.objs, this.checkpoints, this.decos, this.texts]) for (const o of list) if (o.layer == null) o.layer = this.layerAt(o.x);
       for (const list of [this.corridors, this.areas]) for (const o of list) o.layer = this.layerAt(o.x0);
       this.margin = 0;
@@ -310,7 +392,7 @@
   }
 
   // ======================================================================
-  // LEVEL 1 — Hem till Storvreta
+  // LEVEL 2 — Hem till Storvreta
   // ======================================================================
   function buildHome() {
     const b = new Builder();
@@ -628,7 +710,7 @@
   }
 
   // ======================================================================
-  // LEVEL 3 — Vilda skogen (the wild forest). The hardest of the first three: triple spikes, birds, orb chains,
+  // LEVEL 4 — Vilda skogen (the wild forest). The hardest of the first three: triple spikes, birds, orb chains,
   // a tighter bike ride over the bog and a quicker ball section in the bear cave.
   // ======================================================================
   function buildForest() {
@@ -934,7 +1016,7 @@
   }
 
   // ======================================================================
-  // LEVEL 4 — Schackmatt (the chess level). Harder than the forest, a little easier than Djupet: a giant
+  // LEVEL 5 — Schackmatt (the chess level). Harder than the forest, a little easier than Djupet: a giant
   // marble chessboard under a twilight sky. Pawn spikes and halves give way to rising/falling pedestal
   // staircases (b.block heights 1-4) and a pad up onto a tall rook; SPRINGARNA is all "knight's L-jumps" —
   // pads onto high platforms, short drops to low ones, orbs at three different heights over long spike
@@ -1198,7 +1280,7 @@
   }
 
   // ======================================================================
-  // LEVEL 5 — Djupet (the deep). Harder than the forest, easier than the nightmare: no health bar, no
+  // LEVEL 6 — Djupet (the deep). Harder than the forest, easier than the nightmare: no health bar, no
   // age gate, no jump scares. Genuinely different tools than the forest ever touches: b.half() for low
   // fast hops, b.shark()/b.eel() (new, croc()/snapper() reinterpreted), b.rail() reskinned as a live eel
   // in a floor gap, and a real b.hole() layer-drop partway through the wreck that puts the rest of the
@@ -1534,7 +1616,7 @@
   }
 
   // ======================================================================
-  // LEVEL 2 — Tunnelbanan (the Stockholm subway). The step up after level 1: surf the
+  // LEVEL 3 — Tunnelbanan (the Stockholm subway). The step up after level 2: surf the
   // parked trains over the live rail, fly through the tunnel, and halfway through the floor caves in and
   // you drop into the sewers, where crocodiles lurk in the dirty water.
   // ======================================================================
@@ -1794,7 +1876,7 @@
   }
 
   // ======================================================================
-  // LEVEL 6 — Mardrömmen (the nightmare). Age-rated 16+: a health bar, bloody nuns, creepy clowns,
+  // LEVEL 7 — Mardrömmen (the nightmare). Age-rated 16+: a health bar, bloody nuns, creepy clowns,
   // jump scares and strobe lights. Graveyard -> convent -> upside-down chapel -> catacombs by ship ->
   // fairground -> mirror hall -> ghost train by ball -> the bell tower.
   // ======================================================================
@@ -2089,6 +2171,251 @@
   }
 
   // ======================================================================
+  // LEVEL 1 — Stratusvägens alla helgon (Halloween street at dusk, the easiest level). A horseshoe
+  // street: start at nr 66 (south end of the east leg), north, round the NE corner, west along the top,
+  // round the NW corner, south down the west leg to nr 1. EVEN numbers are the outer side, ODD the
+  // inner side — so the background house row flips from even to odd right after the camera-swing corner.
+  // Four fixed neighbours throw things at Vippe (see the NR66/NR62/NR50/NR15 constants and b.person()
+  // below): candy, zucchini, footballs and dumbbells. Only two checkpoints: the start and right after the
+  // swing (≈ halfway through, both in time and blocks).
+  // ======================================================================
+  function buildStratus() {
+    const b = new Builder();
+    const FINISH = 1400;
+
+    // fixed thrower positions (art draws the actual people later; layout only needs where they stand)
+    const NR66 = { x: 14, handY: 2.2 }; // happy woman, long black hair — throws candy
+    const NR62 = { x: 236, handY: 2.0 }; // angry younger woman in a leaf dress — throws zucchini
+    const NR50 = { x: 520, footY: 0.3 }; // happy man — kicks footballs
+    const NR15 = { x: 836, handY: 1.6 }; // angry, shorter, tattooed man — throws dumbbells
+    b.person('nr66', NR66.x, { handY: NR66.handY, mood: 'happy', hair: 'black', throws: 'candy' });
+    b.person('nr62', NR62.x, { handY: NR62.handY, mood: 'angry', hair: 'blond', throws: 'zucchini' });
+    b.person('nr50', NR50.x, { footY: NR50.footY, mood: 'happy', throws: 'football' });
+    b.person('nr15', NR15.x, { handY: NR15.handY, mood: 'angry', throws: 'dumbbell' });
+
+    // ============ AREAS ============
+    b.area('nr66', -60, 'NR 66', 'Bus eller godis!');
+    b.area('ostra', 96, 'ÖSTRA BENET', 'Nr 64');
+    b.area('nr62', 200, 'NR 62', 'Zucchinikriget');
+    b.area('gang', 300, 'NR 60–56', 'Bus eller godis-gänget');
+    b.area('nr50', 470, 'NR 50', 'Straffsparken'); // also covers the (banner-less) swing zone, 584–620
+    b.area('toppen', 624, 'TOPPEN', 'Nr 23–17');
+    b.area('nr15', 800, 'NR 15', 'Hantelhörnan');
+    b.area('nvhorn', 900, 'NORDVÄSTRA HÖRNET', 'Raketbrädan');
+    b.area('upploppet', 936, 'UPPLOPPET', 'Nr 13 → 1');
+
+    // ============ #1 NR 66 (0 – 96): candy from the doorway, no hazards at all ============
+    b.checkpoint(0);
+    b.text(12, 4.6, 'Level 1 · Stratusvägens alla helgon', 0.55);
+    b.text(12, 3.9, 'Hold to keep jumping. Bus eller godis!', 0.4);
+    b.house(NR66.x, 66, 'far');
+    b.house(50, 33, 'near');
+    // ~6 candies thrown from her hand, arriving in the air at jump height, 8 blocks apart
+    for (let x = 4; x <= 44; x += 8) {
+      b.coin(x, 2.0, { mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    }
+    b.portal(48, 'lane');
+    // ~5 candies landing in the lanes — far, far, near, far, near — so switching catches them
+    b.coin(54, 0.3, { lane: 1, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.coin(62, 0.3, { lane: 1, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.coin(70, 0.3, { lane: 0, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.coin(78, 0.3, { lane: 1, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.coin(86, 0.3, { lane: 0, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.portal(90, 'cube');
+
+    // ============ #2 ÖSTRA BENET (96 – 200): warm-up speed bumps, nr 64 in the background ============
+    b.house(130, 64, 'far');
+    b.house(170, 31, 'near');
+    b.bump(104);
+    b.bump(118);
+    b.bump(132);
+    b.bump(146);
+    b.bump(160);
+    b.bump(174);
+    b.coin(112, 2.0, {});
+    b.coin(154, 2.0, {});
+    b.text(188, 5.8, 'Speed bumps — just a little hop!', 0.4);
+
+    // ============ #3 NR 62 (200 – 300): Zucchinikriget — an angry gardener lobs zucchini ============
+    b.house(NR62.x, 62, 'far');
+    b.house(280, 29, 'near');
+    // 3 zucchini landing on the ground — jump over (trigger - fall = 6 >= 4, long since landed by the time
+    // the player is close enough to reach it — see the safety-window comment above Builder.lob())
+    b.lob(212, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 });
+    b.lob(228, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 });
+    b.lob(244, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 });
+    b.portal(248, 'lane');
+    // 4 more, each landing in ONE lane — switch to the other
+    b.lane(b.lob(256, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 0);
+    b.lane(b.lob(268, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 1);
+    b.lane(b.lob(280, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 0);
+    b.lane(b.lob(292, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 1);
+
+    // ============ #4 NR 60–56 (300 – 470): trick-or-treat gang, lane mode continues ============
+    b.house(320, 60, 'far');
+    b.house(350, 58, 'far');
+    b.house(380, 56, 'far');
+    b.house(410, 27, 'near');
+    // the cul-de-sac junction (54, 52 live down the side street, not on the main row) — an open gap in
+    // the house row around x 400–430, kept clear of gameplay obstacles too
+    b.lane(b.block(316, 0, 3, 1.2, 'car'), 0);
+    b.coin(336, 0.3, { lane: 1 }); // a lure in the lane you're NOT forced into
+    b.lane(b.thorny(352, 0, 2, 1.4, 'kids'), 1);
+    b.coin(368, 0.3, { lane: 0 });
+    b.lane(b.thorny(386, 0, 1, 1, 'pumpkin'), 0);
+    b.lane(b.thorny(440, 0, 1, 1.2, 'bin'), 1);
+    b.coin(456, 0.3, { lane: 0 });
+
+    // ============ #5 NR 50 (470 – 584): Straffsparken — a happy dad kicks footballs ============
+    b.house(NR50.x, 50, 'far');
+    b.house(548, 48, 'far');
+    b.house(530, 25, 'near');
+    // balls rolling/bouncing in low, arriving exactly when the player gets there (trigger === fall, like a
+    // thrown candy but with almost no arc) — switch lanes to meet them
+    b.coin(480, 0.3, { style: 'football', lane: 1, mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 0.6 } });
+    b.coin(494, 0.3, { style: 'football', lane: 0, mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 0.6 } });
+    b.coin(508, 0.3, { style: 'football', lane: 1, mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 0.6 } });
+    b.portal(524, 'cube');
+    b.bump(538);
+    // balls arriving high — jump to catch, like nr 66's candy
+    b.coin(546, 2.0, { style: 'football', mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 3 } });
+    b.coin(560, 2.0, { style: 'football', mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 3 } });
+    b.coin(574, 2.0, { style: 'football', mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 3 } });
+    b.text(478, 5.8, 'A floorball goal on the driveway', 0.4);
+
+    // ============ #6 camera swing (584 – 620): empty — flat ground, cube mode, no hazards or coins ============
+    b.swing(588, 620);
+
+    // ============ #7 cp1, right after the swing (≈ halfway through, ≈ 60 s) ============
+    b.checkpoint(624);
+
+    // ============ #8 TOPPEN (624 – 800): round the top, nr 23–17, past the garage row ============
+    b.house(630, 23, 'far');
+    b.house(654, 21, 'far');
+    b.house(678, 19, 'far');
+    b.house(640, 40, 'near');
+    b.house(668, 38, 'near');
+    b.house(696, 36, 'near');
+    b.house(724, 34, 'near');
+    b.bump(636);
+    b.bump(652);
+    b.bump(668);
+    b.portal(684, 'lane');
+    b.house(730, 17, 'far');
+    b.house(752, 30, 'near');
+    b.house(780, 28, 'near');
+    b.house(808, 26, 'near');
+    // the garage row: a trailer, parked cars, and candy as a lure
+    b.lane(b.block(696, 0, 3, 1.3, 'trailer'), 1);
+    b.lane(b.block(716, 0, 2.5, 1.2, 'car'), 0);
+    b.coin(736, 0.3, { lane: 1 });
+    b.lane(b.block(752, 0, 2.5, 1.2, 'car'), 1);
+    b.coin(768, 0.3, { lane: 0 });
+    b.portal(784, 'cube');
+
+    // ============ #9 NR 15 (800 – 900): Hantelhörnan — a short, angry man throws dumbbells ============
+    b.house(NR15.x, 15, 'far');
+    // 4 dumbbells, landing and staying — jump over, same safety window as the zucchini
+    b.lob(806, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
+    b.lob(822, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
+    b.lob(838, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
+    b.lob(854, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
+    b.text(802, 5.8, 'Dumbbells — jump over!', 0.4);
+
+    // ============ #10 NORDVÄSTRA HÖRNET (900 – 936): the NW corner, hop on the rocket skateboard ============
+    b.house(920, 24, 'near');
+    b.coin(906, 2.0, {});
+    b.coin(922, 1.0, {});
+    b.text(908, 5.8, 'A rocket skateboard!', 0.45);
+    b.board(916, FINISH);
+
+    // ============ #11 UPPLOPPET (936 – finish): the west leg down to nr 1, ×1.5 speed ============
+    b.speed(936, 1404, 1.5);
+    b.text(940, 6.2, 'Speed up!', 0.5);
+    b.bump(960);
+    b.bump(990);
+    b.bump(1020);
+    b.bump(1050);
+    b.coin(975, 2.0, {});
+    b.coin(1035, 2.0, {});
+    b.portal(1080, 'lane');
+    b.lane(b.block(1104, 0, 2.5, 1.2, 'car'), 0);
+    b.coin(1119, 0.3, { lane: 1 });
+    b.lane(b.block(1134, 0, 3, 1.3, 'trailer'), 1);
+    b.coin(1149, 0.3, { lane: 0 });
+    b.lane(b.thorny(1164, 0, 2, 1.4, 'kids'), 0);
+    b.coin(1179, 0.3, { lane: 1 });
+    b.lane(b.block(1194, 0, 2.5, 1.2, 'car'), 1);
+    b.coin(1209, 0.3, { lane: 0 });
+    b.portal(1220, 'cube');
+    b.bump(1244);
+    b.bump(1274);
+    b.bump(1304);
+    b.bump(1334);
+    b.coin(1259, 2.0, {});
+    b.coin(1319, 2.0, {});
+    // the last 40 blocks are clear — just a couple more candies on the way to nr 1
+    b.coin(1375, 1.5, {});
+    b.coin(1390, 2.0, {});
+    b.finish(FINISH);
+
+    // far row (background), west leg: 13, 11, 9, 7, 5, 3, 1
+    {
+      const nums = [13, 11, 9, 7, 5, 3, 1];
+      const x0 = 960, step = (1350 - 960) / (nums.length - 1);
+      nums.forEach((n, i) => {
+        const x = Math.round(x0 + step * i);
+        b.house(x, n, 'far');
+      });
+    }
+    // near row (foreground kerb), west leg: 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2
+    {
+      const nums = [22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2];
+      const x0 = 940, step = (1360 - 940) / (nums.length - 1);
+      nums.forEach((n, i) => b.house(Math.round(x0 + step * i), n, 'near'));
+    }
+
+    // ============ NEAR SCENERY (world-anchored) ============
+    b.deco('sign_region', 4, { text: 'STRATUSVÄGEN' });
+    b.deco('fence', 14, { len: 8 });
+    b.deco('lamp', 30);
+    b.deco('lamp', 84);
+    b.deco('bench', 108);
+    b.deco('lamp', 150);
+    b.deco('sign_place', 200, { text: 'Nr 62' });
+    b.deco('lamp', 260);
+    b.deco('lamp', 340);
+    b.deco('sign_place', 470, { text: 'Nr 50' });
+    b.deco('lamp', 500);
+    b.deco('lamp', 560);
+    b.deco('sign_place', 624, { text: 'Toppen' });
+    b.deco('lamp', 660);
+    b.deco('lamp', 740);
+    b.deco('sign_place', 800, { text: 'Nr 15' });
+    b.deco('lamp', 860);
+    b.deco('sign_place', 900, { text: 'Nordvästra hörnet' });
+    b.deco('lamp', 950);
+    b.deco('lamp', 1100);
+    b.deco('lamp', 1250);
+    b.deco('finish', FINISH);
+
+    // ============ MID-LAYER LANDMARKS ============
+    b.landmark('cottage', 20, { color: '#5a3a7a' });
+    b.landmark('villa', 140, { seed: 3 });
+    b.landmark('cottage', 236, { color: '#7a4a2a' });
+    b.landmark('villa', 340, { seed: 11 });
+    b.landmark('cottage', 520, { color: '#3a5a7a' });
+    b.landmark('cottage', 654, { color: '#5a3a7a' });
+    b.landmark('villa', 780, { seed: 17 });
+    b.landmark('cottage', 836, { color: '#6a2a2a' });
+    b.landmark('villa', 1030, { seed: 23 });
+    b.landmark('villa', 1220, { seed: 29 });
+    b.landmark('home', FINISH + 10);
+
+    return b;
+  }
+
+  // ======================================================================
   // THEMES — everything the renderer and the music need to know per level
   // ======================================================================
   const HOME_THEME = {
@@ -2235,44 +2562,93 @@
     song: 'nightmare',
   };
 
+  const STRATUS_THEME = {
+    // a Halloween dusk on a quiet suburban horseshoe street: warm porch-light orange sinking into deep
+    // purple night by the time Vippe reaches nr 1
+    sky: [
+      { x: -100, top: '#3a2a55', bot: '#c98a55', far: '#2a2038', dark: 0.18, sun: 0.55 },
+      { x: 300, top: '#2c2050', bot: '#a86a52', far: '#241c34', dark: 0.28, sun: 0.68 },
+      { x: 600, top: '#1c1442', bot: '#7a4a56', far: '#181230', dark: 0.42, sun: 0.85 },
+      { x: 936, top: '#160f38', bot: '#5a3a4c', far: '#12102a', dark: 0.5, sun: 0.95 },
+      { x: 1200, top: '#100a2c', bot: '#3f2838', far: '#0d0a22', dark: 0.58, sun: 1.05 },
+      { x: 1440, top: '#0a0722', bot: '#2a1c2e', far: '#08061a', dark: 0.65, sun: 1.15 },
+    ],
+    field: { default: 'meadow' },
+    ground: { default: 'grass' }, // mostly hidden under the lane road band (see render.js drawLaneRoad)
+    glow: { default: '#ff9a3c' },
+    far: { default: 'mixed' }, // a distant treeline of pines/birches, with pale villas and an apartment block dotted in
+    // pale villas (small, plain) and a couple of larger apartment blocks, more present than a normal
+    // background skyline — visible behind the grey terrace row the whole way down the street (see
+    // render.js's far-layer 'villa'/'apartblock' cases)
+    farExtra: [
+      { x: 40, t: 'villa', w: 1.3, h: 1.5 },
+      { x: 150, t: 'villa', w: 1.1, h: 1.3 },
+      { x: 260, t: 'apartblock', w: 3.2, h: 3.4 },
+      { x: 360, t: 'villa', w: 1.4, h: 1.6 },
+      { x: 460, t: 'villa', w: 1.2, h: 1.4 },
+      { x: 560, t: 'villa', w: 1.3, h: 1.5 },
+      { x: 660, t: 'apartblock', w: 2.6, h: 3.0 },
+      { x: 760, t: 'villa', w: 1.2, h: 1.3 },
+      { x: 860, t: 'villa', w: 1.4, h: 1.6 },
+      { x: 960, t: 'villa', w: 1.1, h: 1.3 },
+      { x: 1060, t: 'apartblock', w: 3.0, h: 3.3 },
+      { x: 1160, t: 'villa', w: 1.3, h: 1.5 },
+      { x: 1260, t: 'villa', w: 1.2, h: 1.4 },
+      { x: 1360, t: 'villa', w: 1.3, h: 1.5 },
+    ],
+    midFill: { default: 'mixed' },
+    midStep: [4, 6],
+    indoor: {},
+    lanes: true, // Stratusvägen: a two-lane street section — see physics.js 'lane' mode, render.js drawLaneRoad
+    bats: true, // a couple of bats flapping across the dusk sky now and then (render.js drawBats)
+    song: 'stratus',
+  };
+
   // ======================================================================
   // LEVEL LIST — difficulty sets the coin reward (see game.js)
   // ======================================================================
   const LEVELS = [
     {
-      id: 'home', num: 1, name: 'Hem till Storvreta', route: 'Uppland › Uppsala › Storvreta',
+      id: 'stratus', num: 1, name: 'Stratusvägens alla helgon', route: 'Nr 66 › Nr 62 › Nr 50 › Nr 15 › Nr 1',
+      difficulty: 1, diffName: 'Very Easy', reward: 30,
+      winTitle: 'Bus eller godis!',
+      winSub: 'Past the candy, the zucchini, the footballs and the dumbbells, all the way down Stratusvägen on a rocket skateboard.',
+      build: buildStratus, theme: STRATUS_THEME,
+    },
+    {
+      id: 'home', num: 2, name: 'Hem till Storvreta', route: 'Uppland › Uppsala › Storvreta',
       difficulty: 1, diffName: 'Easy', reward: 50,
       winTitle: 'Välkommen hem, Vippe!', winSub: 'From the fields of Uppland, over the rooftops of Uppsala, all the way home to Storvreta.',
       build: buildHome, theme: HOME_THEME,
     },
     {
-      id: 'metro', num: 2, name: 'Tunnelbanan', route: 'T-Centralen › Tunneln › Kloakerna',
+      id: 'metro', num: 3, name: 'Tunnelbanan', route: 'T-Centralen › Tunneln › Kloakerna',
       difficulty: 2, diffName: 'Medium', reward: 100,
       winTitle: 'Ur kloaken!', winSub: 'Over the trains, through the tunnel, down the hole, past the crocodiles and out into the sunshine.',
       build: buildMetro, theme: METRO_THEME,
     },
     {
-      id: 'forest', num: 3, name: 'Vilda skogen', route: 'Skogsbrynet › Myren › Björngrottan › Gläntan',
+      id: 'forest', num: 4, name: 'Vilda skogen', route: 'Skogsbrynet › Myren › Björngrottan › Gläntan',
       difficulty: 3, diffName: 'Hard', reward: 150,
       winTitle: 'Skogens hjälte!', winSub: 'Past the hedgehogs, over the bog, through the bear cave and out into the sunny clearing.',
       build: buildForest, theme: FOREST_THEME,
     },
     {
-      id: 'chess', num: 4, name: 'Schackmatt', route: 'Brädet › Springarna › Tornet › Kungens tron',
+      id: 'chess', num: 5, name: 'Schackmatt', route: 'Brädet › Springarna › Tornet › Kungens tron',
       difficulty: 4, diffName: 'Very Hard', reward: 175,
       winTitle: 'Schack matt!',
       winSub: "Over the pawns, past the knights, up the rook tower, down the bishop's diagonal and all the way to a toppled king.",
       build: buildChess, theme: CHESS_THEME,
     },
     {
-      id: 'ocean', num: 5, name: 'Djupet', route: 'Korallrevet › Manetsvärmen › Valens buk › Ytan',
+      id: 'ocean', num: 6, name: 'Djupet', route: 'Korallrevet › Manetsvärmen › Valens buk › Ytan',
       difficulty: 4, diffName: 'Very Hard', reward: 200,
       winTitle: 'Djupets mästare!',
       winSub: 'Past the urchins, through the wreck, over the current, straight through a whale and up into the light.',
       build: buildOcean, theme: OCEAN_THEME,
     },
     {
-      id: 'nightmare', num: 6, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
+      id: 'nightmare', num: 7, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
       difficulty: 5, diffName: 'Nightmare', reward: 250, health: 135, age: 16, strobe: true,
       winTitle: 'Du överlevde natten!',
       winSub: 'Past the graves, the bloody nuns, the catacombs and the clowns, and out before the bell struck one.',

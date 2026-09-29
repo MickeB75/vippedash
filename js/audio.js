@@ -76,6 +76,17 @@
     M6: parseMelody('A5 E5 C5 E5 A5 E5 C5 E5 | G5 E5 B4 E5 G5 E5 B4 E5 | G5 E5 C5 E5 G5 E5 C5 E5 | F#5 D#5 B4 D#5 F#5 D#5 B4 D#5'),
     M7: parseMelody('E5 - B4 E5 G5 - F#5 E5 | C5 - G4 C5 E5 - D5 C5 | D5 - B4 D5 G5 - A5 B5 | A5 - F#5 - D5 - F#5 A5'),
     M8: parseMelody('B5 - A5 G5 - D5 G5 - | A5 - F#5 D5 - A4 D5 - | G5 - E5 B4 - E5 G5 B5 | C6 - B5 A5 - G5 E5 -'),
+    // the stratus song (level 7 "Stratusvägens alla helgon"), a playful C major Halloween-parade
+    // arrangement of "When the Saints Go Marching In" (traditional spiritual, public domain; this
+    // arrangement is our own). S1 is the tune as a clean 16-bar statement (5 vocal lines: 2+2+4+4+4
+    // bars); S2/S3 reorder the same bars for variety later in the level; S4 is a short 3-bar phrase
+    // recoloured into C minor for the spooky camera-swing bit; S5 is S1 transposed up a step and an
+    // octave (D major, around D6) for the big finale.
+    S1: parseMelody('. . C5 - E5 - F5 - | G5 - - - - - - - | . . C5 - E5 - F5 - | G5 - - - - - - - | . . C5 - E5 - F5 - | G5 - - - E5 - - - | C5 - - - E5 - - - | D5 - - - - - - - | . . E5 - E5 - D5 - | C5 - - - - - C5 - | E5 - - - G5 - - - | G5 - - - F5 - - - | . . E5 - F5 - G5 - | G5 - - - E5 - - - | C5 - - - D5 - - - | C5 - - - - - - -'),
+    S2: parseMelody('. . E5 - E5 - D5 - | C5 - - - - - C5 - | E5 - - - G5 - - - | G5 - - - F5 - - - | . . E5 - F5 - G5 - | G5 - - - E5 - - - | C5 - - - D5 - - - | C5 - - - - - - - | . . C5 - E5 - F5 - | G5 - - - - - - - | . . C5 - E5 - F5 - | G5 - - - - - - -'),
+    S3: parseMelody('. . C5 - E5 - F5 - | G5 - - - E5 - - - | C5 - - - E5 - - - | D5 - - - - - - - | . . E5 - E5 - D5 - | C5 - - - - - C5 - | E5 - - - G5 - - - | G5 - - - F5 - - - | . . E5 - F5 - G5 - | G5 - - - E5 - - - | C5 - - - D5 - - - | C5 - - - - - - -'),
+    S4: parseMelody('. . C5 - D#5 - F5 - | G5 - - - D#5 - - - | C5 - - - - - - -'),
+    S5: parseMelody('. . D6 - F#6 - G6 - | A6 - - - - - - - | . . D6 - F#6 - G6 - | A6 - - - - - - - | . . D6 - F#6 - G6 - | A6 - - - F#6 - - - | D6 - - - F#6 - - - | E6 - - - - - - - | . . F#6 - F#6 - E6 - | D6 - - - - - D6 - | F#6 - - - A6 - - - | A6 - - - G6 - - - | . . F#6 - G6 - A6 - | A6 - - - F#6 - - - | D6 - - - E6 - - - | D6 - - - - - - -'),
   };
   // chords: [bass root midi, triad midis]
   const CH = {
@@ -123,6 +134,16 @@
     circus: ['Cm', 'Bdim', 'Ab', 'Gb'],
     mirror: ['Gb', 'Ab', 'Bdim', 'Cm'],
     climax: ['Cm', 'Gb', 'Db', 'Ab'],
+    // the stratus level ("Stratusvägens alla helgon"), C major Halloween parade: plain I-IV-I-V for
+    // the intro, two classic parade-band turnarounds for variety, a harmonic-minor i-iv-V-i for the
+    // spooky camera-swing bit (G major as the dominant of C minor), and D major (I-IV-V-I, a step up)
+    // for the finale key change.
+    candy: ['C', 'G', 'C', 'G'],
+    parade: ['C', 'F', 'C', 'G'],
+    parade2: ['C', 'G', 'Am', 'F'],
+    parade3: ['C', 'Am', 'F', 'G'],
+    parade4: ['D', 'G', 'A', 'D'],
+    spooky: ['Cm', 'Fm', 'G', 'Cm'],
   };
   // each song: [fromBar, toBar, settings]. `phrase: 'section'` starts the 4-bar phrases at the section start.
   const SONGS = {
@@ -234,6 +255,27 @@
         // tower: the main riff returns
         [66, 70, { prog: 'doom2', guitar: 'doom', drums: 'doom', organ: true, lead: 'N2' }],
         [70, 72, { end: true, endBell: true }],
+      ],
+    },
+    // level 7 "Stratusvägens alla helgon": a dusk Halloween street, the easiest level, ~78 bars (~2:00).
+    // 0-4 a happy woman throws candy (bright bouncy intro, oompah bass); 4-24 zucchini/cars/footballs
+    // lane-switching (full tune, then a xylophone "skeleton bones" plink variant); 24-36 the tune again
+    // with a spooky theremin-like lead doubling; 36-39 a camera swing around the street with no
+    // obstacles (one chorus phrase in C minor, slower, spooky church organ); 39-58 after the checkpoint,
+    // the dumbbells (back to major, energetic); 58-78 a rocket skateboard, the biggest, most energetic
+    // version, a step up to D major.
+    stratus: {
+      endChord: 'D',
+      phrase: 'section',
+      sections: [
+        [0, 4, { prog: 'candy', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true }],
+        [4, 12, { prog: 'parade', drums: 'main', bass: 'oompah', arp: 'up', lead: 'S1' }],
+        [12, 24, { prog: 'parade2', drums: 'drop', bass: 'octave', arp: 'wave', lead: 'S2', tone: 'xylo' }],
+        [24, 36, { prog: 'parade', drums: 'half', bass: 'long', arp: 'wave', lead: 'S3', tone: 'theremin', pad: true }],
+        [36, 39, { prog: 'spooky', drums: 'sparse', organ: true, lead: 'S4' }],
+        [39, 58, { prog: 'parade3', drums: 'train', bass: 'octave', arp: 'fast', lead: 'S1' }],
+        [58, 78, { prog: 'parade4', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'S5', pad: true }],
+        [78, 80, { end: true }],
       ],
     },
   };
@@ -568,6 +610,30 @@
     voice('sawtooth', mtof(rootMidi - 12), t, dur, 0.03, { dest: A.bus, attack: 0.6, hold: 0.9, lp: 500 });
   }
 
+  // a wavering theremin-like tone: sine with slow vibrato (level 7's spooky lead doubling)
+  function thereminNote(t, m, dur, vol, dest) {
+    const ctx = A.ctx;
+    dest = dest || A.bus;
+    const f0 = mtof(m);
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 5;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = f0 * 0.015;
+    lfo.connect(lfoGain);
+    lfoGain.connect(o.frequency);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.08);
+    g.gain.setTargetAtTime(0.0001, t + dur * 0.7, dur * 0.3 + 0.001);
+    o.connect(g);
+    g.connect(dest);
+    o.start(t); o.stop(t + dur + 0.3);
+    lfo.start(t); lfo.stop(t + dur + 0.3);
+  }
+
   function playStep(step, t) {
     const bar = Math.floor(step / 16);
     const s16 = step % 16;
@@ -673,6 +739,11 @@
       voice('sawtooth', mtof(root + (s16 % 4 === 2 ? 12 : 0)), t, STEP * 1.6, 0.24, { lp: 900, lpEnd: 300, q: 5 });
     } else if (cfg.bass === 'long' && (s16 === 0 || s16 === 8)) {
       voice('triangle', mtof(root), t, STEP * 7, 0.35, { hold: 0.7 });
+    } else if (cfg.bass === 'oompah' && s16 % 4 === 0) {
+      // marching-band "oompah": root on beats 1 and 3, fifth on beats 2 and 4 (level 7)
+      const beatNum = s16 / 4;
+      const m = root - 12 + (beatNum % 2 === 0 ? 0 : 7);
+      voice('triangle', mtof(m), t, STEP * 3.2, 0.26, { hold: 0.55, release: 0.12 });
     }
 
     // ---- doom guitar + heavy bass ----
@@ -746,6 +817,14 @@
           const swell = Math.min(dur * 0.85, 0.4);
           voice('sawtooth', mtof(n.midi), t, dur, 0.09, { attack: swell, hold: 0.97, release: 0.03, lp: 2600 });
           voice('square', mtof(n.midi), t, dur, 0.04, { attack: swell, hold: 0.97, release: 0.03, lp: 2000 });
+        } else if (cfg.tone === 'xylo') {
+          // a bright, quickly-decaying mallet "skeleton bones" plink, an octave up for sparkle (level 7)
+          voice('square', mtof(n.midi + 12), t, Math.min(dur, STEP * 1.0), 0.09, { attack: 0.001, hold: 0.12, release: 0.07, lp: 4200 });
+          voice('sine', mtof(n.midi + 24), t, Math.min(dur, STEP * 0.7), 0.03, { attack: 0.001, hold: 0.08, release: 0.05 });
+        } else if (cfg.tone === 'theremin') {
+          // a wavering, spooky theremin-like lead with slow vibrato (level 7)
+          thereminNote(t, n.midi, dur, 0.09);
+          thereminNote(t, n.midi + 12, dur, 0.03);
         } else {
           voice('sawtooth', mtof(n.midi), t, dur, 0.075, { lp: 3200, hold: 0.7, detune: -5 });
           voice('square', mtof(n.midi), t, dur, 0.045, { lp: 2400, hold: 0.7, detune: 5 });

@@ -1,6 +1,6 @@
 # VippeDash
 
-A Geometry Dash–style runner starring **Vippe**. There are six levels: **1 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **2 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **3 · Vilda skogen** (hard, about 1:37) runs through the wild forest, **4 · Schackmatt** (very hard, about 1:38) plays on a giant chessboard with **Brädet › Springarna › Tornet › Kungens tron**, **5 · Djupet** (very hard, about 1:38) dives through **Korallrevet › Manetsvärmen › Valens buk › Ytan**, and **6 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
+A Geometry Dash–style runner starring **Vippe**. There are seven levels: **1 · Stratusvägens alla helgon** (very easy, about 2:00) rides down a quiet suburban street on Halloween: candy, zucchini, footballs and dumbbells from four neighbours, then a rocket skateboard to the finish. **2 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **3 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **4 · Vilda skogen** (hard, about 1:37) runs through the wild forest, **5 · Schackmatt** (very hard, about 1:38) plays on a giant chessboard with **Brädet › Springarna › Tornet › Kungens tron**, **6 · Djupet** (very hard, about 1:38) dives through **Korallrevet › Manetsvärmen › Valens buk › Ytan**, and **7 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
 
 ## Play
 
@@ -20,7 +20,7 @@ Then open <http://localhost:8765>.
 | Hold to keep jumping or keep flying | hold any of the above |
 | Pause | **Esc** / **P** / ⏸ button |
 | Mute | **M** / 🔊 button |
-| Pick a level in the menu | click it, or **1** / **2** / **3** / **4** / **5** |
+| Pick a level in the menu | click it, or **1** / **2** / **3** / **4** / **5** / **6** / **7** |
 | Open the shop | **Shop** button or **S** |
 | Switch between Vippe and Affelito in the shop | click the tab, or **←** / **→** |
 
@@ -113,17 +113,17 @@ Debug and testing URL parameters:
 
 You win coins every time you finish a level:
 
-| | Level 1 (easy) | Level 2 (medium) | Level 3 (hard) | Level 4 (very hard) | Level 5 (very hard) | Level 6 (nightmare) |
-| --- | --- | --- | --- | --- | --- | --- |
-| Level cleared | 50 | 100 | 150 | 175 | 200 | 250 |
-| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 50 | up to 100 | up to 150 | up to 175 | up to 200 | up to 250 |
-| First time you beat the level | 50 | 100 | 150 | 175 | 200 | 250 |
+| | Level 1 (very easy) | Level 2 (easy) | Level 3 (medium) | Level 4 (hard) | Level 5 (very hard) | Level 6 (very hard) | Level 7 (nightmare) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Level cleared | 30 | 50 | 100 | 150 | 175 | 200 | 250 |
+| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 30 | up to 50 | up to 100 | up to 150 | up to 175 | up to 200 | up to 250 |
+| First time you beat the level | 30 | 50 | 100 | 150 | 175 | 200 | 250 |
 
 So a harder level and fewer crashes give more coins. The coin total is shown at the top right of the menu.
 
 The shop has two tabs, one per character. The shop opens on the tab of the character you are wearing.
 
-**Vippe** (curly brown hair) has 14 skins. Red jersey, black hoodie and blue & black are free. The last one is unlocked by beating level 6 Mardrömmen. The others cost coins:
+**Vippe** (curly brown hair) has 14 skins. Red jersey, black hoodie and blue & black are free. The last one is unlocked by beating level 7 Mardrömmen. The others cost coins:
 
 | Skin | Coins | | Skin | Coins |
 | --- | --- | --- | --- | --- |
@@ -134,7 +134,7 @@ The shop has two tabs, one per character. The shop opens on the tab of the chara
 | Moose (antlers) | 400 | | King Vippe (gold crown) | 1500 |
 | | | | Scary Vippe (devil horns, bones and blood) | beat Mardrömmen |
 
-**Affelito** (straight light-brown hair swept to the side, hazel eyes, a lopsided grin and nearly always a trucker cap) has 14 skins. Black tee, grey hoodie and blue fleece are free. The last one is unlocked by beating level 6 Mardrömmen. The others cost coins:
+**Affelito** (straight light-brown hair swept to the side, hazel eyes, a lopsided grin and nearly always a trucker cap) has 14 skins. Black tee, grey hoodie and blue fleece are free. The last one is unlocked by beating level 7 Mardrömmen. The others cost coins:
 
 | Skin | Coins | | Skin | Coins |
 | --- | --- | --- | --- | --- |
@@ -149,7 +149,28 @@ Unlocked skins can't be bought with coins; the shop card shows a lock until you'
 
 Coins, skins and progress are saved in the browser (`localStorage`), so they stay on that device and browser.
 
-## Level 1: Hem till Storvreta (≈ 2:00, 16 checkpoints)
+## Level 1: Stratusvägens alla helgon (≈ 2:00, 2 checkpoints)
+
+A suburban street shaped like a horseshoe at dusk on Halloween. Easiest jumps in the game. The two lanes run in depth (near and far), and in lane mode the button switches lanes instead of jumping. After the first curve past the halfway mark, the camera swings around to show the other side of the street. Speed zones keep the music in sync. The level features **four neighbours** who each do something special: at nr 66 a happy woman opens her door and throws candy; at nr 62 an angry woman throws zucchini from her garden boxes (dodge); at nr 50 a happy man kicks footballs to you (catch); at nr 15 an angry short man throws dumbbells (dodge). After nr 15, you ride a rocket skateboard to the finish at nr 1: faster (1.5× speed) but still jumps and lane switches.
+
+| Section | Where | What happens |
+| --- | --- | --- |
+| **Nr 66** | happy woman, lit doorway | Candy thrown from her hand, landing in the air and on the ground. Lane switching to catch them. |
+| **Östra benet** | warm-up lap | Speed bumps, the easiest jumps to start. |
+| **Nr 62** | angry gardener with zucchini | Zucchini lobbed from her garden boxes (dodge them). Lane switching continues. |
+| **Nr 60–56** | trick-or-treat gang | A parked car, thorny obstacles and candy lures. |
+| **Nr 50** | floorball goal on the driveway | Footballs kicked from nr 50, rolling low and bouncing high. |
+| **Camera swing** | rounding the corner | Empty ground, the camera pans round to reveal the other side of the street. |
+| **Toppen** | past the halfway checkpoint | Bumps, lane gates, a garage row with a trailer and parked cars. |
+| **Nr 15** | angry man, dumbbells | Four dumbbells lobbed to dodge, no lane tricks. |
+| **Nordvästra hörnet** | the NW corner | A rocket skateboard waiting. |
+| **Upploppet** | final lap to nr 1 | Speed zone (×1.5), bumps, lane switches, cars and thorny obstacles, then two bonus candies before the finish line. |
+
+Music: a playful uptempo arrangement of "When the Saints Go Marching In" (public domain), with a minor-key spooky bit during the camera swing and a key change for the skateboard. Coins: candy and footballs (1 coin each) are collected as pickups. Finishing rewards 30 coins plus bonus coins for each candy and football caught.
+
+**New mechanics:** **Lane mode** (portal `'lane'`): the street has two lanes in depth; the button switches lanes instead of jumping; some obstacles are only in one lane. **Speed zones** (`b.speed(x0, x1, mult)`): the run speed multiplies by `mult` from x0 to x1; the level clock and music stay in sync via `Physics.timeAt`. **Coin pickups** (candies and footballs): collected on overlap; pickups before a checkpoint survive a crash, ones after it reappear.
+
+## Level 2: Hem till Storvreta (≈ 2:00, 16 checkpoints)
 
 | Section | Where | What happens |
 | --- | --- | --- |
@@ -163,9 +184,9 @@ Coins, skins and progress are saved in the browser (`localStorage`), so they sta
 
 The sun sets as you go: it's noon in Uppland, sunset over Fyrisån and night in Storvreta.
 
-## Level 2: Tunnelbanan (≈ 1:29, 8 checkpoints)
+## Level 3: Tunnelbanan (≈ 1:29, 8 checkpoints)
 
-Shorter than level 1 and a step up from it, with fewer checkpoints. It's like Subway Surfers: you jump up onto parked metro trains and run along their roofs. Halfway through, the tunnel floor caves in and you fall through a hole into the sewers, where crocodiles lie in the dirty water. The camera follows you down the hole, so you see the tunnel above and the sewer below.
+Shorter than level 2 and a step up from it, with fewer checkpoints. It's like Subway Surfers: you jump up onto parked metro trains and run along their roofs. Halfway through, the tunnel floor caves in and you fall through a hole into the sewers, where crocodiles lie in the dirty water. The camera follows you down the hole, so you see the tunnel above and the sewer below.
 
 | Section | Where | What happens |
 | --- | --- | --- |
@@ -178,11 +199,11 @@ Shorter than level 1 and a step up from it, with fewer checkpoints. It's like Su
 | **Utloppet** | the last of the sewer | More crocodiles, two snapping heads with an orb between them, and out through the outlet... |
 | **Riddarfjärden** | the waterfront at sunset: Gamla stan and Stadshuset with its three crowns | Gulls, cones and barriers, and the finish. |
 
-Level 2 has its own soundtrack in E minor: a train rhythm on the tracks, a drum roll as the floor gives way, dripping water in the sewer, and G major when you come out into the sunshine.
+Level 3 has its own soundtrack in E minor: a train rhythm on the tracks, a drum roll as the floor gives way, dripping water in the sewer, and G major when you come out into the sunshine.
 
-## Level 3: Vilda skogen (≈ 1:37, 9 checkpoints)
+## Level 4: Vilda skogen (≈ 1:37, 9 checkpoints)
 
-A little longer than level 2 and harder: triple spikes, hedgehogs (they're spikes), crows you must not hit, orb chains, a tighter bike ride and faster gravity flips.
+A little longer than level 3 and harder: triple spikes, hedgehogs (they're spikes), crows you must not hit, orb chains, a tighter bike ride and faster gravity flips.
 
 | Section | Where | What happens |
 | --- | --- | --- |
@@ -193,9 +214,9 @@ A little longer than level 2 and harder: triple spikes, hedgehogs (they're spike
 | **Bäckravinen** | the brook ravine: deer, a woodpecker | Stones across the brook, a fox in the path, branches over the rapids. |
 | **Gläntan** | the sunny clearing: a tent and a campfire | A last moose, an orb chain and the finish. |
 
-Level 3 has its own folk-style soundtrack in D minor that ends in a major key when you reach the clearing.
+Level 4 has its own folk-style soundtrack in D minor that ends in a major key when you reach the clearing.
 
-## Level 4: Schackmatt (≈ 1:38, 10 checkpoints)
+## Level 5: Schackmatt (≈ 1:38, 10 checkpoints)
 
 A grand marble chessboard under a twilight sky that deepens from pale lilac at the start to midnight purple at the king's throne. Six sections with rising difficulty: pawn spikes and marble pedestals, knight's L-jumps onto tall platforms, a flying-ship ride up a rook tower with winding spirals and banners, the bishop's diagonal in ball mode with interlocking spikes, everything mixed in the queen's hall, and a boss fight against the king himself who throws pawns that land on the ground and on platforms.
 
@@ -208,9 +229,9 @@ A grand marble chessboard under a twilight sky that deepens from pale lilac at t
 | **Damens sal** | the queen's hall, hardest stretch | Everything mixed: pedestals, pads, platforms at different heights, spike-topped landings, orbs, a steep drop. The queen moves anywhere, and so do the obstacles. |
 | **Kungens tron** | the king's throne, boss fight | The king stands on the board ahead of you, throwing pawns that land on ground level and on platform heights. Jump over the pawns and platforms, then reach the king to topple him — **Schack matt!** |
 
-Level 4 has its own D-minor baroque soundtrack with a harpsichord lead and a march for the king's procession. The harmonic minor scale gives the board an ancient, formal tone that shifts toward the king's fanfare as you near the end.
+Level 5 has its own D-minor baroque soundtrack with a harpsichord lead and a march for the king's procession. The harmonic minor scale gives the board an ancient, formal tone that shifts toward the king's fanfare as you near the end.
 
-## Level 5: Djupet (≈ 1:38, 10 checkpoints)
+## Level 6: Djupet (≈ 1:38, 10 checkpoints)
 
 A little longer and harder than the chess level: a deep-sea dive with half-jumps, sharks, eels, a cave-in that shifts you to a deeper layer, flying-ship mode through jellyfish swarms, floorball mode inside a whale with an irregular rhythm, and the tightest stretch without a checkpoint.
 
@@ -223,9 +244,9 @@ A little longer and harder than the chess level: a deep-sea dive with half-jumps
 | **Djuphavet** | the darkest, tightest, longest stretch | Eels darting up from holes in the sea floor, sharks to jump over, kelp platforms over a deep chasm. No checkpoint midway. |
 | **Ytan** | swimming toward the light and surface | A final rising chain of bubbles straight to the goal. |
 
-Level 5 has its own ambient soundtrack in A minor: flowing and ethereal in the reef and wreck, darker and sparser in the whale and deep sea, brightening toward major as you reach the surface.
+Level 6 has its own ambient soundtrack in A minor: flowing and ethereal in the reef and wreck, darker and sparser in the whale and deep sea, brightening toward major as you reach the surface.
 
-## Level 6: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
+## Level 7: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
 
 A dark horror level with blood, jump scares, bloody nuns, creepy clowns and strobe lights, rated 16+ (the menu card shows a red 16+ badge and a ⚡ for flashing lights). It is hard in other ways than tight jumps too: darkness where only your lantern shines, strobe light where you only see the level in the flashes, moving hazards, running upside down on the ceiling, a mirrored screen, and jump scares that distract you. The last stretch, from the ghost train to the finish, has no checkpoint.
 
@@ -260,7 +281,7 @@ Music: its own doom-metal soundtrack in C minor, in half-time so it feels like 7
 
 ## How it's built
 
-Everything is vanilla JavaScript with Canvas 2D and WebAudio. The game has **no image or audio files**: Vippe, the scenery and the soundtrack are all drawn and synthesised in code. The PNGs in `icons/` are only the app icon, drawn by `tools/icons.html`. The music is generated live at 156 BPM, which is exactly 4 blocks per beat, so obstacles land on the beat. When you respawn, the music restarts from the checkpoint.
+Everything is vanilla JavaScript with Canvas 2D and WebAudio. The game has **no image or audio files**: Vippe, the scenery, the neighbours and the soundtrack are all drawn and synthesised in code. The PNGs in `icons/` are only the app icon, drawn by `tools/icons.html`. The music is generated live at 156 BPM, which is exactly 4 blocks per beat, so obstacles land on the beat. When you respawn, the music restarts from the checkpoint.
 
 ```
 index.html        page + menus (level select, shop, level-complete screen)
@@ -271,7 +292,8 @@ js/level.js       level builder, the level layouts, their themes and the level l
 js/solver.js      search bot that proves the levels are beatable
 js/audio.js       procedural chiptune (one song per level) + sound effects
 js/art.js         all drawing: Vippe, Affelito and their skins, obstacles, animals, landmarks
-js/horror.js      level 6 only: nuns, clowns, pendulums, jump-scare faces, graveyard/convent/circus scenery
+js/horror.js      level 7 only: nuns, clowns, pendulums, jump-scare faces, graveyard/convent/circus scenery
+js/stratus.js     level 1 only: the four neighbours (throwers), the rocket skateboard, props
 js/render.js      parallax scene, camera (incl. following you down a hole), HUD
 js/game.js        game loop, input, checkpoints, menus, coins and the shop
 js/mobile.js      phone extras: fullscreen + landscape, portrait pause, back button
@@ -284,7 +306,8 @@ tools/verify.html level verifier in the browser
 tools/verify.py   level verifier from the command line (headless Chrome)
 tools/map.html    draws a schematic map of a level's layout and rhythm
 tools/skins.html  gallery of every skin in every mode, for checking designs
-tools/horror.html gallery of all level 6 art: nuns, clowns, pendulums, jump scares; use ?t=<seconds> to freeze time
+tools/horror.html gallery of all level 7 art: nuns, clowns, pendulums, jump scares; use ?t=<seconds> to freeze time
+tools/people.html gallery of the level 1 neighbours (throwers); supports ?t=<seconds> and ?scale=
 tools/shot.py     takes a PNG screenshot of any page with headless Chrome
 tools/headless.py shared helper: runs pages in headless Chrome (finds Chrome or Edge automatically)
 tools/icons.html  draws the app icons
@@ -295,7 +318,7 @@ tools/release.py  one command to ship: check, verify, build and serve a new mobi
 
 ### Editing a level
 
-Each level is a build function in `js/level.js` (`buildHome()`, `buildForest()` and `buildMetro()`), listed in `LEVELS` together with its theme (sky colours, ground, music) and coin reward. Units are blocks, and the player moves 10.4 blocks/s. For example:
+Each level is a build function in `js/level.js` (`buildStratus()`, `buildHome()`, `buildForest()`, etc.), listed in `LEVELS` together with its theme (sky colours, ground, music) and coin reward. Units are blocks, and the player moves 10.4 blocks/s. For example:
 
 ```js
 b.spike(26);                 // spike on the ground at x = 26
@@ -311,7 +334,23 @@ b.portal(712, 'ship', { ceil: 10 });
 b.checkpoint(96);
 ```
 
-Level 2 adds:
+Level 1 (Stratusvägen) adds:
+
+```js
+b.bump(x);                   // a speed bump — a low obstacle spanning both lanes, just a little hop to clear
+b.coin(x, y, opts);          // a coin pickup: candy or football (1 each). opts.lane places it in lane 0/1.
+                             // opts.mv throws it (e.g. from a person's hand): { type: 'throw', hx, hy, trigger, fall, arc }
+b.lane(object, lane);        // tags any gameplay object with a lane (0 near, 1 far); returns the object
+b.speed(x0, x1, mult);       // a speed zone: run speed multiplies by mult from x0 to x1; music stays in sync via Physics.timeAt
+b.lob(x, y, opts);           // a hazard thrown from a fixed position: kind 'zucchini' or 'dumbbell'. 
+                             // from: [hx, hy] is the thrower's position; trigger - fall must be ≥ 4
+b.swing(x0, x1);             // a zone where the camera swings/pans for cinematic effect (data marker for render)
+b.board(x0, x1);             // the rocket-skateboard ride zone (data marker for render)
+b.house(x, num, row);        // a house number marker: num is the house number, row 'far' (background) or 'near' (foreground)
+b.person(id, x, opts);       // a fixed person (thrower): id, position x, and opts for render (mood, handY, throws, etc.)
+```
+
+Level 3 (Tunnelbanan) adds:
 
 ```js
 b.train(233, 12);            // a parked metro train, 2.5 blocks tall: too tall to jump onto, so use a pad or a step
@@ -324,7 +363,7 @@ b.hole(454, 7);              // a hole in the floor: fall through it to the laye
 
 `b.hole()` splits the level into two floors, one above the other. Everything placed after the hole is on the lower floor. When you fall in, the physics moves you up by one screen (15 blocks) and onto the lower floor, so the fall looks continuous and the camera follows you down.
 
-Level 4 (Schackmatt) adds:
+Level 5 (Schackmatt) adds:
 
 ```js
 b.king(x0, x1);              // the king boss: stands KING_AHEAD blocks ahead as the player moves through [x0, x1]
@@ -334,17 +373,17 @@ b.pawn(x, y, { trigger, fall, arc }); // a pawn thrown by the king: lands at (x,
                              // king's hand (always KING_AHEAD blocks ahead) to the landing position
 ```
 
-Level 5 (Djupet) adds:
+Level 6 (Djupet) adds:
 
 ```js
-b.half(27);                  // a low, fast hop (level 1 only until now)
+b.half(27);                  // a low, fast hop (level 2 only until now)
 b.shark(78, 5, 'left');      // a shark in the current: back is a platform, jaws (facing you) are a hazard
 b.eel(721);                  // an eel darting up out of a hole in the sea floor
 b.rail(233, 3, 'eel');       // rail()'s touch-and-die mechanic, reskinned as a glowing eel in a floor gap
 b.hole(364, 8, 16);          // the floor caves in — the rest of the level plays out one layer deeper
 ```
 
-Level 6 (Mardrömmen) adds:
+Level 7 (Mardrömmen) adds:
 
 ```js
 b.nun(x, y, { bob, beats, phase });      // a bloody nun bobbing up and down in time with the music
@@ -371,7 +410,7 @@ python tools/verify.py
 
 This runs the search bot from every checkpoint to the next one using the real game physics. Add a level name to check one level only: `python tools/verify.py forest`. Options: `--windows` to measure timing slack (slower; `!` marks a jump with less than 90 ms, `!!` less than 50 ms), `--json` to print the raw report. Exit code 0 when every level is beatable.
 
-Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 aims for 100 ms or more. Level 2's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms. Level 3 is harder: its triple spikes have about 80 ms too, and it's longer. Level 4 (Schackmatt) sits between level 3 and Djupet: most of its tightest presses are around 83 ms, with one 67 ms section in the queen's hall. Level 5's tightest presses are about 67 ms, with more of them than level 4.
+Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 (Stratusvägen) is the easiest, with very wide timing windows. Level 2's tightest jumps are around 100 ms. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms. Level 4 is harder: its triple spikes have about 80 ms too, and it's longer. Level 5 (Schackmatt) sits between level 4 and level 6: most of its tightest presses are around 83 ms, with one 67 ms section in the queen's hall. Level 6's tightest presses are about 67 ms, with more of them than level 5.
 
 To see a level's layout and rhythm at a glance, open `tools/map.html?level=<id>` in a browser. It draws a schematic top-down/side map of the level's hitboxes, obstacles and checkpoints. Options: `from=<x>&to=<x>` (show part of the level), `cols=<n>` (blocks per row), `scale=<px>` (pixels per block, default 12), `bot` (draw the bot's path from every checkpoint, red where it fails), `windows` (also colour each jump by its timing slack). Example: `tools/map.html?level=forest&from=380&to=500&windows&scale=20`.
 
@@ -400,17 +439,17 @@ Open `index.html#debug`. This shows hitboxes and FPS and adds these keys:
 | `G` | God mode |
 | `B` | The bot plays for you |
 | `C` | +500 coins (also works in the menu), for testing the shop |
-| `H` | Refill health to full (level 6 only) |
+| `H` | Refill health to full (level 7 only) |
 
 The hash (or query string) also accepts URL parameters to drop straight into a specific moment for screenshots or video:
 
 | Parameter | Effect |
 | --- | --- |
-| `level=<id>` | Start that level directly, skipping the menu. Ids: `home`, `metro`, `forest`, `chess`, `ocean`, `nightmare` |
+| `level=<id>` | Start that level directly, skipping the menu. Ids: `stratus`, `home`, `metro`, `forest`, `chess`, `ocean`, `nightmare` |
 | `cp=<n>` | Start at checkpoint *n* (0 = the start) |
 | `x=<blocks>` | Start at any x position. The bot plays from the checkpoint before it up to x, so the mode, gravity and floor are right |
 | `skin=<id>` | Wear any skin for this session only (not saved; coins and owned skins untouched) |
-| `hp=<n>` | Start with that much health on level 6 (e.g. to test game over); has no effect on other levels |
+| `hp=<n>` | Start with that much health on level 7 (e.g. to test game over); has no effect on other levels |
 | `bot` | The bot plays |
 | `god` | God mode |
 | `mute` | Start muted (not saved) |

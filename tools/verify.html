@@ -50,7 +50,7 @@ those levels (default: all levels), and <code>windows</code>
       const rep = VD.Solver.verifyAll(lvl, { windows });
       // whole level in one go
       const full = VD.Solver.solve(lvl, VD.Physics.spawn(lvl.checkpoints[0]), lvl.finishX + 1, { maxNodes: 3000000 });
-      html += '<h3>Level ' + L.num + ': ' + L.name + ' (' + lvl.checkpoints.length + ' checkpoints, ' + (lvl.finishX / VD.PHYS.SPEED).toFixed(1) + ' s)</h3>';
+      html += '<h3>Level ' + L.num + ': ' + L.name + ' (' + lvl.checkpoints.length + ' checkpoints, ' + VD.Physics.timeAt(lvl, lvl.finishX).toFixed(1) + ' s)</h3>';
       html += '<table><tr><th>cp</th><th>from</th><th>to</th><th>ok</th><th>furthest x</th><th>nodes</th><th>ms</th>' + (windows ? '<th>tightest press (ms)</th><th>at x</th>' : '') + '</tr>';
       for (const r of rep) {
         let tight = '', at = '';
@@ -72,7 +72,7 @@ those levels (default: all levels), and <code>windows</code>
         num: L.num,
         name: L.name,
         checkpoints: lvl.checkpoints.length,
-        seconds: +(lvl.finishX / VD.PHYS.SPEED).toFixed(1),
+        seconds: +VD.Physics.timeAt(lvl, lvl.finishX).toFixed(1),
         rows: rep.map(rowJson),
         full: { ok: full.ok, reason: full.reason || null, maxX: +full.maxX.toFixed(1), nodes: full.nodes },
       });

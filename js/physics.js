@@ -24,6 +24,8 @@
     BUFFER: 0.09, // a fresh press stays "live" this long (orbs, landing jumps)
     INSET: 0.06, // player hitbox inset against hazards
     ORB_R: 0.6,
+    LANE_RATE: 0.16, // seconds for a full lane switch (laneP 0 -> 1 or back)
+    LANE_HIT: 0.4, // an object with a `lane` only interacts within this much of |laneP - lane|
   };
   VD.PHYS = P;
 
@@ -37,8 +39,12 @@
 
   // The player's x-based "level clock" offset/state of a moving hazard, at player position x.
   // mv.type: 'bob' (sine bob), 'pop' (jack-in-the-box), 'drop' (falling/rising nun), 'swing' (pendulum),
-  // 'throw' (a pawn thrown by the level 4 king boss, see level.js Builder.pawn()).
-  function moveOf(o, x) {
+  // 'throw' (a pawn thrown by the level 4 king boss, see level.js Builder.pawn() — or, with mv.hx set, a
+  // hazard/coin thrown by a stationary thrower standing at a fixed point, see Builder.lob()).
+  // `lvl` (optional) is only used for the beat clock (bob/pop/swing): when the level has speed zones,
+  // moveOf needs the real elapsed time at x, not just x / P.SPEED (see timeAt below). step() passes it;
+  // callers without a level clock nearby (or on a level with no speed zones) can omit it.
+  function moveOf(o, x, lvl) {
     MV.dx = 0;
     MV.dy = 0;
     MV.a = 0;
@@ -58,15 +64,17 @@
       let p = (x - (o.x - mv.trigger)) / mv.fall;
       if (p < 0) p = 0;
       else if (p > 1) p = 1;
-      // the king's hand is always mv.ahead blocks ahead of the player, at height mv.handY; the pawn's
-      // world position is the lerp from there to its landing spot, plus a parabolic arc in y
-      const handX = x + mv.ahead;
+      // the thrower's hand: mv.hx/mv.hy when it's a fixed point (Builder.lob()), otherwise the level 4
+      // king's hand, always mv.ahead blocks ahead of the player at height mv.handY. The thrown object's
+      // world position is the lerp from there to its landing spot, plus a parabolic arc in y.
+      const handX = mv.hx != null ? mv.hx : x + mv.ahead;
+      const handY = mv.hx != null ? mv.hy : mv.handY;
       MV.dx = (handX - o.x) * (1 - p);
-      MV.dy = (mv.handY - o.y) * (1 - p) + mv.arc * 4 * p * (1 - p);
+      MV.dy = (handY - o.y) * (1 - p) + mv.arc * 4 * p * (1 - p);
       MV.k = p;
       return MV;
     }
-    const t = x / P.SPEED;
+    const t = lvl ? timeAt(lvl, x) : x / P.SPEED;
     const u = t / (mv.beats * BEAT) + (mv.phase || 0);
     if (mv.type === 'bob') {
       MV.dy = mv.amp * Math.sin(2 * Math.PI * u);
@@ -99,6 +107,8 @@
       lastPad: -1,
       lastPortal: -1,
       layer: cp.layer || 0, // 0 = the normal floor; +1 for every hole you've fallen through (level 2)
+      lane: cp.lane || 0, // 'lane' mode (Stratusvägen): which lane (0 near, 1 far) the player is headed to
+      laneP: cp.lane || 0, // 0..1 position between the lanes; follows `lane` at P.LANE_RATE
       dead: false,
       cause: null,
       dmg: null, // how much damage the last death dealt (null until a hazard/solid kills)
@@ -109,8 +119,52 @@
     return {
       x: s.x, y: s.y, vy: s.vy, mode: s.mode, gdir: s.gdir, ceil: s.ceil, grounded: s.grounded,
       held: s.held, pressAge: s.pressAge, lastOrb: s.lastOrb, lastPad: s.lastPad,
-      lastPortal: s.lastPortal, layer: s.layer, dead: s.dead, cause: s.cause, dmg: s.dmg,
+      lastPortal: s.lastPortal, layer: s.layer, lane: s.lane, laneP: s.laneP,
+      dead: s.dead, cause: s.cause, dmg: s.dmg,
     };
+  }
+
+  // ---- speed zones (Stratusvägen's 1.5x stretch; a no-op everywhere else) ----
+  // lvl.speeds (always an array, empty by default — see level.js Builder.speed()/Level) holds
+  // { x0, x1, mult } zones, sorted by x0 and non-overlapping. speedAt is the instant speed at x (the
+  // change is a hard step at a zone's edges, which is fine at 240 Hz). timeAt is the level clock in
+  // seconds at x — the integral of dx / speed — used everywhere x used to be divided by the constant
+  // P.SPEED. It must return exactly x / P.SPEED when there are no zones (the fast path every other
+  // level takes), and it's O(zones) with no allocation so it's safe to call every tick.
+  function speedAt(lvl, x) {
+    const zs = lvl && lvl.speeds;
+    if (!zs || !zs.length) return P.SPEED;
+    for (let i = 0; i < zs.length; i++) {
+      const z = zs[i];
+      if (x >= z.x0 && x < z.x1) return P.SPEED * z.mult;
+    }
+    return P.SPEED;
+  }
+
+  function timeAt(lvl, x) {
+    const zs = lvl && lvl.speeds;
+    if (!zs || !zs.length) return x / P.SPEED;
+    let t = 0, cx = 0;
+    for (let i = 0; i < zs.length && cx < x; i++) {
+      const z = zs[i];
+      if (z.x1 <= cx) continue; // behind us already
+      if (z.x0 > cx) {
+        // a normal-speed gap before this zone
+        const gapEnd = Math.min(z.x0, x);
+        t += (gapEnd - cx) / P.SPEED;
+        cx = gapEnd;
+        if (cx >= x) break;
+      }
+      if (x > z.x0) {
+        const segEnd = Math.min(z.x1, x);
+        if (segEnd > cx) {
+          t += (segEnd - cx) / (P.SPEED * z.mult);
+          cx = segEnd;
+        }
+      }
+    }
+    if (x > cx) t += (x - cx) / P.SPEED;
+    return t;
   }
 
   function setMode(s, portal) {
@@ -137,7 +191,8 @@
   // Advance one fixed step. `held` = is the jump input down. `ev` (optional) receives event names.
   function step(s, held, lvl, ev) {
     const dt = P.DT;
-    if (held && !s.held) s.pressAge = 0;
+    const freshPress = held && !s.held; // the raw press edge, used by 'lane' mode below
+    if (freshPress) s.pressAge = 0;
     else s.pressAge += dt;
     s.held = held;
     let fresh = s.pressAge <= P.BUFFER;
@@ -158,6 +213,17 @@
       s.vy += (held ? P.SHIP_UP : -P.SHIP_DOWN) * up * dt;
       if (s.vy > P.SHIP_VUP) s.vy = P.SHIP_VUP;
       else if (s.vy < -P.SHIP_VDOWN) s.vy = -P.SHIP_VDOWN;
+    } else if (s.mode === 'lane') {
+      // Stratusvägen's two-lane street: runs on the ground like cube (same gravity, no ceiling flip),
+      // but a fresh press never jumps — it toggles which lane (0 near, 1 far) the player is headed to.
+      // laneP eases towards it below at P.LANE_RATE, regardless of mode, so leaving lane mode just
+      // freezes it in place (see the "lane easing" block after this if/else chain).
+      if (freshPress) {
+        s.lane = s.lane ? 0 : 1;
+        if (ev) ev.push('lane');
+      }
+      s.vy += s.gdir * P.G * dt;
+      if (s.gdir < 0 ? s.vy < -P.MAX_FALL : s.vy > P.MAX_FALL) s.vy = s.gdir * P.MAX_FALL;
     } else {
       // ball
       if (s.grounded && (fresh || held)) {
@@ -172,10 +238,18 @@
       else if (s.vy < -P.BALL_VMAX) s.vy = -P.BALL_VMAX;
     }
 
+    // laneP eases towards `lane` at a constant rate (a full switch takes P.LANE_RATE seconds); this runs
+    // in every mode, but outside 'lane' mode `lane` never changes so laneP just sits at 0 — zero effect.
+    if (s.laneP !== s.lane) {
+      const laneStep = dt / P.LANE_RATE;
+      if (s.laneP < s.lane) s.laneP = Math.min(s.lane, s.laneP + laneStep);
+      else s.laneP = Math.max(s.lane, s.laneP - laneStep);
+    }
+
     // ---- move ----
     const ph = boxH(s);
     const prevY = s.y;
-    s.x += P.SPEED * dt;
+    s.x += speedAt(lvl, s.x) * dt;
     s.y += s.vy * dt;
     s.grounded = false;
 
@@ -206,6 +280,7 @@
     for (let i = 0; i < n; i++) {
       const o = near[i];
       if (o.t !== 'solid') continue;
+      if (o.lane != null && Math.abs(s.laneP - o.lane) >= P.LANE_HIT) continue;
       if (s.x < o.x + o.w && s.x + 1 > o.x && s.y < o.y + o.h && s.y + ph > o.y) {
         const top = o.y + o.h, bot = o.y;
         const canTop = s.mode !== 'cube' || s.gdir < 0;
@@ -233,10 +308,11 @@
     for (let i = 0; i < n; i++) {
       const o = near[i];
       const t = o.t;
+      if (o.lane != null && Math.abs(s.laneP - o.lane) >= P.LANE_HIT) continue;
       if (t === 'haz') {
         let hx0 = o.hx0, hx1 = o.hx1, hy0 = o.hy0, hy1 = o.hy1;
         if (o.mv) {
-          const mo = moveOf(o, s.x);
+          const mo = moveOf(o, s.x, lvl);
           hx0 += mo.dx; hx1 += mo.dx; hy0 += mo.dy; hy1 += mo.dy;
         }
         if (ix0 < hx1 + m && ix1 > hx0 - m && iy0 < hy1 + m && iy1 > hy0 - m) {
@@ -275,5 +351,5 @@
     return s;
   }
 
-  VD.Physics = { spawn, clone, step, boxH, moveOf };
+  VD.Physics = { spawn, clone, step, boxH, moveOf, speedAt, timeAt };
 })();

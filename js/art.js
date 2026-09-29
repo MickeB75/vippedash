@@ -3358,6 +3358,228 @@
         ctx.fillRect(x - 2, y - 6, w + 4, 8);
         break;
       }
+      // ---- Stratusvägen (level 8 "Stratusvägens alla helgon") ----
+      case 'car': {
+        const cols = ['#8a1a24', '#1c3a6e', '#2a2a30', '#5a5f66', '#175a3a'];
+        const body = TL(cols[seed % cols.length]);
+        const wheelY = y + h - Math.min(10, h * 0.16);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(x + w / 2, y + h + 2, w * 0.48, 5, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = body;
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.04, wheelY);
+        ctx.lineTo(x + w * 0.04, y + h * 0.56);
+        ctx.quadraticCurveTo(x + w * 0.1, y + h * 0.38, x + w * 0.26, y + h * 0.34);
+        ctx.lineTo(x + w * 0.32, y + h * 0.14);
+        ctx.quadraticCurveTo(x + w * 0.36, y + h * 0.04, x + w * 0.5, y + h * 0.04);
+        ctx.lineTo(x + w * 0.74, y + h * 0.04);
+        ctx.quadraticCurveTo(x + w * 0.86, y + h * 0.06, x + w * 0.9, y + h * 0.22);
+        ctx.lineTo(x + w * 0.94, y + h * 0.34);
+        ctx.quadraticCurveTo(x + w * 0.98, y + h * 0.4, x + w * 0.98, y + h * 0.56);
+        ctx.lineTo(x + w * 0.98, wheelY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = TL('#0c0c10');
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(20,26,34,0.88)';
+        rr(ctx, x + w * 0.34, y + h * 0.12, w * 0.16, h * 0.24, 3);
+        ctx.fill();
+        rr(ctx, x + w * 0.54, y + h * 0.12, w * 0.22, h * 0.24, 3);
+        ctx.fill();
+        ctx.fillStyle = TL('#ffe9a8');
+        rr(ctx, x + w * 0.9, y + h * 0.42, w * 0.06, h * 0.12, 2);
+        ctx.fill();
+        ctx.fillStyle = TL('#c0182a');
+        rr(ctx, x + w * 0.02, y + h * 0.42, w * 0.05, h * 0.12, 2);
+        ctx.fill();
+        ctx.fillStyle = '#161616';
+        for (const wx of [x + w * 0.22, x + w * 0.78]) {
+          circle(ctx, wx, wheelY, Math.min(w, h) * 0.16);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#5a5a5a';
+        for (const wx of [x + w * 0.22, x + w * 0.78]) {
+          circle(ctx, wx, wheelY, Math.min(w, h) * 0.07);
+          ctx.fill();
+        }
+        if (seed % 3 === 0) {
+          const ps = (h * 0.44) / (1.1 * 48); // a small pumpkin on the roof, about 0.44 of the car's height wide
+          if (VD.Stratus && VD.Stratus.pumpkin) VD.Stratus.pumpkin(ctx, x + w * 0.5, y + h * 0.05, ps, t || 0, true);
+          else {
+            ctx.fillStyle = TL('#e8731f');
+            circle(ctx, x + w * 0.5, y + h * 0.02, h * 0.14);
+            ctx.fill();
+          }
+        }
+        break;
+      }
+      case 'trailer': {
+        const wheelY = y + h - 6;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(x + w / 2, y + h + 2, w * 0.46, 5, 0, 0, TAU);
+        ctx.fill();
+        bevel(ctx, x + w * 0.06, y + h * 0.12, w * 0.88, h * 0.62, TL('#9a9ea6'), TL('#5c6068'), TL('#242428'), 5);
+        ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+        ctx.lineWidth = 2;
+        for (let rx = x + w * 0.16; rx < x + w * 0.9; rx += w * 0.12) {
+          ctx.beginPath();
+          ctx.moveTo(rx, y + h * 0.14);
+          ctx.lineTo(rx, y + h * 0.7);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = TL('#3a3a3e');
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(x, y + h * 0.62);
+        ctx.lineTo(x - w * 0.08, wheelY);
+        ctx.stroke();
+        ctx.fillStyle = TL('#3a3a3e');
+        circle(ctx, x - w * 0.08, wheelY, 4);
+        ctx.fill();
+        ctx.fillStyle = '#161616';
+        circle(ctx, x + w * 0.62, wheelY, Math.min(w, h) * 0.14);
+        ctx.fill();
+        ctx.fillStyle = '#5a5a5a';
+        circle(ctx, x + w * 0.62, wheelY, Math.min(w, h) * 0.06);
+        ctx.fill();
+        break;
+      }
+      case 'kids': {
+        const costumes = ['ghost', 'witch', 'skeleton'];
+        for (let i = 0; i < 3; i++) {
+          const cx2 = x + w * (0.2 + i * 0.3), kh = h * (0.6 + (i % 2) * 0.32);
+          const ky = y + h - kh;
+          const kind = costumes[(seed + i) % costumes.length];
+          const bw = Math.min(w * 0.3, h * 0.32);
+          if (kind === 'ghost') {
+            ctx.fillStyle = 'rgba(240,240,248,0.95)';
+            ctx.beginPath();
+            ctx.moveTo(cx2 - bw * 0.5, y + h);
+            ctx.quadraticCurveTo(cx2 - bw * 0.6, ky, cx2, ky - bw * 0.2);
+            ctx.quadraticCurveTo(cx2 + bw * 0.6, ky, cx2 + bw * 0.5, y + h);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = '#1a1a1a';
+            circle(ctx, cx2 - bw * 0.18, ky + bw * 0.3, 2);
+            ctx.fill();
+            circle(ctx, cx2 + bw * 0.18, ky + bw * 0.3, 2);
+            ctx.fill();
+          } else if (kind === 'witch') {
+            ctx.fillStyle = TL('#4a2a68');
+            ctx.beginPath();
+            ctx.moveTo(cx2 - bw * 0.4, y + h);
+            ctx.lineTo(cx2 - bw * 0.3, ky + bw * 0.5);
+            ctx.lineTo(cx2 + bw * 0.3, ky + bw * 0.5);
+            ctx.lineTo(cx2 + bw * 0.4, y + h);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#f0c9a0';
+            circle(ctx, cx2, ky + bw * 0.3, bw * 0.28);
+            ctx.fill();
+            ctx.fillStyle = '#1a1420';
+            tri(ctx, cx2 - bw * 0.35, ky + bw * 0.1, cx2 + bw * 0.35, ky + bw * 0.1, cx2 + bw * 0.05, ky - bw * 0.55);
+            ctx.fill();
+            ctx.fillRect(cx2 - bw * 0.42, ky + bw * 0.02, bw * 0.84, bw * 0.12);
+          } else {
+            ctx.fillStyle = '#181818';
+            ctx.beginPath();
+            ctx.moveTo(cx2 - bw * 0.38, y + h);
+            ctx.lineTo(cx2 - bw * 0.3, ky + bw * 0.55);
+            ctx.lineTo(cx2 + bw * 0.3, ky + bw * 0.55);
+            ctx.lineTo(cx2 + bw * 0.38, y + h);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(cx2, ky + bw * 0.6);
+            ctx.lineTo(cx2, y + h - 2);
+            for (let r = 0; r < 3; r++) {
+              ctx.moveTo(cx2 - bw * 0.2, ky + bw * 0.7 + r * bw * 0.3);
+              ctx.lineTo(cx2 + bw * 0.2, ky + bw * 0.7 + r * bw * 0.3);
+            }
+            ctx.stroke();
+            ctx.fillStyle = '#f0e8d8';
+            circle(ctx, cx2, ky + bw * 0.32, bw * 0.26);
+            ctx.fill();
+            ctx.fillStyle = '#181818';
+            circle(ctx, cx2 - bw * 0.09, ky + bw * 0.28, 1.6);
+            ctx.fill();
+            circle(ctx, cx2 + bw * 0.09, ky + bw * 0.28, 1.6);
+            ctx.fill();
+          }
+          ctx.fillStyle = TL('#e8731f');
+          rr(ctx, cx2 + bw * 0.32, y + h - bw * 0.34, bw * 0.24, bw * 0.24, 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'pumpkin': {
+        // VD.Stratus.pumpkin's size arg is a scale multiplier (its own b = s * 48), not a pixel size —
+        // pick s so the pumpkin's rendered width (1.1 * s * 48) fills most of the block's width
+        const ps = (w * 0.92) / (1.1 * 48);
+        const cy2 = y + h - ps * 48 * 0.46;
+        if (VD.Stratus && VD.Stratus.pumpkin) VD.Stratus.pumpkin(ctx, x + w / 2, cy2, ps, t || 0, true);
+        else {
+          ctx.fillStyle = TL('#e8731f');
+          ctx.beginPath();
+          ctx.ellipse(x + w / 2, y + h * 0.6, w * 0.46, h * 0.4, 0, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = TL('#8a3a10');
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'bin': {
+        ctx.fillStyle = TL('#2c2e34');
+        rr(ctx, x + w * 0.08, y + h * 0.18, w * 0.84, h * 0.78, 4);
+        ctx.fill();
+        ctx.strokeStyle = TL('#0e0f12');
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = TL('#1c1d22');
+        rr(ctx, x + w * 0.04, y + h * 0.06, w * 0.92, h * 0.16, 3);
+        ctx.fill();
+        ctx.fillStyle = '#111';
+        circle(ctx, x + w * 0.22, y + h * 0.98, w * 0.1);
+        ctx.fill();
+        circle(ctx, x + w * 0.78, y + h * 0.98, w * 0.1);
+        ctx.fill();
+        ctx.strokeStyle = TL('#3a3c42');
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.5, y + h * 0.06);
+        ctx.lineTo(x + w * 0.5, y - h * 0.06);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(230,230,238,0.55)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.08, y + h * 0.2);
+        ctx.quadraticCurveTo(x + w * 0.3, y + h * 0.05, x + w * 0.5, y + h * 0.18);
+        ctx.moveTo(x + w * 0.08, y + h * 0.32);
+        ctx.quadraticCurveTo(x + w * 0.26, y + h * 0.2, x + w * 0.4, y + h * 0.3);
+        ctx.stroke();
+        ctx.fillStyle = '#0c0c0c';
+        circle(ctx, x + w * 0.3, y + h * 0.14, 2.4);
+        ctx.fill();
+        ctx.strokeStyle = '#0c0c0c';
+        ctx.lineWidth = 1;
+        for (const a of [-1, -0.4, 0.4, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(x + w * 0.3, y + h * 0.14);
+          ctx.lineTo(x + w * 0.3 + a * 4, y + h * 0.14 + 3);
+          ctx.stroke();
+        }
+        break;
+      }
       default: {
         if (METRO_BLOCKS[st]) return METRO_BLOCKS[st](ctx, x, y, w, h, bs, seed, t);
         bevel(ctx, x, y, w, h, '#30303a', '#16161c', '#ffffff', 4);
@@ -3969,6 +4191,28 @@
     ctx.fillRect(x - 13, base - 46, 26, 46);
     ctx.fillStyle = T('#2d5c7a');
     ctx.fillRect(x - 9, base - 42, 18, 42);
+  };
+  // a white/cream modern villa, mid-ground background for Stratusvägen (replaces the generic city row there)
+  mid.villa = function (ctx, x, base, d) {
+    const w = 150, h = 96;
+    ctx.fillStyle = T('#e7e4da');
+    ctx.fillRect(x - w / 2, base - h, w, h);
+    ctx.fillStyle = T('#4a4a52');
+    ctx.fillRect(x - w / 2 - 6, base - h - 12, w + 12, 14);
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    ctx.fillRect(x - w / 2, base - h * 0.52, w, 3);
+    const n = (d.seed || 1) * 500;
+    windowRect(ctx, x - w * 0.32, base - h + 14, 20, 24, n);
+    windowRect(ctx, x + w * 0.08, base - h + 14, 20, 24, n + 1);
+    windowRect(ctx, x - w * 0.32, base - h * 0.42, 20, 24, n + 2);
+    ctx.strokeStyle = T('#c9c6ba');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.05, base - h * 0.42 + 26);
+    ctx.lineTo(x + w * 0.42, base - h * 0.42 + 26);
+    ctx.stroke();
+    ctx.fillStyle = T('#3a3a40');
+    ctx.fillRect(x - 14, base - 40, 28, 40);
   };
   mid.barn = function (ctx, x, base) {
     const w = 230, h = 100;
@@ -6204,6 +6448,122 @@
         ctx.fill();
       }
     }
+  };
+  // ---- Stratusvägen: candy and football pickups, and hazards thrown from a fixed thrower ----
+  // a coin (candy or a football, see Builder.coin()) drawn centred at cx, cy, gently bobbing. Placeholder
+  // art: a small wrapped candy (bright, twisted ends) or a black-and-white football — the art pass polishes it.
+  Art.coin = function (ctx, cx, cy, bs, style, t, seed) {
+    const bob = Math.sin(t * 3 + seed) * bs * 0.06;
+    const ang = Math.sin(t * 2 + seed) * 0.25;
+    // Stratusvägen: hand the coin off to the neighbour art (js/stratus.js) when it's loaded, so candy and
+    // footballs match the props the throwers are actually holding. Falls back to the plain shapes below
+    // when js/stratus.js hasn't loaded yet (or on every other level, which never uses these styles).
+    const VDS = VD.Stratus;
+    if (VDS) {
+      if (style === 'football' && VDS.football) {
+        VDS.football(ctx, cx, cy + bob, bs * 0.0105, ang);
+        return;
+      }
+      if (style !== 'football' && VDS.candy) {
+        VDS.candy(ctx, cx, cy + bob, bs * 0.0105, ang);
+        return;
+      }
+    }
+    const r = bs * 0.24;
+    ctx.save();
+    ctx.translate(cx, cy + bob);
+    ctx.rotate(ang);
+    if (style === 'football') {
+      ctx.fillStyle = '#f2f2f2';
+      circle(ctx, 0, 0, r);
+      ctx.fill();
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = Math.max(1, bs * 0.03);
+      ctx.stroke();
+      ctx.fillStyle = '#1a1a1a';
+      circle(ctx, 0, 0, r * 0.4);
+      ctx.fill();
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * TAU;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r * 0.4, Math.sin(a) * r * 0.4);
+        ctx.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9);
+        ctx.stroke();
+      }
+    } else {
+      // wrapped candy: a bright cylinder with twisted foil ends
+      ctx.fillStyle = seed % 2 === 0 ? '#ff5fa0' : '#ffb02e';
+      rr(ctx, -r * 1.1, -r * 0.55, r * 2.2, r * 1.1, r * 0.5);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      rr(ctx, -r * 0.9, -r * 0.4, r * 1.8, r * 0.32, r * 0.16);
+      ctx.fill();
+      ctx.fillStyle = seed % 2 === 0 ? '#c8397a' : '#c47c1a';
+      tri(ctx, -r * 1.1, -r * 0.55, -r * 1.7, 0, -r * 1.1, r * 0.55);
+      ctx.fill();
+      tri(ctx, r * 1.1, -r * 0.55, r * 1.7, 0, r * 1.1, r * 0.55);
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+  // a hazard in flight (or freshly landed) from a fixed thrower (Builder.lob()): kind 'zucchini' or
+  // 'dumbbell', spinning while it flies and settling flat once it lands. A dark shadow at the landing
+  // spot (shadowX, shadowY — always on the ground) fades in as it approaches, so the player can see
+  // where it'll come down.
+  Art.lob = function (ctx, cx, cy, shadowX, shadowY, bs, k, kind, t, seed) {
+    const shadowA = 0.15 + 0.25 * Math.min(1, k + 0.15);
+    ctx.fillStyle = 'rgba(0,0,0,' + shadowA.toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(shadowX, shadowY - 3, bs * 0.32 * (0.5 + 0.5 * k), bs * 0.1, 0, 0, TAU);
+    ctx.fill();
+    const ang = k < 0.999 ? k * TAU * 2.4 + seed : 0;
+    // hand off to js/stratus.js's props when present (see the comment in Art.coin above)
+    const VDS = VD.Stratus;
+    if (VDS) {
+      if (kind === 'dumbbell' && VDS.dumbbell) {
+        VDS.dumbbell(ctx, cx, cy, bs * 0.016, ang);
+        return;
+      }
+      if (kind === 'zucchini' && VDS.zucchini) {
+        VDS.zucchini(ctx, cx, cy, bs * 0.0085, ang);
+        return;
+      }
+    }
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (k < 0.999) ctx.rotate(ang);
+    if (kind === 'dumbbell') {
+      const barW = bs * 0.7, plateR = bs * 0.22;
+      ctx.strokeStyle = '#2a2a30';
+      ctx.lineWidth = bs * 0.09;
+      ctx.beginPath();
+      ctx.moveTo(-barW / 2, 0);
+      ctx.lineTo(barW / 2, 0);
+      ctx.stroke();
+      ctx.fillStyle = '#3a3a42';
+      circle(ctx, -barW / 2, 0, plateR);
+      ctx.fill();
+      circle(ctx, barW / 2, 0, plateR);
+      ctx.fill();
+      ctx.fillStyle = '#57575f';
+      circle(ctx, -barW / 2, 0, plateR * 0.4);
+      ctx.fill();
+      circle(ctx, barW / 2, 0, plateR * 0.4);
+      ctx.fill();
+    } else {
+      // zucchini: an elongated green body with a lighter tip
+      const len = bs * 0.75, w = bs * 0.26;
+      const g = ctx.createLinearGradient(-len / 2, 0, len / 2, 0);
+      g.addColorStop(0, '#2f6a1e');
+      g.addColorStop(1, '#8fce4a');
+      ctx.fillStyle = g;
+      rr(ctx, -len / 2, -w / 2, len, w, w / 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      rr(ctx, -len * 0.3, -w * 0.28, len * 0.5, w * 0.22, w * 0.1);
+      ctx.fill();
+    }
+    ctx.restore();
   };
   // the king himself: a big stately figure standing a fixed distance ahead of the player, drawn at
   // (x, groundY) with his feet at that point. `toppled` (0..1) tips him over at the finish; `armK` is

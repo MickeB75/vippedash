@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VippeDash Stratusvägen people gallery</title>
+<style>
+  @font-face {
+    font-family: 'Lilita One';
+    src: url('../fonts/LilitaOne-Regular.ttf') format('truetype');
+    font-display: swap;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0b0e1a; color: #e8ecf6; font: 14px/1.4 system-ui, sans-serif; }
+  body { padding: 22px; }
+  h1 { font-family: 'Lilita One', 'Arial Black', Impact, sans-serif; font-size: 28px; margin: 0 0 8px; color: #ffd634; }
+  .info { max-width: 980px; color: #aab6d8; margin: 0 0 22px; }
+  .info code { color: #dfe8ff; background: rgba(255, 255, 255, 0.08); padding: 1px 5px; border-radius: 4px; }
+  .row { display: flex; align-items: flex-end; gap: 18px; margin-bottom: 26px; flex-wrap: wrap; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .label { font-size: 12px; color: #aab6d8; text-align: center; max-width: 160px; }
+  canvas.tile { display: block; border-radius: 6px; }
+  h2 { font-family: 'Lilita One', 'Arial Black', Impact, sans-serif; font-size: 20px; margin: 22px 0 10px; color: #8fd3ff; border-bottom: 2px solid rgba(255,255,255,0.15); padding-bottom: 4px; }
+</style>
+</head>
+<body>
+<h1>Stratusvägen people gallery</h1>
+<p class="info">
+  Every draw function of <code>VD.Stratus</code> (<code>../js/stratus.js</code>), for checking the four
+  neighbours, the rocket skateboard and the props with one screenshot. Parameters: <code>t=&lt;seconds&gt;</code>
+  freeze time (deterministic pixels) &middot; <code>scale=&lt;n&gt;</code> multiply all sizes (default 1) &middot;
+  <code>bg=dusk</code> is the default street-at-dusk background (only value supported for now).
+</p>
+<div id="app"></div>
+
+<script>
+  (function () {
+    var qs = new URLSearchParams(location.search);
+    var raw = qs.get('t');
+    if (raw !== null && raw !== '' && !isNaN(parseFloat(raw))) {
+      var frozenMs = parseFloat(raw) * 1000;
+      performance.now = function () { return frozenMs; };
+    }
+  })();
+</script>
+<script src="../js/util.js"></script>
+<script src="../js/art.js"></script>
+<script src="../js/horror.js"></script>
+<script src="../js/stratus.js"></script>
+<script>
+  (function () {
+    var VD = window.VD, Art = VD.Art, Stratus = VD.Stratus;
+    var qs = new URLSearchParams(location.search);
+    var tRaw = qs.get('t');
+    var frozen = tRaw !== null && tRaw !== '' && !isNaN(parseFloat(tRaw));
+    var scale = parseFloat(qs.get('scale'));
+    if (!scale || scale <= 0) scale = 1;
+
+    Art.setDark(0.35); // dusk street tint, matches a Halloween evening
+
+    // dusk sky gradient background, drawn fresh on every tile so canvases can sit side by side
+    function paintDusk(ctx, w, h) {
+      var g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#2b2350');
+      g.addColorStop(0.55, '#6a4a5e');
+      g.addColorStop(0.8, '#c97a52');
+      g.addColorStop(1, '#3a2e28');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+      // ground strip
+      ctx.fillStyle = '#241f1a';
+      ctx.fillRect(0, h * 0.82, w, h * 0.18);
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.82);
+      ctx.lineTo(w, h * 0.82);
+      ctx.stroke();
+    }
+
+    var currentT = frozen ? parseFloat(tRaw) : performance.now() / 1000;
+    var tiles = [];
+
+    function addTile(w, h, draw, label) {
+      var c = document.createElement('canvas');
+      c.className = 'tile';
+      c.width = w;
+      c.height = h;
+      var ctx = c.getContext('2d');
+      var entry = { ctx: ctx, w: w, h: h, draw: draw };
+      tiles.push(entry);
+      paint(entry);
+      var cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.appendChild(c);
+      if (label) {
+        var l = document.createElement('div');
+        l.className = 'label';
+        l.textContent = label;
+        cell.appendChild(l);
+      }
+      return cell;
+    }
+    function paint(entry) {
+      paintDusk(entry.ctx, entry.w, entry.h);
+      entry.draw(entry.ctx, entry.w, entry.h);
+    }
+
+    function row(cells) {
+      var r = document.createElement('div');
+      r.className = 'row';
+      cells.forEach(function (c) { r.appendChild(c); });
+      return r;
+    }
+    function heading(text) {
+      var h = document.createElement('h2');
+      h.textContent = text;
+      return h;
+    }
+
+    var app = document.getElementById('app');
+
+    // ---- all four, standing together on one baseline, to compare heights and the street lineup ----
+    app.appendChild(heading('Street lineup — nr50 clearly taller than nr15, all on one baseline'));
+    var LINE_W = Math.round(560 * scale), LINE_H = Math.round(260 * scale);
+    app.appendChild(row([
+      addTile(LINE_W, LINE_H, function (ctx, w, h) {
+        var baseY = h * 0.94;
+        Stratus.nr66(ctx, w * 0.14, baseY, scale, currentT, { throwK: 0, doorK: 1 });
+        Stratus.nr62(ctx, w * 0.4, baseY, scale, currentT, { throwK: 0 });
+        Stratus.nr50(ctx, w * 0.65, baseY, scale, currentT, { throwK: 0 });
+        Stratus.nr15(ctx, w * 0.88, baseY, scale, currentT, { throwK: 0 });
+      }, 'nr66, nr62, nr50, nr15 — same baseline'),
+    ]));
+
+    // ---- the four neighbours: idle and mid-throw ----
+    app.appendChild(heading('Neighbours — idle (throwK 0) and mid-throw (throwK 0.9)'));
+    var PEOPLE_W = Math.round(140 * scale), PEOPLE_H = Math.round(240 * scale);
+    var people = [
+      { fn: 'nr66', name: 'nr66 — happy woman, candy' },
+      { fn: 'nr62', name: 'nr62 — angry woman, zucchini' },
+      { fn: 'nr50', name: 'nr50 — happy tall man, football' },
+      { fn: 'nr15', name: 'nr15 — angry short man, dumbbells' },
+    ];
+    var peopleCells = [];
+    people.forEach(function (p) {
+      [0, 0.9].forEach(function (k) {
+        var extra = p.fn === 'nr66' ? { throwK: k, doorK: 1 } : { throwK: k };
+        peopleCells.push(addTile(PEOPLE_W, PEOPLE_H, function (ctx, w, h) {
+          Stratus[p.fn](ctx, w / 2, h * 0.92, scale, currentT, extra);
+        }, p.name + ' (throwK=' + k + ')'));
+      });
+    });
+    app.appendChild(row(peopleCells));
+
+    // ---- nr66 with the door closed, for comparison ----
+    app.appendChild(heading('nr66 — door closed vs open'));
+    app.appendChild(row([
+      addTile(PEOPLE_W, PEOPLE_H, function (ctx, w, h) {
+        Stratus.nr66(ctx, w / 2, h * 0.92, scale, currentT, { throwK: 0, doorK: 0 });
+      }, 'doorK=0 (closed)'),
+      addTile(PEOPLE_W, PEOPLE_H, function (ctx, w, h) {
+        Stratus.nr66(ctx, w / 2, h * 0.92, scale, currentT, { throwK: 0, doorK: 1 });
+      }, 'doorK=1 (open)'),
+    ]));
+
+    // ---- nr62's garden ----
+    app.appendChild(heading('nr62 — raised garden boxes'));
+    var GARDEN_W = Math.round(320 * scale), GARDEN_H = Math.round(140 * scale);
+    app.appendChild(row([
+      addTile(GARDEN_W, GARDEN_H, function (ctx, w, h) {
+        Stratus.nr62Garden(ctx, w * 0.08, h * 0.85, scale, currentT);
+      }, 'nr62Garden'),
+    ]));
+
+    // ---- skateboard ----
+    app.appendChild(heading('Rocket skateboard — parked and lit'));
+    var SK_W = Math.round(180 * scale), SK_H = Math.round(120 * scale);
+    app.appendChild(row([
+      addTile(SK_W, SK_H, function (ctx, w, h) {
+        Stratus.skateboard(ctx, w / 2, h * 0.62, scale, currentT, { on: false });
+      }, 'parked'),
+      addTile(SK_W, SK_H, function (ctx, w, h) {
+        Stratus.skateboard(ctx, w / 2, h * 0.62, scale, currentT, { on: true });
+      }, 'lit'),
+    ]));
+
+    // ---- props ----
+    app.appendChild(heading('Props'));
+    var PROP_W = Math.round(110 * scale), PROP_H = Math.round(110 * scale);
+    var propCells = [];
+    [
+      ['candy A', function (ctx, w, h) { Stratus.candy(ctx, w / 2, h / 2, 0.9 * scale, 0.3); }],
+      ['candy B', function (ctx, w, h) { Stratus.candy(ctx, w * 0.3, h * 0.3, 0.9 * scale, -0.6); Stratus.candy(ctx, w * 0.65, h * 0.65, 0.9 * scale, 1.1); }],
+      ['football', function (ctx, w, h) { Stratus.football(ctx, w / 2, h / 2, 0.9 * scale, 0.4); }],
+      ['zucchini', function (ctx, w, h) { Stratus.zucchini(ctx, w / 2, h / 2, 0.9 * scale, 0.2); }],
+      ['dumbbell', function (ctx, w, h) { Stratus.dumbbell(ctx, w / 2, h / 2, 0.9 * scale, 0); }],
+      ['pumpkin lit', function (ctx, w, h) { Stratus.pumpkin(ctx, w / 2, h / 2, 0.9 * scale, currentT, true); }],
+      ['pumpkin unlit', function (ctx, w, h) { Stratus.pumpkin(ctx, w / 2, h / 2, 0.9 * scale, currentT, false); }],
+    ].forEach(function (p) { propCells.push(addTile(PROP_W, PROP_H, p[1], p[0])); });
+    app.appendChild(row(propCells));
+
+    // tools/shot.py reads this to size the screenshot window
+    document.body.dataset.shotSize = document.documentElement.scrollWidth + 'x' + document.documentElement.scrollHeight;
+    window.PEOPLE_DONE = true;
+
+    if (!frozen) {
+      (function loop() {
+        currentT = performance.now() / 1000;
+        for (var i = 0; i < tiles.length; i++) paint(tiles[i]);
+        requestAnimationFrame(loop);
+      })();
+    }
+  })();
+</script>
+</body>
+</html>

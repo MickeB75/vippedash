@@ -8,7 +8,13 @@
   function key(s, n) {
     return (
       n + '|' + Math.round(s.y * 64) + '|' + Math.round(s.vy * 8) + '|' + s.mode + s.gdir + (s.grounded ? 1 : 0) +
-      (s.held ? 1 : 0) + (s.pressAge <= P.BUFFER ? 1 : 0) + '|' + s.lastOrb + '|' + s.lastPad + '|' + s.lastPortal + '|' + s.layer
+      (s.held ? 1 : 0) + (s.pressAge <= P.BUFFER ? 1 : 0) + '|' + s.lastOrb + '|' + s.lastPad + '|' + s.lastPortal + '|' + s.layer +
+      // *64 (not a coarser bucket): laneP's reachable values are a fixed step sequence (dt / P.LANE_RATE
+      // per physics step) that crosses the P.LANE_HIT safety threshold (0.4/0.6) between two adjacent
+      // steps; a coarser bucket (e.g. *8) can round values from opposite sides of that threshold into the
+      // same key, so the search wrongly treats a still-unsafe state as equivalent to a safe one (or vice
+      // versa) and prunes a winning branch as "already visited"
+      '|' + s.lane + '|' + Math.round(s.laneP * 64)
     );
   }
 

@@ -3,6 +3,7 @@
   const VD = (window.VD = window.VD || {});
   const U = VD.U, Art = VD.Art, P = VD.PHYS;
   const W = 1280, H = 720, BS = 48, GY = 552, PX = 8;
+  const TAU = Math.PI * 2;
   const HALF = W / BS / 2; // 13.33 blocks
   const FONT = '"Lilita One", "Arial Black", Impact, sans-serif';
   const R = (VD.Render = { W, H, BS, GY, PX, FONT });
@@ -20,7 +21,7 @@
   }
 
   const MID_HALFWIDTH = {
-    cottage: 5, barn: 6, church: 6, mounds: 10, oldchurch: 5, cityrow: 8, castle: 10, stadium: 7, cathedral: 11,
+    cottage: 5, villa: 5, barn: 6, church: 6, mounds: 10, oldchurch: 5, cityrow: 8, castle: 10, stadium: 7, cathedral: 11,
     willows: 6, farm: 9, hall: 6, villas: 9, home: 4, pines: 6, birches: 5, moose: 3,
     spruces: 6, tarn: 6, cranes: 4, deadtrees: 5, deer: 3, moosecalf: 4, foxrun: 2, rockhill: 9, firetower: 2, jakttorn: 2,
     whale: 15, reeftower: 7, shipwreck: 10, kelpforest: 8,
@@ -99,7 +100,7 @@
         u += 0.35 + rnd() * 0.7;
       }
     }
-    for (const e of th.farExtra || []) far.push({ u: (e.x - PX) * pF + HALF + 4, t: e.t });
+    for (const e of th.farExtra || []) far.push({ u: (e.x - PX) * pF + HALF + 4, t: e.t, w: e.w, h: e.h, seed: e.seed });
     far.sort((a, b) => a.u - b.u);
     this.far = far;
 
@@ -156,6 +157,14 @@
     // schools of fish drifting through the ocean background, in place of bird flocks
     this.fishSchools = [];
     if (th.fish) for (let i = 0; i < 5; i++) this.fishSchools.push({ o: i * 0.21 + rnd() * 0.1, y: 90 + rnd() * 320, s: 0.6 + rnd() * 0.5, n: 4 + Math.floor(rnd() * 6), sp: 0.03 + rnd() * 0.025 });
+    // a couple of bats flapping across the Halloween dusk sky, well apart so they read as occasional
+    this.bats = [];
+    if (th.bats) for (let i = 0; i < 2; i++) this.bats.push({ o: i * 0.5 + rnd() * 0.2, y: 60 + rnd() * 160, s: 0.7 + rnd() * 0.4, sp: 0.02 + rnd() * 0.012 });
+    // Stratusvägen: the houses/terraces/background scenery along the street, computed once here and
+    // cached — see buildStreetscape() and drawHouses() below
+    this.streetProps = th.lanes ? buildStreetscape(lvl) : null;
+    this.spriteCache = new Map(); // fresh per level load — see getSprite() below
+    this.patternCache = new Map(); // fresh per level load — see getPattern() below
     // stars
     const sr = U.rng(99);
     this.stars = [];
@@ -167,6 +176,12 @@
   const sx = (wx, camX) => (wx - camX) * BS;
   const sy = (wy) => GY - wy * BS;
   R.sx = sx;
+  // Stratusvägen's two-lane street ('lane' player mode, physics.js): the far lane (lane 1) is drawn
+  // shifted up this many blocks and a little smaller, purely a screen trick for depth — physics never
+  // moves a lane object's actual y. Zero effect on every other level (nothing there has a `lane`, and
+  // the player's laneP never leaves 0 outside 'lane' mode).
+  const LANE_DY = 0.8;
+  const LANE_SCALE = 0.92;
   R.sy = sy;
   // first x <= x0 on a world-aligned grid of `step` px (off = how far the layer has scrolled, in px).
   // Patterns start from here so they scroll with the world, even where an area or a corridor starts on screen.
@@ -339,7 +354,9 @@
       return;
     }
     const cyc = ((px % 4) + 4) % 4;
-    const phase = cyc / P.SPEED;
+    // seconds since the last beat boundary (px - cyc); equals cyc / P.SPEED whenever the level has no
+    // speed zones (the fast path VD.Physics.timeAt takes), so this is a no-op everywhere but Stratusvägen
+    const phase = VD.Physics.timeAt(this.lvl, px) - VD.Physics.timeAt(this.lvl, px - cyc);
     let bright = 0;
     if (phase < 0.05) bright = 1;
     else if (phase < 0.2) bright = 1 - (phase - 0.05) / 0.15;
@@ -354,7 +371,9 @@
   // double flicker (~0.3s) where x mod 32 crosses 16, i.e. on the downbeat of every odd bar
   R.lightningPulse = function (px) {
     const cyc = ((px % 32) + 32) % 32;
-    const dphase = (cyc - 16) / P.SPEED;
+    // seconds since the downbeat 16 blocks into the current 32-block cycle; see the note in drawStrobe
+    const downbeatX = px - cyc + 16;
+    const dphase = VD.Physics.timeAt(this.lvl, px) - VD.Physics.timeAt(this.lvl, downbeatX);
     if (dphase < 0 || dphase > 0.3) return 0;
     const p1 = Math.exp(-Math.pow((dphase - 0.03) / 0.05, 2));
     const p2 = 0.85 * Math.exp(-Math.pow((dphase - 0.17) / 0.06, 2));
@@ -369,7 +388,7 @@
   // a subtle rotation on the half-time downbeat (every 8 blocks), alternating sign, decaying over ~0.3s
   R.tiltAngle = function (px) {
     const cyc = ((px % 8) + 8) % 8;
-    const dphase = cyc / P.SPEED;
+    const dphase = VD.Physics.timeAt(this.lvl, px) - VD.Physics.timeAt(this.lvl, px - cyc);
     if (dphase > 0.3) return 0;
     const sign = Math.floor(px / 8) % 2 === 0 ? 1 : -1;
     const decay = Math.exp(-dphase * 9);
@@ -389,64 +408,119 @@
       if (k > inT) (inT = k), (inKind = r.kind);
     }
 
-    if (inT < 1) {
-      this.drawOutdoor(ctx, camX, sky, t, center);
-      this.drawNear(ctx, camX, t, false, L);
-      if (this.theme.canopy) this.drawCanopy(ctx, camX, t, areaWeight(this.lvl, this.theme.canopy, center));
-    }
-    if (inT > 0) {
-      ctx.globalAlpha = inT;
-      if (inKind === 'cave') {
-        this.drawCave(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true, L);
-        // a dark veil pushes the bear and the crystals behind the (brightly outlined) hazards
-        ctx.fillStyle = 'rgba(16,12,24,0.45)';
-        ctx.fillRect(0, 0, W, GY);
-      } else if (inKind === 'metro') {
-        this.drawMetro(ctx, camX, t, center);
-        this.drawNear(ctx, camX, t, true, L);
-      } else if (inKind === 'sewer') {
-        this.drawSewer(ctx, camX, t, center);
-        this.drawNear(ctx, camX, t, true, L);
-      } else if (inKind === 'convent') {
-        this.drawConvent(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true, L);
-      } else if (inKind === 'chapel') {
-        this.drawChapel(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true, L);
-      } else if (inKind === 'catacomb') {
-        this.drawCatacomb(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true, L);
-      } else if (inKind === 'mirrors') {
-        this.drawMirrors(ctx, camX, t, G);
-        this.drawNear(ctx, camX, t, true, L);
-      } else if (inKind === 'ghosttrain') {
-        this.drawGhosttrain(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true, L);
-      } else if (inKind === 'whale') {
-        this.drawWhale(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true, L);
-      } else if (inKind === 'rooktower') {
-        this.drawRooktower(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true, L);
-      } else if (inKind === 'cathedral') {
-        this.drawCathedral(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true, L);
-      } else {
-        this.drawHall(ctx, camX, t);
-        this.drawNear(ctx, camX, t, true, L);
+    // Stratusvägen: the camera swing (see the comment on drawSwingScene below). Only relevant inside an
+    // lvl.swings zone, on this theme, with an actual player — the menu's attract mode never triggers it.
+    let swingZone = null, swingP = 0, swingTheta = 0, flatAlpha = 1, threeDAlpha = 0;
+    if (this.theme.lanes && this.lvl.swings.length && G.s && G.state !== 'menu') {
+      for (const z of this.lvl.swings) if (px >= z.x0 && px <= z.x1) { swingZone = z; break; }
+      if (swingZone) {
+        swingP = U.clamp((px - swingZone.x0) / (swingZone.x1 - swingZone.x0), 0, 1);
+        flatAlpha = swingEnvelope(swingP);
+        threeDAlpha = 1 - flatAlpha;
+        swingTheta = U.smooth(swingP) * Math.PI; // eased yaw — 0 at the start, π at the end
       }
-      ctx.globalAlpha = 1;
     }
-    this.drawGround(ctx, camX, t, inT, L);
-    this.drawCorridors(ctx, camX, t, L);
-    if (this.lvl.drops.length) this.drawHoles(ctx, camX, t, L);
-    if (this.lvl.boss) this.drawKing(ctx, camX, t, G, L);
-    this.drawObjects(ctx, camX, t, G, L);
-    this.drawTexts(ctx, camX, G, L);
     const here = G.s && (G.s.layer || 0) === L;
-    if (here && G.state !== 'menu') this.drawPlayer(ctx, camX, G, t);
-    this.drawParticles(ctx, camX, G, L);
+
+    ctx.save();
+    ctx.globalAlpha = flatAlpha;
+    if (flatAlpha > 0.015) {
+      if (inT < 1) {
+        this.drawOutdoor(ctx, camX, sky, t, center);
+        // Stratusvägen: lamps/benches/signs are anchored at GY, but the lane road band (drawn further
+        // down) reaches well above GY too — draw them after the road instead, so they aren't painted over
+        if (!this.theme.lanes) this.drawNear(ctx, camX, t, false, L);
+        if (this.theme.canopy) this.drawCanopy(ctx, camX, t, areaWeight(this.lvl, this.theme.canopy, center));
+      }
+      if (inT > 0) {
+        ctx.globalAlpha = inT * flatAlpha;
+        if (inKind === 'cave') {
+          this.drawCave(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+          // a dark veil pushes the bear and the crystals behind the (brightly outlined) hazards
+          ctx.fillStyle = 'rgba(16,12,24,0.45)';
+          ctx.fillRect(0, 0, W, GY);
+        } else if (inKind === 'metro') {
+          this.drawMetro(ctx, camX, t, center);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'sewer') {
+          this.drawSewer(ctx, camX, t, center);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'convent') {
+          this.drawConvent(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'chapel') {
+          this.drawChapel(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'catacomb') {
+          this.drawCatacomb(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'mirrors') {
+          this.drawMirrors(ctx, camX, t, G);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'ghosttrain') {
+          this.drawGhosttrain(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'whale') {
+          this.drawWhale(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'rooktower') {
+          this.drawRooktower(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'cathedral') {
+          this.drawCathedral(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+        } else {
+          this.drawHall(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+        }
+        ctx.globalAlpha = flatAlpha;
+      }
+      this.drawGround(ctx, camX, t, inT, L);
+      if (this.theme.lanes) {
+        this.drawLaneRoad(ctx, camX, t);
+        this.drawNear(ctx, camX, t, false, L);
+        this.drawHouses(ctx, camX, t);
+        this.drawPeople(ctx, camX, t, px);
+        this.drawParkedBoards(ctx, camX, t);
+      }
+      this.drawCorridors(ctx, camX, t, L);
+      if (this.lvl.drops.length) this.drawHoles(ctx, camX, t, L);
+      if (this.lvl.boss) this.drawKing(ctx, camX, t, G, L);
+      if (this.theme.lanes) {
+        // far-lane objects, then the player and the near-lane objects in the order their depth calls for —
+        // so a far-lane car sits behind the player when he's in the near lane, and in front of him when
+        // he's the one in the far lane (see drawObjects' laneFilter and the comment on LANE_DY above).
+        // During a swing, Vippe is drawn separately below (via the 3D projection) instead.
+        const laneP = (here && G.s && G.s.laneP) || 0;
+        this.drawObjects(ctx, camX, t, G, L, 1);
+        this.drawTexts(ctx, camX, G, L);
+        if (laneP < 0.5) {
+          if (here && G.state !== 'menu' && !swingZone) this.drawPlayer(ctx, camX, G, t);
+          this.drawObjects(ctx, camX, t, G, L, 0);
+        } else {
+          this.drawObjects(ctx, camX, t, G, L, 0);
+          if (here && G.state !== 'menu' && !swingZone) this.drawPlayer(ctx, camX, G, t);
+        }
+        this.drawSpeedFX(ctx, camX, t, px);
+      } else {
+        this.drawObjects(ctx, camX, t, G, L);
+        this.drawTexts(ctx, camX, G, L);
+        if (here && G.state !== 'menu') this.drawPlayer(ctx, camX, G, t);
+      }
+    }
+    ctx.restore();
+
+    if (swingZone) {
+      if (threeDAlpha > 0.015) {
+        ctx.save();
+        ctx.globalAlpha = threeDAlpha;
+        this.drawSwingScene(ctx, swingTheta, sky);
+        ctx.restore();
+      }
+      if (here && G.state !== 'menu') this.drawSwingPlayer(ctx, G, t, swingTheta);
+    }
+    if (!swingZone) this.drawParticles(ctx, camX, G, L); // particles are fine to hide during the swing
     if (G.debug && here) this.drawDebug(ctx, camX, G);
   };
   // the area at x on layer L
@@ -583,6 +657,40 @@
           for (let yy = base - h + 6; yy < base - 6; yy += 9) for (let xx = x + 4; xx < x + w - 4; xx += 8) if (r() > 0.6) ctx.fillRect(xx, yy, 3, 4);
           ctx.fillStyle = farDark;
         }
+      } else if (f.t === 'villa') {
+        // a small pale gabled villa, further back than the terraced house row (Stratusvägen). Pale early
+        // (readable behind the grey terrace, like the photos), sinking to a plain silhouette once it's
+        // properly dark — same blend the apartment block below uses.
+        const w = (f.w || 1.3) * BS * 0.55, h = (f.h || 1.4) * 34;
+        const villaCol = U.mixHex('#d8d4c8', farDark, U.clamp(sky.dark * 1.6, 0, 1));
+        ctx.fillStyle = villaCol;
+        ctx.fillRect(x - w / 2, base - h, w, h);
+        ctx.beginPath();
+        ctx.moveTo(x - w / 2 - 4, base - h);
+        ctx.lineTo(x, base - h - h * 0.55);
+        ctx.lineTo(x + w / 2 + 4, base - h);
+        ctx.closePath();
+        ctx.fill();
+        if (lit) {
+          ctx.fillStyle = 'rgba(255,214,130,0.65)';
+          const r = U.rng(f.seed || Math.floor(f.u * 131));
+          if (r() > 0.35) ctx.fillRect(x - w * 0.24, base - h * 0.55, w * 0.16, h * 0.16);
+          if (r() > 0.45) ctx.fillRect(x + w * 0.08, base - h * 0.55, w * 0.16, h * 0.16);
+        }
+        ctx.fillStyle = farDark;
+      } else if (f.t === 'apartblock') {
+        // the larger apartment block in the background (Stratusvägen) — a separate type from 'bldg' (used
+        // by other levels' skylines) so only this theme gets the paler, more-visible dusk tint
+        const w = (f.w || 2.8) * BS * 0.7, h = (f.h || 3.2) * 30;
+        const col = U.mixHex('#c7c3ba', farDark, U.clamp(sky.dark * 1.5, 0, 1));
+        ctx.fillStyle = col;
+        ctx.fillRect(x - w / 2, base - h, w, h + 6);
+        if (lit) {
+          ctx.fillStyle = 'rgba(255,214,130,0.85)';
+          const r = U.rng(f.seed || Math.floor(f.u * 97));
+          for (let yy = base - h + 8; yy < base - 8; yy += 11) for (let xx = x - w / 2 + 5; xx < x + w / 2 - 5; xx += 10) if (r() > 0.55) ctx.fillRect(xx, yy, 4, 5);
+        }
+        ctx.fillStyle = farDark;
       } else if (f.t === 'spires') {
         for (const dx of [-14, 14]) {
           ctx.fillRect(x + dx - 9, base - 70, 18, 74);
@@ -643,6 +751,7 @@
     ctx.fillRect(0, 0, W, GY);
     if (th.flocks) this.drawFlocks(ctx, camX, t, sky);
     if (th.fish) this.drawFishSchool(ctx, camX, t, sky);
+    if (th.bats) this.drawBats(ctx, camX, t, sky);
     if (th.mist) this.drawMist(ctx, camX, t, areaWeight(this.lvl, th.mist, center, 24));
     if (th.beams) this.drawBeams(ctx, camX, t, areaWeight(this.lvl, th.beams, center, 24) * (1 - sky.dark));
     // the regional train racing along the railway towards Storvreta
@@ -700,6 +809,24 @@
         ctx.closePath();
         ctx.fill();
       }
+    }
+  };
+  // a couple of small bat silhouettes flapping across the Halloween dusk sky (Stratusvägen only)
+  R.drawBats = function (ctx, camX, t, sky) {
+    ctx.fillStyle = U.rgba('#100a18', 0.75 * U.clamp(sky.dark * 1.6, 0.25, 1));
+    for (const bt of this.bats) {
+      const span = W + 400;
+      const x0 = (((t * bt.sp + bt.o) * span - camX * 2) % span + span) % span - 200;
+      const y = bt.y + Math.sin(t * 0.9 + bt.o * 8) * 14;
+      const flap = Math.sin(t * 11 + bt.o * 6) * 0.8 + 0.2;
+      const s = 9 * bt.s;
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.quadraticCurveTo(x0 - s * 1.6, y - s * flap, x0 - s * 2.6, y + s * 0.3);
+      ctx.quadraticCurveTo(x0 - s * 1.3, y + s * 0.15, x0, y + s * 0.35);
+      ctx.quadraticCurveTo(x0 + s * 1.3, y + s * 0.15, x0 + s * 2.6, y + s * 0.3);
+      ctx.quadraticCurveTo(x0 + s * 1.6, y - s * flap, x0, y);
+      ctx.fill();
     }
   };
   R.drawBeams = function (ctx, camX, t, k) {
@@ -2718,7 +2845,7 @@
       if (o.kind !== 'pawn') continue;
       const t0 = o.x - o.mv.trigger, t1 = t0 + o.mv.fall;
       if (px >= t0 - 1 && px <= t1 + 1) {
-        armK = VD.Physics.moveOf(o, px).k;
+        armK = VD.Physics.moveOf(o, px, this.lvl).k;
         break;
       }
     }
@@ -2728,9 +2855,998 @@
     ctx.restore();
   };
 
+  // ------------------------------------------------------------------ Stratusvägen: the two-lane street
+  // Screen geometry (see the module comment on LANE_DY above): the near lane sits at screen y = GY, the far
+  // lane LANE_DY blocks "higher" (further away). FAR_KERB/NEAR_KERB give a little extra room behind/in front
+  // of the two lanes for the sidewalks, so houses and foreground props have somewhere to stand.
+  const FAR_SIDEWALK_H = 34, FAR_KERB_GAP = 34, NEAR_KERB_GAP = 46;
+  R.roadFarY = function () { return GY - LANE_DY * BS; };
+  R.roadFarKerbY = function () { return this.roadFarY() - FAR_KERB_GAP; };
+  R.roadNearKerbY = function () { return GY + NEAR_KERB_GAP; };
+  // ---- sprite cache: performance ----------------------------------------------------------------
+  // The street's houses/terraces/filler scenery are each complex (dozens of canvas calls: cladding lines,
+  // a gable, two floors of windows, a fence, a car, ...) but otherwise static — the only thing that ever
+  // changes is the ambient dusk tint (Art.TL/Art.T, driven by Art.dark()). So each unique sprite is drawn
+  // once per "tint bucket" into an offscreen canvas and reused with cheap drawImage() calls afterwards,
+  // instead of replaying its whole draw call graph every single frame. Art.dark() only takes a handful of
+  // distinct values as the player crosses the level, so this stays small in practice (bucketed to 8 steps).
+  R.getSprite = function (key, w, h, drawFn) {
+    if (!this.spriteCache) this.spriteCache = new Map();
+    const bucket = Math.floor(Art.dark() * 8);
+    const fullKey = key + '#' + bucket;
+    let cv = this.spriteCache.get(fullKey);
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.ceil(w));
+      cv.height = Math.max(1, Math.ceil(h));
+      drawFn(cv.getContext('2d'));
+      this.spriteCache.set(fullKey, cv);
+    }
+    return cv;
+  };
+  // same idea as getSprite, but for a small repeating texture (paving joints, leaves): cache a CanvasPattern
+  // once and reuse it, instead of stroking/filling dozens of tiny shapes across the screen every frame
+  R.getPattern = function (ctx, key, tileW, tileH, drawFn) {
+    if (!this.patternCache) this.patternCache = new Map();
+    let p = this.patternCache.get(key);
+    if (!p) {
+      const cv = document.createElement('canvas');
+      cv.width = tileW;
+      cv.height = tileH;
+      drawFn(cv.getContext('2d'));
+      p = ctx.createPattern(cv, 'repeat');
+      this.patternCache.set(key, p);
+    }
+    return p;
+  };
+  // a subtle paving-stone grid on the far sidewalk, world-aligned so it scrolls with the street — reads as
+  // pavement instead of a flat wall of colour
+  // a small paving-stone joint pattern, tiled — cached as a CanvasPattern (see getPattern below) instead
+  // of stroking ~50 lines every frame
+  function paintSidewalkTile(cctx, tile, h) {
+    cctx.strokeStyle = 'rgba(0,0,0,0.14)';
+    cctx.lineWidth = 1;
+    cctx.beginPath();
+    cctx.moveTo(0, 0);
+    cctx.lineTo(0, h);
+    cctx.moveTo(0, h / 2);
+    cctx.lineTo(tile, h / 2);
+    cctx.stroke();
+    cctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    cctx.beginPath();
+    cctx.moveTo(tile / 2, 0);
+    cctx.lineTo(tile / 2, h / 2);
+    cctx.stroke();
+  }
+  // a handful of scattered autumn leaves, tiled the same way
+  function paintLeavesTile(cctx, tileW, tileH) {
+    cctx.fillStyle = 'rgba(200,120,40,0.35)';
+    const rnd = U.rng(77);
+    for (let i = 0; i < 8; i++) {
+      const lx = rnd() * tileW, ly = 6 + rnd() * Math.max(1, tileH - 12);
+      cctx.beginPath();
+      cctx.ellipse(lx, ly, 3.2, 2, rnd() * TAU, 0, TAU);
+      cctx.fill();
+    }
+  }
+  R.drawLaneRoad = function (ctx, camX, t) {
+    const farY = this.roadFarY(), nearY = GY;
+    const farKerbY = this.roadFarKerbY(), nearKerbY = this.roadNearKerbY();
+    const midY = (farY + nearY) / 2;
+
+    // far sidewalk, right in front of the far house row — paving stones, not a flat wall
+    ctx.fillStyle = Art.TL('#4e4b53');
+    ctx.fillRect(0, farKerbY - FAR_SIDEWALK_H, W, FAR_SIDEWALK_H);
+    const swTile = 22;
+    const swShift = -((((camX * BS) % swTile) + swTile) % swTile);
+    ctx.save();
+    ctx.translate(swShift, farKerbY - FAR_SIDEWALK_H);
+    ctx.fillStyle = this.getPattern(ctx, 'sidewalk', swTile, FAR_SIDEWALK_H, (cctx) => paintSidewalkTile(cctx, swTile, FAR_SIDEWALK_H));
+    ctx.fillRect(0, 0, W - swShift + swTile, FAR_SIDEWALK_H);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(226,226,232,0.5)';
+    ctx.fillRect(0, farKerbY - 3, W, 3);
+
+    // asphalt: a soft vertical gradient (far edge a touch lighter — cheap atmospheric perspective) plus a
+    // dashed white centre line at the lane midline
+    const rg = ctx.createLinearGradient(0, farKerbY, 0, nearKerbY);
+    rg.addColorStop(0, Art.TL('#403d48'));
+    rg.addColorStop(1, Art.TL('#201e26'));
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, farKerbY, W, nearKerbY - farKerbY);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    const dashW = 22, gap = 20, period = dashW + gap;
+    for (let x = gridStart(0, camX * BS, period); x < W; x += period) ctx.fillRect(x, midY - 2, dashW, 4);
+
+    // near kerb + the foreground pavement strip (mailboxes/props land on this, see drawHouses)
+    ctx.fillStyle = 'rgba(226,226,232,0.55)';
+    ctx.fillRect(0, nearKerbY, W, 3);
+    ctx.fillStyle = Art.TL('#232128');
+    ctx.fillRect(0, nearKerbY + 3, W, H - nearKerbY - 3);
+    // a few scattered autumn leaves on the near pavement, world-aligned so they scroll with the street
+    const leafTileW = 192, leafTileH = H - nearKerbY - 3;
+    const leafShift = -((((camX * BS) % leafTileW) + leafTileW) % leafTileW);
+    ctx.save();
+    ctx.translate(leafShift, nearKerbY + 3);
+    ctx.fillStyle = this.getPattern(ctx, 'leaves', leafTileW, leafTileH, (cctx) => paintLeavesTile(cctx, leafTileW, leafTileH));
+    ctx.fillRect(0, 0, W - leafShift + leafTileW, leafTileH);
+    ctx.restore();
+  };
+  // a low, flat black rubber strip lying ON the road surface — a shallow parallelogram (like a zebra-
+  // crossing stripe seen at a slight angle), only ~0.2-0.25 blocks of visible thickness at its front edge,
+  // with yellow reflector dashes. Drawn once per lane (near + far — see drawBump below): the game's lane
+  // trick already puts the far lane a fixed distance higher on screen than the near lane, so one bump mark
+  // per lane reads as "a flat strip in each lane" rather than one tall connector standing up between them.
+  R.paintBumpMark = function (cctx, cx, groundY, w, thickness) {
+    const skew = w * 0.22; // a slight lean, so the strip reads as angled/foreshortened, not a plain block
+    cctx.fillStyle = '#15141a';
+    cctx.beginPath();
+    cctx.moveTo(cx - w / 2, groundY);
+    cctx.lineTo(cx + w / 2, groundY);
+    cctx.lineTo(cx + w / 2 - skew, groundY - thickness);
+    cctx.lineTo(cx - w / 2 - skew, groundY - thickness);
+    cctx.closePath();
+    cctx.fill();
+    cctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    cctx.lineWidth = 1;
+    cctx.beginPath();
+    cctx.moveTo(cx - w / 2 - skew, groundY - thickness);
+    cctx.lineTo(cx + w / 2 - skew, groundY - thickness);
+    cctx.stroke();
+    cctx.fillStyle = '#e8c23c';
+    for (let p = 0.14; p <= 0.9; p += 0.24) {
+      const bx = cx - w / 2 + w * p - skew * 0.5;
+      cctx.fillRect(bx - 3.5, groundY - thickness + 1.5, 7, thickness - 3);
+    }
+  };
+  // spans both lanes: one flat mark at the near lane's ground line, one (a touch smaller, matching the
+  // far lane's own scale) at the far lane's — see paintBumpMark above. Cached: every bump in the level is
+  // the same shape (o.w is always 1), so one sprite is reused everywhere.
+  R.drawBump = function (ctx, camX, o) {
+    const farY = this.roadFarY(), nearY = GY;
+    const cx2 = sx(o.x + o.w / 2, camX);
+    const thickness = BS * 0.22, nearW = o.w * BS * 0.85, farW = nearW * LANE_SCALE;
+    const w = Math.max(nearW, farW) + 24, h = thickness + 8;
+    const key = 'bump';
+    const nearCv = this.getSprite(key + '#near', w, h, (cctx) => this.paintBumpMark(cctx, w / 2, h - 4, nearW, thickness));
+    const farCv = this.getSprite(key + '#far', w, h, (cctx) => this.paintBumpMark(cctx, w / 2, h - 4, farW, thickness));
+    ctx.drawImage(farCv, cx2 - w / 2, farY - (h - 4));
+    ctx.drawImage(nearCv, cx2 - w / 2, nearY - (h - 4));
+  };
+
+  // grey untreated wood, deterministic per house/unit seed so a given unit always looks the same
+  const HOUSE_WOOD = ['#5c584f', '#66625a', '#58554d', '#6c675d', '#615d54'];
+  // narrow, tall terraced units (taller than wide, very steep gable) — the real street is a continuous
+  // saw-tooth row of these, not lone detached cottages (see the contact-sheet photos)
+  const GABLE_W = 4.0, GABLE_BODY_H = 4.6, GABLE_ROOF_H = 3.0;
+  // a gap this small or smaller between two numbered far-row houses reads as one attached terrace run,
+  // bridged with unnumbered filler units of the same style; a bigger gap gets background streetscape instead
+  const TERRACE_MAX = 34;
+  // the known cul-de-sac gap in the plan (between nr 56 and nr 50, roughly x 380-470): show it as a short
+  // side street receding into the distance, with 54/52 standing tiny and far back
+  const CULDESAC_X = [370, 480];
+  const FILLER_KINDS = ['shed', 'fence', 'garden', 'parking', 'carport', 'bin'];
+
+  // one streetscape pass, computed once per level load (see R.build) and cached on this.streetProps — a
+  // list of world-anchored props: the numbered houses, unnumbered terrace filler units that bridge close
+  // gaps into one continuous row, and denser background scenery (sheds, fences, gardens, parking, one
+  // playground, the cul-de-sac) filling the wider gaps so no long stretch of the street reads as empty
+  function buildStreetscape(lvl) {
+    const far = lvl.houses.filter((h) => h.row === 'far').slice().sort((a, b) => a.x - b.x);
+    const props = [];
+    function fillerRun(x0, x1, seedBase) {
+      if (x1 - x0 < 6) return;
+      let x = x0 + 3 + U.hash(seedBase) * 2;
+      while (x < x1 - 3) {
+        const seed = Math.floor(x * 13.7) + seedBase;
+        props.push({ x, kind: FILLER_KINDS[Math.floor(U.hash(seed) * FILLER_KINDS.length)], seed, t: 'filler' });
+        x += 6 + U.hash(seed + 1) * 3;
+      }
+    }
+    if (far.length) fillerRun(-56, far[0].x - 5, 1);
+    for (let i = 0; i < far.length; i++) {
+      const h = far[i], prev = far[i - 1], next = far[i + 1];
+      const attachLeft = !!prev && h.x - prev.x <= TERRACE_MAX;
+      const attachRight = !!next && next.x - h.x <= TERRACE_MAX;
+      props.push({ x: h.x, kind: 'house', num: h.num, t: 'house', attachLeft, attachRight });
+      if (next) {
+        const gap = next.x - h.x;
+        if (gap <= TERRACE_MAX) {
+          // bridge the gap with attached, unnumbered gable units — a continuous saw-tooth roofline
+          const span = gap - GABLE_W, n = Math.max(1, Math.round(span / GABLE_W));
+          const uw = span / n;
+          for (let k = 0; k < n; k++) props.push({ x: h.x + GABLE_W / 2 + uw * (k + 0.5), w: uw, kind: 'terrace', t: 'terrace', seed: h.num * 31 + k });
+        } else if (h.x >= CULDESAC_X[0] - 30 && next.x <= CULDESAC_X[1] + 110 && gap > 50 && gap < 160) {
+          props.push({ x: (h.x + next.x) / 2, kind: 'culdesac', t: 'culdesac', seed: 54 });
+        } else {
+          fillerRun(h.x + 5, next.x - 5, h.num * 7 + 3);
+        }
+      }
+    }
+    if (far.length) fillerRun(far[far.length - 1].x + 5, lvl.finishX - 10, 91);
+    // one small playground, tucked into a wide gap well clear of the cul-de-sac (the "toppen" stretch)
+    for (let i = props.length - 1; i >= 0; i--) if (props[i].t === 'filler' && Math.abs(props[i].x - 776) < 5) props.splice(i, 1);
+    props.push({ x: 776, kind: 'playground', t: 'filler', seed: 5 });
+    props.sort((a, b) => a.x - b.x);
+    return props;
+  }
+  // the shared body+roof+windows of one narrow gable unit — used for numbered houses, unnumbered terrace
+  // filler and the tiny distant cul-de-sac houses alike, so the whole row reads as one consistent style.
+  // Returns the unit's screen bounds so the caller can add a door/mailbox/fence around it.
+  // the shared body+roof+door+windows of one narrow gable unit (uncached — see drawGableUnit below, the
+  // cached wrapper every caller actually uses)
+  R.paintGableUnit = function (ctx, cx, farKerbY, unitW, seed) {
+    const rnd = U.rng(seed);
+    // `b` scales every vertical/detail measurement with the requested width, relative to the standard
+    // GABLE_W unit — so a deliberately narrower unit (the tiny cul-de-sac houses) comes out shorter too,
+    // instead of a narrow but still full-height tower
+    const b = BS * (unitW / GABLE_W);
+    const bw = unitW * BS, bodyH = b * GABLE_BODY_H, roofH = b * GABLE_ROOF_H;
+    const x0 = cx - bw / 2, bodyY = farKerbY - bodyH, roofY = bodyY - roofH;
+    ctx.fillStyle = Art.TL(HOUSE_WOOD[Math.abs(seed) % HOUSE_WOOD.length]);
+    ctx.fillRect(x0, bodyY, bw, bodyH);
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let bx = x0 + 6; bx < x0 + bw; bx += Math.max(4, 9 * (unitW / GABLE_W))) {
+      ctx.moveTo(bx, bodyY);
+      ctx.lineTo(bx, farKerbY);
+    }
+    ctx.stroke();
+    // steep gable roof, facing the street — a small overhang on every unit, even attached ones, so the
+    // roofline still reads as gable-gable-gable rather than one flat ridge
+    ctx.fillStyle = Art.TL('#2b2c32');
+    ctx.beginPath();
+    ctx.moveTo(x0 - b * 0.14, bodyY + b * 0.08);
+    ctx.lineTo(cx, roofY);
+    ctx.lineTo(x0 + bw + b * 0.14, bodyY + b * 0.08);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // gable-end attic window
+    const duskLit = Art.dark() > 0.22;
+    const attic = duskLit && rnd() > 0.4;
+    ctx.fillStyle = attic ? '#ffd27a' : Art.TL('#20222a');
+    ctx.beginPath();
+    ctx.arc(cx, bodyY - b * 0.26, b * 0.18, Math.PI, 0);
+    ctx.lineTo(cx + b * 0.18, bodyY - b * 0.08);
+    ctx.lineTo(cx - b * 0.18, bodyY - b * 0.08);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // two floors of white-framed windows, some lit and some dark (one column on a narrow unit)
+    const winW = Math.min(b * 0.58, bw * 0.3), winH = b * 0.7;
+    const cols = bw > BS * 3.1 ? [x0 + bw * 0.18, x0 + bw * 0.58] : [x0 + bw * 0.5 - winW / 2];
+    for (let floor = 0; floor < 2; floor++) {
+      const wy = bodyY + b * 0.28 + floor * b * 1.5;
+      for (const fx of cols) {
+        const on = duskLit && rnd() > 0.35;
+        ctx.fillStyle = on ? '#ffd27a' : Art.TL('#8fb0c8');
+        ctx.fillRect(fx, wy, winW, winH);
+        ctx.strokeStyle = '#f2f0e8';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(fx, wy, winW, winH);
+        ctx.beginPath();
+        ctx.moveTo(fx + winW / 2, wy);
+        ctx.lineTo(fx + winW / 2, wy + winH);
+        ctx.stroke();
+        if (floor === 1) {
+          ctx.strokeStyle = '#e8e6dc';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(fx - b * 0.06, wy + winH + 6);
+          ctx.lineTo(fx + winW + b * 0.06, wy + winH + 6);
+          for (let rx = fx - b * 0.04; rx <= fx + winW + b * 0.04; rx += b * 0.12) {
+            ctx.moveTo(rx, wy + winH + 6);
+            ctx.lineTo(rx, wy + winH + 15);
+          }
+          ctx.stroke();
+        }
+        // a paper ghost taped up in a dark window, on some units
+        if (!on && rnd() < 0.2) {
+          ctx.fillStyle = 'rgba(245,245,250,0.9)';
+          ctx.beginPath();
+          ctx.arc(fx + winW / 2, wy + winH * 0.42, winW * 0.34, Math.PI, 0);
+          ctx.lineTo(fx + winW * 0.68, wy + winH * 0.72);
+          ctx.lineTo(fx + winW / 2, wy + winH * 0.6);
+          ctx.lineTo(fx + winW * 0.32, wy + winH * 0.72);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#1a1a1a';
+          ctx.beginPath();
+          ctx.arc(fx + winW * 0.42, wy + winH * 0.38, 1.6, 0, TAU);
+          ctx.arc(fx + winW * 0.58, wy + winH * 0.38, 1.6, 0, TAU);
+          ctx.fill();
+        }
+      }
+    }
+    // a front door, right in the middle of the ground floor — every unit has its own entrance, numbered
+    // house or unnumbered terrace filler alike
+    ctx.fillStyle = Art.TL('#2a2622');
+    ctx.fillRect(cx - b * 0.22, farKerbY - b * 0.92, b * 0.44, b * 0.92);
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - b * 0.22, farKerbY - b * 0.92, b * 0.44, b * 0.92);
+    return { x0, bw, bodyY, bodyH, duskLit };
+  };
+  // cached: see the R.getSprite comment above. Draws into a local-space offscreen canvas once per (seed,
+  // width, tint bucket) and blits it afterwards — replaces dozens of canvas calls with one drawImage().
+  R.drawGableUnit = function (ctx, cx, farKerbY, unitW, seed) {
+    const b = BS * (unitW / GABLE_W);
+    const bw = unitW * BS, bodyH = b * GABLE_BODY_H, roofH = b * GABLE_ROOF_H;
+    const padX = b * 0.3;
+    const w = bw + padX * 2, h = bodyH + roofH + 3;
+    const key = 'gable#' + seed + '#' + unitW.toFixed(3);
+    const cv = this.getSprite(key, w, h, (cctx) => this.paintGableUnit(cctx, w / 2, h, unitW, seed));
+    ctx.drawImage(cv, cx - w / 2, farKerbY - h);
+    return { x0: cx - bw / 2, bw, bodyY: farKerbY - bodyH, bodyH, duskLit: Art.dark() > 0.22 };
+  };
+  // a small grass patch with a young autumn tree and a low bush, filling a non-attached house corner
+  R.drawCornerGarden = function (ctx, edgeX, farKerbY, side, seed) {
+    const rnd = U.rng(seed);
+    const w = BS * 1.6, gx = side < 0 ? edgeX - w : edgeX;
+    ctx.fillStyle = Art.TL('#3a5a2e');
+    ctx.fillRect(gx, farKerbY - 10, w, 10);
+    ctx.fillStyle = Art.TL('#4a7038');
+    ctx.fillRect(gx, farKerbY - 12, w, 4);
+    const tx = gx + w * 0.5, tyBase = farKerbY - 10;
+    ctx.strokeStyle = Art.TL('#4a3524');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(tx, tyBase);
+    ctx.lineTo(tx, tyBase - BS * 0.7);
+    ctx.stroke();
+    const leafCol = ['#c98a2e', '#d9a52e', '#8a4a24'][Math.floor(rnd() * 3)];
+    ctx.fillStyle = Art.TL(leafCol);
+    ctx.beginPath();
+    ctx.arc(tx, tyBase - BS * 0.95, BS * 0.4, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = Art.TL('#3f5a2a');
+    ctx.beginPath();
+    ctx.arc(tx + (side < 0 ? -BS * 0.55 : BS * 0.55), tyBase - BS * 0.16, BS * 0.22, 0, TAU);
+    ctx.fill();
+  };
+  // a bike leaning at (bx0, by0) — its own rear wheel touching the ground there
+  R.drawLeaningBike = function (ctx, bx0, by0) {
+    ctx.strokeStyle = '#c9c9c9';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(bx0, by0, BS * 0.22, 0, TAU);
+    ctx.arc(bx0 + BS * 0.5, by0, BS * 0.22, 0, TAU);
+    ctx.moveTo(bx0, by0);
+    ctx.lineTo(bx0 + BS * 0.25, by0 - BS * 0.32);
+    ctx.lineTo(bx0 + BS * 0.5, by0);
+    ctx.lineTo(bx0 + BS * 0.25, by0 - BS * 0.32);
+    ctx.lineTo(bx0 + BS * 0.18, by0 - BS * 0.42);
+    ctx.stroke();
+  };
+  // a numbered far-row terraced house: the gable unit, a door, a paving path + mailbox, and — only on a
+  // side that isn't attached to a terrace neighbour — a fence/garden corner with a car or a bike, plus a
+  // jack-o'-lantern by the door on about half the houses and a floorball goal by nr 50/48
+  // one numbered far-row terraced house (uncached — see drawTerraceHouse below, the cached wrapper every
+  // caller actually uses). Calls paintGableUnit directly (not the cached drawGableUnit) since we're
+  // already rendering into an offscreen canvas once here — no need for a second, redundant cache entry.
+  R.paintTerraceHouse = function (ctx, cx, farKerbY, num, t, attachLeft, attachRight) {
+    const seed = num * 97 + 11, rnd = U.rng(seed);
+    const g = this.paintGableUnit(ctx, cx, farKerbY, GABLE_W, seed);
+    const freeSides = [];
+    if (!attachLeft) freeSides.push(-1);
+    if (!attachRight) freeSides.push(1);
+    if (freeSides.length) {
+      const side = freeSides[freeSides.length > 1 && rnd() < 0.5 ? 1 : 0];
+      const edgeX = side < 0 ? g.x0 : g.x0 + g.bw;
+      this.drawCornerGarden(ctx, edgeX, farKerbY, side, num * 3 + 1);
+      const fenceX = side < 0 ? edgeX - BS * 1.9 : edgeX + BS * 0.9;
+      ctx.fillStyle = Art.TL('#4f4c45');
+      ctx.fillRect(fenceX, farKerbY - BS * 1.5, BS * 0.95, BS * 1.5);
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let px2 = fenceX + 5; px2 < fenceX + BS * 0.95; px2 += 7) {
+        ctx.moveTo(px2, farKerbY - BS * 1.5);
+        ctx.lineTo(px2, farKerbY);
+      }
+      ctx.stroke();
+      if (rnd() < 0.35) drawCobweb(ctx, fenceX + (side < 0 ? 4 : BS * 0.9), farKerbY - BS * 1.45, side);
+      if (rnd() < 0.55) {
+        const cw = BS * 1.7, chh = BS * 0.72;
+        Art.block(ctx, 'car', side < 0 ? fenceX - cw - BS * 0.15 : fenceX + BS * 1.05, farKerbY - chh, cw, chh, BS, num, t);
+      } else if (rnd() < 0.35) {
+        this.drawLeaningBike(ctx, fenceX + BS * (side < 0 ? -0.35 : 1.25), farKerbY - BS * 0.28);
+      }
+    }
+    if (rnd() < 0.5) {
+      const pb = BS * 0.5;
+      if (VD.Stratus && VD.Stratus.pumpkin) VD.Stratus.pumpkin(ctx, cx + BS * 0.4, farKerbY - pb * 0.4, pb / BS, t, g.duskLit);
+      else {
+        ctx.fillStyle = '#e8731f';
+        ctx.beginPath();
+        ctx.ellipse(cx + BS * 0.4, farKerbY - pb * 0.4, pb * 0.5, pb * 0.42, 0, 0, TAU);
+        ctx.fill();
+      }
+    }
+    if (num === 50 || num === 48) {
+      const gx = g.x0 + g.bw + BS * 0.3, gw = BS * 1.1, gh = BS * 0.82;
+      ctx.strokeStyle = '#e8e0c8';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(gx, farKerbY - gh, gw, gh);
+      ctx.strokeStyle = 'rgba(232,224,200,0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let gxx = gx + gw * 0.2; gxx < gx + gw; gxx += gw * 0.22) {
+        ctx.moveTo(gxx, farKerbY - gh);
+        ctx.lineTo(gxx, farKerbY);
+      }
+      ctx.stroke();
+    }
+    // a paving path from the sidewalk up to the door, and the mailbox at its foot
+    ctx.fillStyle = 'rgba(150,146,138,0.5)';
+    ctx.fillRect(cx - BS * 0.34, farKerbY - FAR_SIDEWALK_H, BS * 0.68, FAR_SIDEWALK_H);
+    this.drawMailbox(ctx, cx - BS * 0.95, farKerbY, num, BS * 0.9);
+  };
+  // cached: see the R.getSprite comment above
+  R.drawTerraceHouse = function (ctx, cx, farKerbY, num, t, attachLeft, attachRight) {
+    const pad = BS * 3.3; // room for a fence + car/goal extending past the gable, on whichever side is free
+    const w = GABLE_W * BS + pad * 2, h = BS * (GABLE_BODY_H + GABLE_ROOF_H) + 6;
+    const key = 'house#' + num + '#' + (attachLeft ? 1 : 0) + (attachRight ? 1 : 0);
+    const cv = this.getSprite(key, w, h, (cctx) => this.paintTerraceHouse(cctx, w / 2, h, num, t, attachLeft, attachRight));
+    ctx.drawImage(cv, cx - w / 2, farKerbY - h);
+  };
+  // background streetscape filling the wider gaps between terraces — sheds, fences, gardens, parking bays,
+  // carports, bins/bikes, and one small playground — so no stretch of the street reads as empty
+  // background streetscape scenery (uncached — see drawFillerItem below, the cached wrapper every caller
+  // actually uses)
+  R.paintFillerItem = function (ctx, cx, farKerbY, kind, seed, t) {
+    const rnd = U.rng(seed);
+    if (kind === 'shed') {
+      const w = BS * 2.1, h = BS * 1.5, x0 = cx - w / 2, y0 = farKerbY - h;
+      ctx.fillStyle = Art.TL(HOUSE_WOOD[seed % HOUSE_WOOD.length]);
+      ctx.fillRect(x0, y0, w, h);
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let bx = x0 + 5; bx < x0 + w; bx += 8) {
+        ctx.moveTo(bx, y0);
+        ctx.lineTo(bx, farKerbY);
+      }
+      ctx.stroke();
+      ctx.fillStyle = Art.TL('#2b2c32');
+      ctx.beginPath();
+      ctx.moveTo(x0 - 4, y0);
+      ctx.lineTo(x0 + w * 0.3, y0 - BS * 0.35);
+      ctx.lineTo(x0 + w + 4, y0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = Art.TL('#242024');
+      ctx.fillRect(x0 + w * 0.62, y0 + h * 0.35, w * 0.3, h * 0.65);
+    } else if (kind === 'fence') {
+      const w = BS * 2.6, x0 = cx - w / 2, h = BS * 1.35;
+      ctx.fillStyle = Art.TL('#4f4c45');
+      ctx.fillRect(x0, farKerbY - h, w, h);
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let bx = x0 + 5; bx < x0 + w; bx += 7) {
+        ctx.moveTo(bx, farKerbY - h);
+        ctx.lineTo(bx, farKerbY);
+      }
+      ctx.stroke();
+      if (rnd() < 0.5) drawCobweb(ctx, x0 + (rnd() < 0.5 ? 6 : w - 6), farKerbY - h + 8, rnd() < 0.5 ? 1 : -1);
+    } else if (kind === 'garden') {
+      this.drawCornerGarden(ctx, cx - BS * 0.8, farKerbY, -1, seed);
+      this.drawCornerGarden(ctx, cx + BS * 0.8, farKerbY, 1, seed + 1);
+    } else if (kind === 'parking') {
+      ctx.fillStyle = Art.TL('#6a6670');
+      ctx.fillRect(cx - BS * 1.7, farKerbY - 6, BS * 3.4, 6);
+      const cw = BS * 1.6, chh = BS * 0.68;
+      Art.block(ctx, 'car', cx - cw - BS * 0.15, farKerbY - chh, cw, chh, BS, seed, t);
+      if (rnd() < 0.6) Art.block(ctx, 'car', cx + BS * 0.15, farKerbY - chh, cw, chh, BS, seed + 3, t);
+    } else if (kind === 'carport') {
+      const w = BS * 2.4, x0 = cx - w / 2, postH = BS * 1.7;
+      ctx.strokeStyle = Art.TL('#3a3630');
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(x0 + 4, farKerbY);
+      ctx.lineTo(x0 + 4, farKerbY - postH);
+      ctx.moveTo(x0 + w - 4, farKerbY);
+      ctx.lineTo(x0 + w - 4, farKerbY - postH);
+      ctx.stroke();
+      ctx.fillStyle = Art.TL('#2b2c32');
+      ctx.fillRect(x0 - 6, farKerbY - postH - 10, w + 12, 14);
+      const cw = w * 0.82, chh = BS * 0.62;
+      Art.block(ctx, 'car', cx - cw / 2, farKerbY - chh, cw, chh, BS, seed, t);
+    } else if (kind === 'bin') {
+      Art.block(ctx, 'bin', cx - BS * 0.4, farKerbY - BS * 0.9, BS * 0.8, BS * 0.9, BS, seed, t);
+      this.drawLeaningBike(ctx, cx + BS * 0.55, farKerbY - BS * 0.28);
+    } else if (kind === 'playground') {
+      const w = BS * 2.8, x0 = cx - w / 2, postH = BS * 1.4;
+      ctx.fillStyle = 'rgba(210,190,150,0.35)';
+      ctx.fillRect(x0 - 10, farKerbY - 10, w + 20, 10);
+      ctx.strokeStyle = Art.TL('#8a6a3a');
+      ctx.lineWidth = 5;
+      for (const px3 of [x0 + w * 0.1, x0 + w * 0.9]) {
+        ctx.beginPath();
+        ctx.moveTo(px3, farKerbY);
+        ctx.lineTo(px3 + (px3 < cx ? w * 0.12 : -w * 0.12), farKerbY - postH);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(x0 + w * 0.22, farKerbY - postH);
+      ctx.lineTo(x0 + w * 0.78, farKerbY - postH);
+      ctx.stroke();
+      const sway = Math.sin(t * 1.1) * BS * 0.1;
+      for (const sx2 of [x0 + w * 0.38, x0 + w * 0.62]) {
+        ctx.strokeStyle = '#8a8a90';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx2, farKerbY - postH);
+        ctx.lineTo(sx2 + sway, farKerbY - BS * 0.3);
+        ctx.moveTo(sx2 + BS * 0.14, farKerbY - postH);
+        ctx.lineTo(sx2 + BS * 0.14 + sway, farKerbY - BS * 0.3);
+        ctx.stroke();
+        ctx.fillStyle = Art.TL('#8a4a24');
+        ctx.fillRect(sx2 + sway - 2, farKerbY - BS * 0.32, BS * 0.18, BS * 0.08);
+      }
+    }
+  };
+  // cached: see the R.getSprite comment above. The playground's swing-sway is baked in at whatever `t`
+  // happened to be when that tint bucket was first built — a static pose instead of continuous animation,
+  // an acceptable trade for not re-walking ~15 canvas calls every frame for scenery this far in the background.
+  R.drawFillerItem = function (ctx, cx, farKerbY, kind, seed, t) {
+    const w = BS * 4.4, h = BS * 2.3;
+    const key = 'filler#' + kind + '#' + seed;
+    const cv = this.getSprite(key, w, h, (cctx) => this.paintFillerItem(cctx, w / 2, h, kind, seed, t));
+    ctx.drawImage(cv, cx - w / 2, farKerbY - h);
+  };
+  // the cul-de-sac gap (see CULDESAC_X): a short side street receding into the distance, with nr 54 and 52
+  // standing small and further back — not the main row, but not empty either
+  R.drawCuldesac = function (ctx, cx, farKerbY, t) {
+    const nearW = BS * 3.8, farW = BS * 1.7, depth = BS * 1.8;
+    const g = ctx.createLinearGradient(0, farKerbY - depth, 0, farKerbY);
+    g.addColorStop(0, Art.TL('#37343e'));
+    g.addColorStop(1, Art.TL('#242229'));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(cx - nearW / 2, farKerbY);
+    ctx.lineTo(cx - farW / 2, farKerbY - depth);
+    ctx.lineTo(cx + farW / 2, farKerbY - depth);
+    ctx.lineTo(cx + nearW / 2, farKerbY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(226,226,232,0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - nearW / 2, farKerbY);
+    ctx.lineTo(cx - farW / 2, farKerbY - depth);
+    ctx.moveTo(cx + nearW / 2, farKerbY);
+    ctx.lineTo(cx + farW / 2, farKerbY - depth);
+    ctx.stroke();
+    const backY = farKerbY - depth + BS * 0.1;
+    const g54 = this.drawGableUnit(ctx, cx - BS * 0.78, backY, GABLE_W * 0.5, 754);
+    this.drawMailbox(ctx, g54.x0 - BS * 0.15, backY, 54, BS * 0.42);
+    const g52 = this.drawGableUnit(ctx, cx + BS * 0.92, backY, GABLE_W * 0.5, 752);
+    this.drawMailbox(ctx, g52.x0 + g52.bw + BS * 0.15, backY, 52, BS * 0.42);
+  };
+  // a black mailbox on a post with the house number in white
+  R.drawMailbox = function (ctx, cx, baseY, num, postH) {
+    ctx.strokeStyle = Art.TL('#3a3a3e');
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY);
+    ctx.lineTo(cx, baseY - postH);
+    ctx.stroke();
+    const boxW = BS * 0.56, boxH = BS * 0.32, boxY = baseY - postH - boxH * 0.4;
+    ctx.fillStyle = '#15130f';
+    Art.rr(ctx, cx - boxW / 2, boxY, boxW, boxH, 4);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - boxW / 2, boxY, boxW, boxH);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = Math.round(BS * 0.22) + 'px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(num), cx, boxY + boxH / 2 + 1);
+  };
+  // the near-side kerb: just a mailbox and a little foreground clutter, in front of the road (Stratusvägen)
+  // (uncached — see drawNearHouse below, the cached wrapper every caller actually uses)
+  R.paintNearHouse = function (ctx, cx, nearKerbY, num, t) {
+    const rnd = U.rng(num * 131 + 5);
+    this.drawMailbox(ctx, cx, nearKerbY + 30, num, BS * 1.05);
+    // a small pumpkin or a leaf pile at the foot of about a third of the posts
+    if (rnd() < 0.3) {
+      const pb = BS * 0.34;
+      if (VD.Stratus && VD.Stratus.pumpkin) VD.Stratus.pumpkin(ctx, cx + BS * 0.5, nearKerbY + 30 - pb * 0.35, pb / BS, t, Art.dark() > 0.22);
+      else {
+        ctx.fillStyle = '#e8731f';
+        ctx.beginPath();
+        ctx.ellipse(cx + BS * 0.5, nearKerbY + 30 - pb * 0.35, pb * 0.5, pb * 0.42, 0, 0, TAU);
+        ctx.fill();
+      }
+    } else if (rnd() < 0.6) {
+      ctx.fillStyle = 'rgba(200,120,40,0.5)';
+      for (let i = 0; i < 4; i++) {
+        const lx = cx - BS * 0.4 + i * 7, ly = nearKerbY + 34 + (i % 2) * 4;
+        ctx.beginPath();
+        ctx.ellipse(lx, ly, 3.4, 2.2, i, 0, TAU);
+        ctx.fill();
+      }
+    }
+  };
+  // cached: see the R.getSprite comment above
+  R.drawNearHouse = function (ctx, cx, num, t) {
+    const nearKerbY = this.roadNearKerbY();
+    const w = BS * 2.4, h = BS * 2.3, localBaseY = h - 20;
+    const key = 'nearhouse#' + num;
+    const cv = this.getSprite(key, w, h, (cctx) => this.paintNearHouse(cctx, w / 2, localBaseY, num, t));
+    ctx.drawImage(cv, cx - w / 2, nearKerbY - localBaseY);
+  };
+  R.drawHouses = function (ctx, camX, t) {
+    const props = this.streetProps;
+    if (props) {
+      const farKerbY = this.roadFarKerbY();
+      for (const p of props) {
+        const x = sx(p.x, camX);
+        const margin = p.t === 'house' ? 170 : p.t === 'culdesac' ? 150 : 90;
+        if (x < -margin || x > W + margin) continue;
+        if (p.t === 'house') this.drawTerraceHouse(ctx, x, farKerbY, p.num, t, p.attachLeft, p.attachRight);
+        else if (p.t === 'terrace') this.drawGableUnit(ctx, x, farKerbY, p.w || GABLE_W, p.seed);
+        else if (p.t === 'culdesac') this.drawCuldesac(ctx, x, farKerbY, t);
+        else this.drawFillerItem(ctx, x, farKerbY, p.kind, p.seed, t);
+      }
+    }
+    const houses = this.lvl.houses;
+    if (!houses || !houses.length) return;
+    for (const h of houses) {
+      if (h.row === 'far') continue; // drawn above, from this.streetProps
+      const x = sx(h.x, camX);
+      if (x < -160 || x > W + 160) continue;
+      this.drawNearHouse(ctx, x, h.num, t);
+    }
+  };
+  // the four neighbours (js/stratus.js, if it has loaded — feature-detected so this level still works
+  // before/without that file), standing in the far row where Builder.person() placed them
+  R.personThrowK = function (p, px) {
+    const handY = p.handY != null ? p.handY : p.footY;
+    let best = 0;
+    for (const o of this.lvl.objs) {
+      const mv = o.mv;
+      if (!mv || mv.type !== 'throw' || mv.hx == null || mv.hx !== p.x || mv.hy !== handY) continue;
+      // throwK peaks at the moment the object leaves the hand (x = o.x - mv.trigger), not when it lands
+      const releaseX = o.x - mv.trigger, d = px - releaseX, winL = 3, winR = 4.2;
+      let k = 0;
+      if (d < 0 && d > -winL) k = 1 + d / winL;
+      else if (d >= 0 && d < winR) k = 1 - d / winR;
+      if (k > best) best = k;
+    }
+    return best;
+  };
+  R.drawPeople = function (ctx, camX, t, px) {
+    const VDS = VD.Stratus;
+    if (!VDS || !this.lvl.people.length) return;
+    const farKerbY = this.roadFarKerbY();
+    for (const p of this.lvl.people) {
+      const fn = VDS[p.id];
+      if (!fn) continue;
+      const x = sx(p.x, camX);
+      if (x < -110 || x > W + 110) continue;
+      const state = { throwK: this.personThrowK(p, px) };
+      if (p.id === 'nr66') state.doorK = U.clamp((px - (p.x - 10)) / 16, 0, 1);
+      fn(ctx, x, farKerbY, 0.85, t, state);
+    }
+  };
+  // the rocket skateboard, parked and unlit, standing on the road a couple of blocks before the ride zone
+  // so the player visibly runs up and hops on it (see Builder.board(); the actual ride is drawn in drawPlayer)
+  R.drawParkedBoards = function (ctx, camX, t) {
+    const boards = this.lvl.boards;
+    if (!boards || !boards.length) return;
+    const VDS = VD.Stratus;
+    for (const z of boards) {
+      const x = sx(z.x0 - 4, camX);
+      if (x < -60 || x > W + 60) continue;
+      if (VDS && VDS.skateboard) VDS.skateboard(ctx, x, GY, 1, t, { on: false });
+      else {
+        ctx.fillStyle = '#7a4a28';
+        Art.rr(ctx, x - 34, GY - 10, 68, 10, 4);
+        ctx.fill();
+      }
+    }
+  };
+  // speed lines streaking past in the ×1.5 zone at the end of the street (see Builder.speed())
+  R.drawSpeedFX = function (ctx, camX, t, px) {
+    const speeds = this.lvl.speeds;
+    if (!speeds || !speeds.length) return;
+    let mult = 1;
+    for (const z of speeds) if (px >= z.x0 && px <= z.x1) { mult = z.mult; break; }
+    if (mult <= 1.01) return;
+    const rnd = U.rng(Math.floor(t * 13));
+    ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+      const yy = 90 + rnd() * (GY - 120), len = 46 + rnd() * 100;
+      const xx = rnd() * (W + 260) - 140;
+      ctx.lineWidth = 1.5 + rnd() * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(xx, yy);
+      ctx.lineTo(xx - len, yy);
+      ctx.stroke();
+    }
+  };
+
+  // ------------------------------------------------------------------ Stratusvägen: the camera swing
+  // A short cinematic flourish inside an lvl.swings zone (see Builder.swing()): the even-numbered row was
+  // behind Vippe before it, the odd-numbered row (nr 15 among them) is behind him after — so the camera
+  // swings 180° around him mid-run to sell "we're filming from the other side now". A tiny flat-shaded 3D
+  // scene (painter's algorithm, no per-face gradients, ~100 faces) stands in for the street during the
+  // turn; the ordinary flat 2D layers cross-fade out over the first ~12% of the zone and back in over the
+  // last ~12%, so both ends are seamless with the regular side-view rendering. Gameplay/physics never read
+  // any of this — it's pure presentation over an already-flat, obstacle-free zone.
+  function swingEnvelope(p) {
+    const FADE = 0.12;
+    if (p < FADE) return 1 - U.smooth(p / FADE);
+    if (p > 1 - FADE) return U.smooth((p - (1 - FADE)) / FADE);
+    return 0;
+  }
+  // Vippe stays in the foreground throughout: the camera is a chase-cam a fixed distance behind/above him
+  // (not a pure "always centred" orbit), pitched down a little so the road runs from under his feet into
+  // the distance, the same way the ordinary side view has him low-centre on the road at y ≈ GY.
+  const SW_R = 11, SW_CAMH = 2.4, SW_PITCH = 0.2, SW_FOCAL = 300, SW_CY = 0.78;
+  function v3sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+  function v3cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+  function v3norm(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+  // the camera's basis at yaw `theta` (0 = the ordinary side view, π/2 = looking straight down the street
+  // from behind Vippe, π = the ordinary side view from the far side) — shared by the scene and the player.
+  // Orbits Vippe at a fixed radius (so his size stays put) but AIMS along a fixed downward pitch rather
+  // than straight at him, which is what keeps him low in frame instead of dead-centre.
+  function swingCam(theta) {
+    const pos = [-SW_R * Math.sin(theta), SW_CAMH, -SW_R * Math.cos(theta)];
+    const fh = [Math.sin(theta), 0, Math.cos(theta)]; // horizontal aim, camera → the street's centreline
+    const cp = Math.cos(SW_PITCH), sp = Math.sin(SW_PITCH);
+    const fwd = v3norm([fh[0] * cp, -sp, fh[2] * cp]);
+    let right = v3norm(v3cross(fwd, [0, 1, 0]));
+    if (!isFinite(right[0]) || (Math.abs(right[0]) < 1e-6 && Math.abs(right[2]) < 1e-6)) right = [1, 0, 0];
+    const up = v3cross(right, fwd);
+    return { pos, fwd, right, up, fh };
+  }
+  function swingProject(cam, p) {
+    const rx = p[0] - cam.pos[0], ry = p[1] - cam.pos[1], rz = p[2] - cam.pos[2];
+    const cxv = rx * cam.right[0] + ry * cam.right[1] + rz * cam.right[2];
+    const cyv = rx * cam.up[0] + ry * cam.up[1] + rz * cam.up[2];
+    const czv = rx * cam.fwd[0] + ry * cam.fwd[1] + rz * cam.fwd[2];
+    if (czv < 0.2) return null; // behind the camera plane — cull
+    const f = SW_FOCAL / Math.max(czv, 3.5); // clamp how large anything can loom up close (houses near the orbit path)
+    return [W / 2 + cxv * f, H * SW_CY - cyv * f, czv];
+  }
+  // the screen Y of the horizon (where the flat ground vanishes) at the camera's current pitch/height — a
+  // point at the camera's own height, far away along the (un-pitched) horizontal aim, projects there
+  // regardless of distance. Used to guarantee the ground fill below always meets the sky exactly.
+  function swingHorizonY(cam) {
+    const far = [cam.pos[0] + cam.fh[0] * 1000, cam.pos[1], cam.pos[2] + cam.fh[2] * 1000];
+    const q = swingProject(cam, far);
+    return q ? q[1] : H * 0.55;
+  }
+  // the scene's static geometry, in local (along-street S, up Y, lateral Z) space, built once (see below):
+  // a handful of narrow gable houses either side of the road, set back behind a sidewalk/garden strip like
+  // the real street, a few lamps and a couple of parked cars. Faces only — no back walls (never seen).
+  // wallDetail/frame flags add a couple of cheap post-fill strokes (board lines, window frames) without
+  // costing extra sorted faces. mailboxes/pumpkins (the nearest 2 houses of each row) are billboarded
+  // separately, after the main pass, straight from SWING_PROPS.
+  const SWING_PROPS = [];
+  function buildSwingModel() {
+    const faces = [];
+    SWING_PROPS.length = 0;
+    function house(s, sgn, seed, num) {
+      const hw = 1.9, wallH = 3.1, roofH = 2.0, d0 = 6.5, d1 = 11.5;
+      const zf = sgn * d0, zb = sgn * d1;
+      const wall = HOUSE_WOOD[seed % HOUSE_WOOD.length];
+      const roof = '#24252c';
+      faces.push({ p: [[s - hw, 0, zf], [s + hw, 0, zf], [s + hw, wallH, zf], [s - hw, wallH, zf]], c: wall, wallDetail: true });
+      faces.push({ p: [[s - hw, wallH, zf], [s + hw, wallH, zf], [s, wallH + roofH, zf]], c: roof });
+      faces.push({ p: [[s - 0.4, 1.15, zf], [s + 0.4, 1.15, zf], [s + 0.4, 1.95, zf], [s - 0.4, 1.95, zf]], glowC: seed % 2 ? '#ffd27a' : 'rgba(143,176,200,0.9)', frame: true });
+      faces.push({ p: [[s - 0.28, 0, zf], [s + 0.28, 0, zf], [s + 0.28, 1.0, zf], [s - 0.28, 1.0, zf]], c: '#2a2622' }); // door
+      faces.push({ p: [[s - hw, 0, zf], [s - hw, 0, zb], [s - hw, wallH, zb], [s - hw, wallH, zf]], c: wall, wallDetail: true });
+      faces.push({ p: [[s + hw, 0, zf], [s + hw, 0, zb], [s + hw, wallH, zb], [s + hw, wallH, zf]], c: wall, wallDetail: true });
+      faces.push({ p: [[s, wallH + roofH, zf], [s, wallH + roofH, zb], [s - hw, wallH, zb], [s - hw, wallH, zf]], c: roof });
+      faces.push({ p: [[s, wallH + roofH, zf], [s, wallH + roofH, zb], [s + hw, wallH, zb], [s + hw, wallH, zf]], c: roof });
+      if (num != null) SWING_PROPS.push({ pos: [s - hw - 0.5, 0, zf - sgn * 0.3], num, pumpkin: seed % 2 === 0 });
+    }
+    // the camera's own S-coordinate stays in [-SW_R, 0] for the whole 0→π sweep (only its Z crosses from
+    // - to + — see swingCam), so every house needs real clearance from that whole range, not just from
+    // wherever the camera happens to sit at the one instant being screenshotted
+    const sArr = [-22, -16, -10, 10, 16, 22];
+    const leftNums = [64, 62, 66, null, null, null], rightNums = [null, null, null, 21, 19, 15];
+    for (let i = 0; i < sArr.length; i++) {
+      house(sArr[i], -1, i * 3 + 1, leftNums[i]); // even row (66…48), behind Vippe before the swing
+      house(sArr[i] + 4, 1, i * 5 + 2, rightNums[i]); // odd row (23…1), behind him after
+    }
+    function lamp(s, sgn) {
+      const x = sgn * 5.6;
+      faces.push({ p: [[s - 0.06, 0, x], [s + 0.06, 0, x], [s + 0.06, 2.6, x], [s - 0.06, 2.6, x]], c: '#2a2a30' });
+      faces.push({ pt: [s, 2.7, x], r: 0.5, glowC: 'rgba(255,214,130,0.5)' });
+    }
+    for (const s of [-26, -12, 12]) { lamp(s, -1); lamp(s + 6, 1); }
+    function car(s, sgn, cc) {
+      const x = sgn * 4.4, w = 1.8, h = 0.85, d = 0.9;
+      faces.push({ p: [[s - w / 2, 0, x - d / 2], [s + w / 2, 0, x - d / 2], [s + w / 2, h, x - d / 2], [s - w / 2, h, x - d / 2]], c: cc });
+      faces.push({ p: [[s - w / 2, h, x - d / 2], [s + w / 2, h, x - d / 2], [s + w / 2, h, x + d / 2], [s - w / 2, h, x + d / 2]], c: cc });
+      faces.push({ p: [[s - w / 2, 0, x + d / 2], [s + w / 2, 0, x + d / 2], [s + w / 2, h, x + d / 2], [s - w / 2, h, x + d / 2]], c: cc });
+    }
+    car(-19, -1, '#8a1a24');
+    car(19, 1, '#1c3a6e');
+    // the ground, in short segments along the street — a single quad spanning the whole ±40 range would
+    // often have one end behind the camera and one ahead once the orbit turns to look down the street, and
+    // the simple all-or-nothing culling below drops a whole face if any one of its corners is behind the
+    // camera plane; segmenting keeps each dropped piece tiny. A flat fill behind all of this (see
+    // drawSwingScene) is the real guarantee against any sky showing through a gap.
+    const bands = [
+      [-11.5, -5.2, '#3a3840'], // far sidewalk/garden strip
+      [-5.2, 5.2, '#26242c'], // road
+      [5.2, 11.5, '#3a3840'], // near sidewalk/garden strip
+    ];
+    for (const [z0, z1, c] of bands) for (let s = -40; s < 40; s += 8) faces.push({ p: [[s, 0, z0], [s + 8, 0, z0], [s + 8, 0, z1], [s, 0, z1]], c });
+    return faces;
+  }
+  let SWING_MODEL = null; // built lazily on first use (HOUSE_WOOD isn't defined yet at this point in the file)
+  R.drawSwingScene = function (ctx, theta, sky) {
+    if (!SWING_MODEL) SWING_MODEL = buildSwingModel();
+    const cam = swingCam(theta);
+    // sky backdrop, reusing the level's own dusk gradient at the player's current x
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, sky.top);
+    g.addColorStop(1, sky.bot);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    // ground fill down to the bottom of the screen — a flat pavement/grass dusk tone behind everything
+    // else, so there is never a gap of sky showing through below the horizon at any θ
+    const horizonY = swingHorizonY(cam);
+    ctx.fillStyle = Art.TL('#2c2a32');
+    ctx.fillRect(0, Math.max(0, horizonY), W, H - Math.max(0, horizonY));
+    // a moon that drifts across and brightens as the camera turns, cheap (no per-frame allocation)
+    if (sky.dark > 0.28) {
+      const moonX = W * 0.18 + (theta / Math.PI) * W * 0.64, moonY = 90;
+      const halo = ctx.createRadialGradient(moonX, moonY, 6, moonX, moonY, 70);
+      halo.addColorStop(0, 'rgba(255,246,218,0.3)');
+      halo.addColorStop(1, 'rgba(255,246,218,0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(moonX - 70, moonY - 70, 140, 140);
+      ctx.fillStyle = '#fff6da';
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, 20, 0, TAU);
+      ctx.fill();
+    }
+    const drawList = [];
+    for (const f of SWING_MODEL) {
+      if (f.pt) {
+        const q = swingProject(cam, f.pt);
+        // same near-camera clamp as swingProject's own x/y (q[2] is the raw, unclamped depth) — otherwise a
+        // lamp passing close to the orbiting camera briefly blows up into a screen-filling glow circle
+        if (q) drawList.push({ z: q[2], glow: true, x: q[0], y: q[1], r: Math.min(60, Math.max(1, (f.r * SW_FOCAL) / Math.max(q[2], 3.5))), c: f.glowC });
+        continue;
+      }
+      const pts = [];
+      let z = 0, ok = true;
+      for (const p of f.p) {
+        const q = swingProject(cam, p);
+        if (!q) { ok = false; break; }
+        pts.push(q);
+        z += q[2];
+      }
+      if (!ok) continue;
+      // regular surfaces (f.c) darken with the dusk like everything else; glow surfaces (f.glowC — lit
+      // windows, lamp light) are self-illuminated and stay at their own colour, same convention as the
+      // rest of the street art
+      drawList.push({ z: z / f.p.length, pts, c: f.c ? Art.TL(f.c) : f.glowC, wallDetail: f.wallDetail, frame: f.frame });
+    }
+    drawList.sort((a, b) => b.z - a.z); // painter's algorithm: farthest first
+    for (const d of drawList) {
+      if (d.glow) {
+        ctx.fillStyle = d.c;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, TAU);
+        ctx.fill();
+        continue;
+      }
+      ctx.fillStyle = d.c;
+      ctx.beginPath();
+      ctx.moveTo(d.pts[0][0], d.pts[0][1]);
+      for (let i = 1; i < d.pts.length; i++) ctx.lineTo(d.pts[i][0], d.pts[i][1]);
+      ctx.closePath();
+      ctx.fill();
+      // cheap post-fill detail, reusing the face's own already-projected corners — a couple of vertical
+      // board-line strokes on a wall (points are [bottomNear, bottomFar, topFar, topNear]), or a plain
+      // white frame around a window — instead of adding more sorted faces
+      if (d.wallDetail) {
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const k of [0.33, 0.66]) {
+          const bx = d.pts[0][0] + (d.pts[1][0] - d.pts[0][0]) * k, by = d.pts[0][1] + (d.pts[1][1] - d.pts[0][1]) * k;
+          const tx = d.pts[3][0] + (d.pts[2][0] - d.pts[3][0]) * k, ty = d.pts[3][1] + (d.pts[2][1] - d.pts[3][1]) * k;
+          ctx.moveTo(bx, by);
+          ctx.lineTo(tx, ty);
+        }
+        ctx.stroke();
+      } else if (d.frame) {
+        ctx.strokeStyle = 'rgba(242,240,232,0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(d.pts[0][0], d.pts[0][1]);
+        for (let i = 1; i < d.pts.length; i++) ctx.lineTo(d.pts[i][0], d.pts[i][1]);
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+    // mailbox posts with the house number, and a pumpkin on a step, on the nearest couple of houses of
+    // each row — simple billboards at their projected foot position, not worth sorting in with the rest
+    for (const p of SWING_PROPS) {
+      const qTop = swingProject(cam, [p.pos[0], 0.85, p.pos[2]]);
+      const qBot = swingProject(cam, p.pos);
+      if (!qTop || !qBot) continue;
+      const sc = U.clamp(SW_R / qBot[2], 0.25, 1.6);
+      ctx.strokeStyle = Art.TL('#3a3a3e');
+      ctx.lineWidth = Math.max(1, 3 * sc);
+      ctx.beginPath();
+      ctx.moveTo(qBot[0], qBot[1]);
+      ctx.lineTo(qTop[0], qTop[1]);
+      ctx.stroke();
+      const boxW = 16 * sc, boxH = 10 * sc;
+      ctx.fillStyle = '#15130f';
+      ctx.fillRect(qTop[0] - boxW / 2, qTop[1] - boxH * 0.6, boxW, boxH);
+      ctx.fillStyle = '#fff';
+      ctx.font = Math.max(6, Math.round(9 * sc)) + 'px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(p.num), qTop[0], qTop[1] - boxH * 0.1);
+      if (p.pumpkin) {
+        const qp = swingProject(cam, [p.pos[0] + 0.6, 0, p.pos[2] + 0.3]);
+        if (qp) {
+          const pr = Math.max(2, 9 * sc);
+          ctx.fillStyle = '#e8731f';
+          ctx.beginPath();
+          ctx.ellipse(qp[0], qp[1] - pr * 0.5, pr, pr * 0.82, 0, 0, TAU);
+          ctx.fill();
+        }
+      }
+    }
+  };
+  // Vippe himself, projected through the same chase camera — always drawn at full opacity (only the world
+  // around him cross-fades) so he never looks translucent mid-run, with a small ground shadow under his
+  // feet. Cube mode only (the swing zone is flat, obstacle-free ground — see Builder.swing()), so no
+  // ship/ball branches are needed here.
+  R.drawSwingPlayer = function (ctx, G, t, theta) {
+    const s = G.s, v = G.vis;
+    if (G.state === 'dead') { this.drawPlayer(ctx, 0, G, t); return; } // shouldn't happen (no hazards here), but safe
+    const cam = swingCam(theta);
+    const q = swingProject(cam, [0, 0.5, 0]);
+    if (!q) return;
+    const scale = SW_R / q[2]; // ~1.0 near the orbit radius, matching the ordinary cube's on-screen size
+    const qFoot = swingProject(cam, [0, 0, 0]);
+    if (qFoot) {
+      ctx.fillStyle = 'rgba(6,5,8,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(qFoot[0], qFoot[1] + 3 * scale, 22 * scale, 7 * scale, 0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(q[0], q[1]);
+    ctx.scale(scale, scale);
+    ctx.rotate(v.rot);
+    const expr = G.state === 'won' || G.state === 'winning' ? 'happy' : v.oT > 0 ? 'o' : 'grin';
+    Art.cube(ctx, BS, expr, G.skin, 1);
+    ctx.restore();
+  };
+
   // ------------------------------------------------------------------ gameplay objects
   const WATER_STYLE = { peat: 'bog', sewer: 'sludge' };
-  R.drawObjects = function (ctx, camX, t, G, L = 0) {
+  // laneFilter is only used on Stratusvägen (this.theme.lanes): 1 draws only far-lane (lane === 1) objects,
+  // 0 draws everything else (laneless objects, lane 0, and the "always" stuff — water/checkpoints/finish
+  // glow), undefined (every other level) draws everything in one pass exactly as before. See the comment
+  // in drawScene on why the far/near objects are split around the player for correct depth.
+  R.drawObjects = function (ctx, camX, t, G, L = 0, laneFilter) {
     const lvl = this.lvl;
     const AH = Art.horror;
     const vis = lvl.visible(camX - 2, camX + W / BS + 2).filter((o) => (o.layer || 0) === L);
@@ -2742,25 +3858,50 @@
       for (const z of darkZones) if (x >= z.x0 - 6 && x <= z.x1 + 6) return true;
       return false;
     };
-    // water and the live rail first (they sit in the ground)
-    for (const o of vis) {
-      if (o.t !== 'haz') continue;
-      if (o.kind === 'water') {
-        const x0 = sx(o.x, camX), x1 = sx(o.x + o.w, camX), ys = sy(0.22);
-        const wf = AH && AH.water && AH.water[o.style];
-        if (wf) wf(ctx, x0, x1, ys, H, t);
-        else Art.water(ctx, x0, x1, ys, H, t, o.style || WATER_STYLE[this.theme.ground[this.areaIn(L, o.x).id]]);
-      } else if (o.kind === 'rail') Art.rail(ctx, sx(o.x, camX), sx(o.x + o.w, camX), GY, t, o.style || this.theme.ground[this.areaIn(L, o.x).id]);
+    if (laneFilter !== 1) {
+      // water, the live rail, and Stratusvägen's speed bumps first (they sit in/on the ground)
+      for (const o of vis) {
+        if (o.t !== 'haz') continue;
+        if (o.kind === 'water') {
+          const x0 = sx(o.x, camX), x1 = sx(o.x + o.w, camX), ys = sy(0.22);
+          const wf = AH && AH.water && AH.water[o.style];
+          if (wf) wf(ctx, x0, x1, ys, H, t);
+          else Art.water(ctx, x0, x1, ys, H, t, o.style || WATER_STYLE[this.theme.ground[this.areaIn(L, o.x).id]]);
+        } else if (o.kind === 'rail') Art.rail(ctx, sx(o.x, camX), sx(o.x + o.w, camX), GY, t, o.style || this.theme.ground[this.areaIn(L, o.x).id]);
+        else if (o.kind === 'bump') this.drawBump(ctx, camX, o);
+      }
+      // checkpoints
+      for (const cp of lvl.checkpoints) {
+        if (cp.index === 0 || (cp.layer || 0) !== L || cp.x < camX - 2 || cp.x > camX + 30) continue;
+        const active = G.state !== 'menu' && G.cpIndex >= cp.index;
+        Art.checkpoint(ctx, sx(cp.x, camX), GY, BS, active, t);
+      }
     }
-    // checkpoints
-    for (const cp of lvl.checkpoints) {
-      if (cp.index === 0 || (cp.layer || 0) !== L || cp.x < camX - 2 || cp.x > camX + 30) continue;
-      const active = G.state !== 'menu' && G.cpIndex >= cp.index;
-      Art.checkpoint(ctx, sx(cp.x, camX), GY, BS, active, t);
-    }
     for (const o of vis) {
-      const x = sx(o.x, camX), y = sy(o.y + o.h), w = o.w * BS, h = o.h * BS;
+      if (laneFilter === 1 && o.lane !== 1) continue;
+      if (laneFilter === 0 && o.lane === 1) continue;
+      let x = sx(o.x, camX), y = sy(o.y + o.h), w = o.w * BS, h = o.h * BS;
+      if (o.lane === 1) {
+        // Stratusvägen's far lane: shift up and shrink a little around its own centre, so it reads as
+        // further away. Purely a screen trick — physics.js never moves the object's real y.
+        const ccx = x + w / 2, ccy = y + h / 2 - LANE_DY * BS;
+        w *= LANE_SCALE;
+        h *= LANE_SCALE;
+        x = ccx - w / 2;
+        y = ccy - h / 2;
+      }
       switch (o.t) {
+        case 'coin': {
+          if (G.got && G.got.has(o.id)) break; // already collected
+          let ccx = x + w / 2, ccy = y + h / 2;
+          if (o.mv) {
+            const mv = VD.Physics.moveOf(o, px, lvl);
+            ccx += mv.dx * BS;
+            ccy -= mv.dy * BS; // world y is up, screen y is down
+          }
+          Art.coin(ctx, ccx, ccy, o.lane === 1 ? BS * LANE_SCALE : BS, o.style, t, o.id);
+          break;
+        }
         case 'solid': {
           const bf = AH && AH.block && AH.block[o.style];
           if (bf) bf(ctx, x, y, w, h, BS, o.id, t);
@@ -2788,8 +3929,16 @@
           else if (o.kind === 'snapper') Art.snapper(ctx, x, y, w, h, t, o.id, glow(o.x));
           else if (o.kind === 'shark') Art.sharkHead(ctx, x, y, w, h, o.dir, t, o.id, glow(o.x));
           else if (o.kind === 'eel') Art.eel(ctx, x, y, w, h, t, o.id, glow(o.x));
-          else if (o.kind === 'nun') {
-            const mv = VD.Physics.moveOf(o, px);
+          else if (o.kind === 'lob') {
+            // a hazard thrown from a fixed thrower (Builder.lob()): zucchini or dumbbell, flying in from
+            // mv.hx/mv.hy and landing at (o.x, o.y). A shadow on the ground shows where it'll land.
+            const laneDy = o.lane === 1 ? LANE_DY : 0; // same depth trick as the shared x/y/w/h above
+            const mv = VD.Physics.moveOf(o, px, lvl);
+            const lcx = sx(o.x + o.w / 2 + mv.dx, camX), lcy = sy(o.y + o.h / 2 + mv.dy + laneDy);
+            const shadowX = sx(o.x + o.w / 2, camX);
+            Art.lob(ctx, lcx, lcy, shadowX, sy(o.y + laneDy), o.lane === 1 ? BS * LANE_SCALE : BS, mv.k, o.style, t, o.id);
+          } else if (o.kind === 'nun') {
+            const mv = VD.Physics.moveOf(o, px, lvl);
             const ncx = sx(o.x + o.w / 2 + mv.dx, camX), ncy = sy(o.y + o.h / 2 + mv.dy);
             if (AH && AH.hazard && AH.hazard.nun) AH.hazard.nun(ctx, ncx, ncy, BS, t, o.id, glow(o.x), o.style);
             else {
@@ -2799,7 +3948,7 @@
             }
             if (inDark(o.x)) this._eyeSpots.push({ x: ncx, y: ncy - h * 0.28, size: BS * 0.4, seed: o.id, color: '#f4f8ff' });
           } else if (o.kind === 'jack') {
-            const mv = VD.Physics.moveOf(o, px);
+            const mv = VD.Physics.moveOf(o, px, lvl);
             const jx = sx(o.x, camX), jy = sy(o.y + o.h);
             const rise = (o.mv && o.mv.rise) || 1.5;
             if (AH && AH.hazard && AH.hazard.jack) AH.hazard.jack(ctx, jx, jy, BS, mv.k, rise, t, o.id, glow(o.x));
@@ -2810,7 +3959,7 @@
               ctx.fill();
             }
           } else if (o.kind === 'pendulum' && o.mv) {
-            const mv = VD.Physics.moveOf(o, px);
+            const mv = VD.Physics.moveOf(o, px, lvl);
             const pvx = sx(o.mv.px, camX), pvy = sy(o.mv.py);
             if (AH && AH.hazard && AH.hazard.pendulum) AH.hazard.pendulum(ctx, pvx, pvy, o.mv.len * BS, mv.a, BS, t, o.id, glow(o.x));
             else {
@@ -2827,7 +3976,7 @@
               ctx.fill();
             }
           } else if (o.kind === 'balloon') {
-            const mv = VD.Physics.moveOf(o, px);
+            const mv = VD.Physics.moveOf(o, px, lvl);
             const bcx = sx(o.x + o.w / 2 + mv.dx, camX), bcy = sy(o.y + 1.1 + mv.dy);
             if (AH && AH.hazard && AH.hazard.balloon) AH.hazard.balloon(ctx, bcx, bcy, BS, t, o.id, glow(o.x));
             else {
@@ -2838,7 +3987,7 @@
             }
           } else if (o.kind === 'pawn') {
             // a pawn thrown by the level 4 "Schackmatt" king boss (see Builder.pawn(), physics.js moveOf)
-            const mv = VD.Physics.moveOf(o, px);
+            const mv = VD.Physics.moveOf(o, px, lvl);
             const pcx = sx(o.x + o.w / 2 + mv.dx, camX), pcy = sy(o.y + o.h / 2 + mv.dy);
             const landX = o.x - o.mv.trigger + o.mv.fall;
             const dust = mv.k >= 0.999 ? U.clamp(1 - (px - landX) / 3, 0, 1) : 0;
@@ -2876,7 +4025,7 @@
     }
     // finish line glow
     const fx = sx(lvl.finishX, camX);
-    if (fx > -40 && fx < W + 40 && lvl.layerAt(lvl.finishX) === L) {
+    if (laneFilter !== 1 && fx > -40 && fx < W + 40 && lvl.layerAt(lvl.finishX) === L) {
       const g = ctx.createLinearGradient(fx - 30, 0, fx + 30, 0);
       g.addColorStop(0, 'rgba(255,255,255,0)');
       g.addColorStop(0.5, 'rgba(255,240,180,0.55)');
@@ -2909,7 +4058,8 @@
   R.drawPlayer = function (ctx, camX, G, t) {
     const s = G.s, v = G.vis;
     const ph = VD.Physics.boxH(s);
-    const cx = sx(s.x + 0.5, camX), cy = sy(s.y + ph / 2);
+    const laneP = s.laneP || 0;
+    const cx = sx(s.x + 0.5, camX), cy = sy(s.y + ph / 2 + laneP * LANE_DY);
     if (G.state === 'dead') {
       // Vippe sticks his tongue out as he pops
       const k = G.deadAge;
@@ -2924,10 +4074,22 @@
       }
       return;
     }
+    // Stratusvägen: inside a board zone (see Builder.board()), Vippe rides the rocket skateboard — draw it
+    // under his feet, at the same lane depth he's currently at
+    if (this.theme.lanes && this.lvl.boards.some((z) => s.x >= z.x0 && s.x <= z.x1)) {
+      const VDS = VD.Stratus;
+      const footY = sy(s.y + laneP * LANE_DY);
+      const boardScale = 1 - (1 - LANE_SCALE) * laneP;
+      if (VDS && VDS.skateboard) VDS.skateboard(ctx, cx, footY, boardScale, t, { on: true });
+    }
     ctx.save();
     ctx.translate(cx, cy);
+    if (laneP) {
+      const sc = 1 - (1 - LANE_SCALE) * laneP;
+      ctx.scale(sc, sc);
+    }
     const expr = G.state === 'won' || G.state === 'winning' ? 'happy' : v.oT > 0 ? 'o' : 'grin';
-    if (s.mode === 'cube') {
+    if (s.mode === 'cube' || s.mode === 'lane') {
       ctx.rotate(v.rot);
       if (s.gdir > 0) ctx.scale(1, -1); // a gravity portal flipped him: run on the ceiling
       Art.cube(ctx, BS, expr, G.skin, 1);
@@ -2974,7 +4136,7 @@
       if (o.t === 'haz') {
         let hx0 = o.hx0, hx1 = o.hx1, hy0 = o.hy0, hy1 = o.hy1;
         if (o.mv) {
-          const mv = VD.Physics.moveOf(o, s.x);
+          const mv = VD.Physics.moveOf(o, s.x, this.lvl);
           hx0 += mv.dx;
           hx1 += mv.dx;
           hy0 += mv.dy;

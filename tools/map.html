@@ -78,6 +78,8 @@
       pressOk: '#3ddc73',
       pressWarn: '#ffcf3d',
       pressBad: '#ff4d4d',
+      speedZone: 'rgba(255,180,60,0.14)',
+      speedZoneStroke: 'rgba(255,180,60,0.6)',
     };
 
     // deterministic string -> hue, so each solid `style` gets its own (muted) tint
@@ -303,8 +305,9 @@
     ctx.fillText('Level ' + def.num + ': ' + def.name + '  (' + def.id + ')', LEFT, 20);
     ctx.fillStyle = COL.textDim;
     ctx.font = '12px system-ui, sans-serif';
-    const lenS = (lvl.finishX / VD.PHYS.SPEED).toFixed(1);
+    const lenS = Ph.timeAt(lvl, lvl.finishX).toFixed(1);
     let info = lvl.finishX + ' blocks, ' + lenS + ' s, ' + lvl.checkpoints.length + ' checkpoints';
+    if (lvl.speeds.length) info += '  —  ' + lvl.speeds.length + ' speed zone(s)';
     if (fromX !== 0 || toX !== lvl.finishX + 20) info += '  —  showing x ' + fromX + '–' + toX;
     if (showBot) {
       const okN = botSegs.filter((s) => s.ok).length;
@@ -552,6 +555,25 @@
           ctx.fillStyle = '#fff';
           ctx.font = 'bold 10px system-ui, sans-serif';
           ctx.fillText(a.name, xPix(a.x0, x0) + 3, top + RULER_H + AREA_H - 3);
+        }
+      }
+
+      // ---- speed zones (Stratusvägen's real speed-up — see Builder.speed()) ----
+      for (const z of lvl.speeds) {
+        if (z.x1 <= x0 || z.x0 >= x1) continue;
+        const segX0 = Math.max(z.x0, x0), segX1 = Math.min(z.x1, x1);
+        const zx = xPix(segX0, x0), zw = (segX1 - segX0) * scale;
+        ctx.fillStyle = COL.speedZone;
+        ctx.fillRect(zx, track, zw, trackH(r));
+        ctx.strokeStyle = COL.speedZoneStroke;
+        ctx.setLineDash([4, 3]);
+        ctx.lineWidth = 1;
+        ctx.strokeRect(zx + 0.5, track + 0.5, zw - 1, trackH(r) - 1);
+        ctx.setLineDash([]);
+        if (z.x0 >= x0 && z.x0 < x1) {
+          ctx.fillStyle = COL.speedZoneStroke;
+          ctx.font = '9px system-ui, sans-serif';
+          ctx.fillText(z.mult + 'x speed', zx + 3, track + 10);
         }
       }
 

@@ -90,13 +90,15 @@
     G.coins = Math.max(0, G.coins + n);
     store.set('coins', G.coins);
   }
-  // Coins for finishing a level: the level's reward, a crash bonus (the same amount again, minus 10% per crash)
-  // and the reward once more the first time you beat it. Harder levels have a bigger reward.
-  function levelReward(def, crashes, firstWin) {
+  // Coins for finishing a level: the level's reward, a crash bonus (the same amount again, minus 10% per crash),
+  // the reward once more the first time you beat it, and 1 coin per candy/football picked up along the way
+  // (Stratusvägen; every other level has no coin pickups, so `pickups` is 0 and the reward is unchanged).
+  // Harder levels have a bigger reward.
+  function levelReward(def, crashes, firstWin, pickups = 0) {
     const base = def.reward;
     const bonus = Math.max(0, Math.round(def.reward * (1 - crashes / 10)));
     const first = firstWin ? def.reward : 0;
-    return { base, bonus, first, total: base + bonus + first };
+    return { base, bonus, first, pickups, total: base + bonus + first + pickups };
   }
   G.levelReward = levelReward;
 
@@ -275,7 +277,7 @@
     G.vis = { rot: 0, wheel: 0, oT: 0 };
     G.camV = G.camVT = lvl.depthOf(s.layer);
     G.camX = s.x - R.PX;
-    AU.startMusic(s.x / P.SPEED);
+    AU.startMusic(Ph.timeAt(lvl, s.x));
   }
   function applyDebugStart() {
     const q = debugParams();
@@ -573,6 +575,8 @@
     G.scare = null;
     G.scared = {}; // which lvl.scares indices have fired this run
     G.hbT = 0;
+    G.got = new Set(); // ids of coins (candy/footballs) collected this run
+    G.runCoins = 0;
     updateLowHp();
     releaseAll();
     G.respawn();
@@ -592,7 +596,18 @@
     G.tapQueued = false;
     G.camX = G.s.x - R.PX;
     G.flash = 0.25;
-    AU.startMusic(cp.x / P.SPEED);
+    // candy/footballs collected past this checkpoint don't survive the respawn; ones before it do
+    if (G.got) {
+      let n = 0;
+      for (const o of G.lvl.objs) {
+        if (o.t === 'coin' && G.got.has(o.id)) {
+          if (o.x >= cp.x) G.got.delete(o.id);
+          else n++;
+        }
+      }
+      G.runCoins = n;
+    }
+    AU.startMusic(Ph.timeAt(G.lvl, cp.x));
     if (G.bot) computeBot(G.s);
   };
 
@@ -611,7 +626,7 @@
     G.acc = 0;
     G.last = performance.now();
     G.ignoreHeld = G.held;
-    AU.startMusic(G.s.x / P.SPEED);
+    AU.startMusic(Ph.timeAt(G.lvl, G.s.x));
   };
   G.toMenu = function () {
     AU.stopMusic(0.1);
@@ -683,7 +698,7 @@
     G.fwT = 0;
     AU.sfx(G.hpMax > 0 ? 'bell' : 'win');
     const p = G.progress[G.levelDef.id];
-    G.reward = levelReward(G.levelDef, G.deaths, p.wins === 0);
+    G.reward = levelReward(G.levelDef, G.deaths, p.wins === 0, G.runCoins || 0);
     G.coinsBefore = G.coins;
     addCoins(G.reward.total);
     p.best = 100;
@@ -714,6 +729,7 @@
     $('reward').innerHTML =
       line('Level ' + def.num + ' cleared (' + def.diffName + ')', r.base) +
       line(G.deaths === 0 ? 'No crashes — perfect run!' : 'Crash bonus (' + G.deaths + (G.deaths === 1 ? ' crash' : ' crashes') + ')', r.bonus) +
+      (r.pickups ? line('Candy & footballs', r.pickups) : '') +
       (r.first ? line('First time beating this level!', r.first) : '') +
       (r.first ? unlockedLine(def.id) : '') +
       '<div class="rtotal"><i class="coin"></i><b id="rewardTotal">+0</b><span id="rewardNow"></span></div>';
@@ -760,6 +776,7 @@
     if (s.mode !== prevMode) G.vis.rot = 0;
     visuals(s, wasGrounded);
     followDown(s);
+    collectCoins(s);
     checkScares(prevX, s.x);
     if (s.dead) return die();
     const cps = G.lvl.checkpoints;
@@ -790,12 +807,42 @@
     G.camV += (G.camVT - G.camV) * 0.06;
   }
 
+  // Stratusvägen: candy and footballs (t: 'coin' — see Builder.coin()). Physics never touches them, so
+  // this runs the overlap test itself, the same way as a hazard: the player box vs. the coin's centre
+  // (its `mv` offset applied first, for a thrown coin — see Builder.lob()'s comment), gated by lane too.
+  function collectCoins(s) {
+    if (!G.got) return; // menu attract mode has no run in progress
+    const ph = Ph.boxH(s);
+    for (const o of G.lvl.query(s.x)) {
+      if (o.t !== 'coin' || G.got.has(o.id)) continue;
+      if (o.lane != null && Math.abs(s.laneP - o.lane) >= 0.5) continue;
+      let cx = o.x + 0.5, cy = o.y + 0.5;
+      if (o.mv) {
+        const mv = Ph.moveOf(o, s.x, G.lvl);
+        cx += mv.dx;
+        cy += mv.dy;
+      }
+      if (s.x < cx + 0.55 && s.x + 1 > cx - 0.55 && s.y < cy + 0.55 && s.y + ph > cy - 0.55) {
+        G.got.add(o.id);
+        G.runCoins++;
+        AU.sfx('coin');
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          particle({ x: cx, y: cy, vx: Math.cos(a) * 3.5, vy: Math.sin(a) * 3.5 + 1, life: 0.4, size: 4, color: o.style === 'football' ? '#f2f2f2' : '#ffd634', grav: 6, round: true });
+        }
+      }
+    }
+  }
+
   function onEvent(e) {
     const s = G.s, ph = Ph.boxH(s);
     if (e === 'pad' || e === 'orb') {
       AU.sfx(e);
       G.vis.oT = 0.45;
       particle({ x: s.x + 0.5, y: s.y + ph / 2, life: 0.35, size: 50, color: '#ffd634', ring: true });
+    } else if (e === 'lane') {
+      AU.sfx('click');
+      for (let i = 0; i < 4; i++) particle({ x: s.x + 0.5, y: s.y + 0.05, vx: (Math.random() - 0.5) * 2, vy: 0.5 + Math.random(), life: 0.25, size: 4, color: 'rgba(255,255,255,0.6)' });
     } else if (e === 'portal') {
       AU.sfx('portal');
       G.flash = 0.35;
@@ -862,8 +909,15 @@
   function visuals(s, wasGrounded) {
     const v = G.vis, dt = P.DT;
     if (v.oT > 0) v.oT -= dt;
-    if (s.mode === 'cube') {
-      if (!s.grounded) v.rot += 7.1 * dt;
+    // Stratusvägen: riding the rocket skateboard (see Builder.board(), render.js drawPlayer) — no cube
+    // spin, just a gentle tilt with the jump instead
+    const lvl = G.lvl;
+    const onBoard = lvl && lvl.boards && lvl.boards.some((z) => s.x >= z.x0 && s.x <= z.x1);
+    if (s.mode === 'cube' || s.mode === 'lane') {
+      if (onBoard) {
+        const target = U.clamp(-s.vy * 0.22, -0.3, 0.3);
+        v.rot += (target - v.rot) * 0.25;
+      } else if (!s.grounded) v.rot += 7.1 * dt;
       else {
         const q = Math.PI / 2, target = Math.round(v.rot / q) * q;
         v.rot += (target - v.rot) * 0.35;
@@ -955,7 +1009,7 @@
     } else if (G.state === 'winning' || G.state === 'won') {
       G.winAge += dt;
       const prevX = G.s.x;
-      G.s.x += P.SPEED * dt;
+      G.s.x += Ph.speedAt(G.lvl, G.s.x) * dt;
       checkScares(prevX, G.s.x); // the 'final' scare sits just after the finish line
       G.vis.rot += 7 * dt;
       G.fwT -= dt;
@@ -985,7 +1039,7 @@
     G.flash = Math.max(0, G.flash - dt * 2.5);
     G.shake = Math.max(0, G.shake - dt);
     updateParticles(dt);
-    if (G.s && (G.state === 'play' || G.state === 'winning' || G.state === 'won')) AU.update(G.s.x / P.SPEED);
+    if (G.s && (G.state === 'play' || G.state === 'winning' || G.state === 'won')) AU.update(Ph.timeAt(G.lvl, G.s.x));
     R.draw(G, dt);
     requestAnimationFrame(loop);
   }

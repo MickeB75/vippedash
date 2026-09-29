@@ -6,7 +6,7 @@
 
 // Levels in column order. A level id seen in incoming data but missing here just gets
 // appended as an extra column (named after its id), so a future level 7 shows up on its own.
-const LEVELS = [['home', 'Hem'], ['metro', 'Tunnelbanan'], ['forest', 'Skogen'], ['chess', 'Schackmatt'], ['ocean', 'Djupet'], ['nightmare', 'Mardrömmen']];
+const LEVELS = [['stratus', 'Stratusvägen'], ['home', 'Hem'], ['metro', 'Tunnelbanan'], ['forest', 'Skogen'], ['chess', 'Schackmatt'], ['ocean', 'Djupet'], ['nightmare', 'Mardrömmen']];
 
 const LOG_SHEET = 'Logg';
 const DAILY_SHEET = 'Per dag';
