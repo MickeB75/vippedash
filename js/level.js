@@ -2610,6 +2610,7 @@
   const LEVELS = [
     {
       id: 'stratus', num: 1, name: 'Stratusvägens alla helgon', route: 'Nr 66 › Nr 62 › Nr 50 › Nr 15 › Nr 1',
+      localOnly: true, // not released yet: only listed when the game runs on this computer (see below)
       difficulty: 1, diffName: 'Very Easy', reward: 30,
       winTitle: 'Bus eller godis!',
       winSub: 'Past the candy, the zucchini, the footballs and the dumbbells, all the way down Stratusvägen on a rocket skateboard.',
@@ -2655,6 +2656,15 @@
       build: buildNightmare, theme: NIGHTMARE_THEME,
     },
   ];
+
+  // localOnly levels are still unreleased: they're only listed on a local run (localhost or opened from
+  // disk), never on GitHub Pages. The remaining levels are renumbered so the menu still counts 1, 2, 3...
+  const host = location.hostname;
+  const isLocal = location.protocol === 'file:' || host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+  if (!isLocal) {
+    for (let i = LEVELS.length - 1; i >= 0; i--) if (LEVELS[i].localOnly) LEVELS.splice(i, 1);
+    LEVELS.forEach((L, i) => (L.num = i + 1));
+  }
 
   VD.LEVELS = LEVELS;
   VD.levelDef = (id) => LEVELS.find((l) => l.id === id) || LEVELS[0];
