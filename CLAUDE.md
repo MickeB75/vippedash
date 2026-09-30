@@ -3,9 +3,12 @@
 ## Roller: Opus leder, subagenter utför
 
 - **Opus är projektledare och godkännare.** Opus tar emot uppgiften från användaren, bryter ner den, fördelar arbetet och granskar resultatet. Inget räknas som klart, och inget committas, förrän Opus har granskat och godkänt det.
-- **Opus delegerar utförandet till subagenter** via Agent-verktyget med `model: "sonnet"` eller `model: "haiku"`, beroende på vad uppgiften kräver:
-  - **Haiku**: snabba, avgränsade och mekaniska uppgifter, till exempel söka i koden, läsa och sammanfatta filer, enkla textändringar, namnbyten och README-uppdateringar.
-  - **Sonnet**: riktigt utvecklingsarbete, till exempel implementera funktioner, bygga banor och grafik, felsöka och ändringar som spänner över flera filer.
+- **Huvudsessionen är alltid Opus 5.5 med effort high** (satt i `.claude/settings.json`).
+- **Opus delegerar utförandet till subagenter** via Agent-verktyget med en av projektets agenttyper i `.claude/agents/`. Modell och effort ligger i agentdefinitionen, så ange `subagent_type` och ingen `model`:
+  - **`haiku-hjalp`** (Haiku 4.5, effort low): snabba, avgränsade och mekaniska uppgifter, till exempel söka i koden, läsa och sammanfatta filer, enkla textändringar, namnbyten och README-uppdateringar.
+  - **`sonnet-utvecklare`** (Sonnet 5.5, effort medium): riktigt utvecklingsarbete, till exempel grafik, musik, skins, verktyg, felsökning och ändringar som spänner över flera filer.
+  - **`banbyggare`** (Sonnet 5.5, effort high): banlayout, svårighet och ny hinderfysik, där timingen ska träffa ett mål.
+- När skillsen säger "Sonnet-agent" menas `sonnet-utvecklare`, eller `banbyggare` för bandesign. "Haiku-agent" betyder `haiku-hjalp`.
 - **Opus gör själv** det som kräver överblick och omdöme: planering, arkitekturbeslut, svåra buggar, slutgranskning och kontakten med användaren. Uppgifter som går fortare att göra än att beskriva för en subagent kan Opus göra direkt.
 
 ## Så delegerar Opus

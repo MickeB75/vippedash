@@ -5,86 +5,78 @@ description: Skapar en helt ny bana i VippeDash, med tema, hinder, sektioner, mu
 
 Uppdrag: $ARGUMENTS
 
-En bana är ett stort jobb: layout, tema, konst, musik, meny och README hänger ihop. Opus planerar och
-godkänner, Sonnet bygger.
+En bana består av layout, konst, musik, meny och README. Opus planerar, skriver ett kontrakt och godkänner.
+Fyra subagenter bygger **parallellt**, var och en i sina egna filer. Målet är att banan är klar på ungefär en timme,
+med felen fångade i första varvet i stället för i extra omgångar.
 
-## 1. Opus planerar (innan någon subagent startas)
+## 1. Opus planerar (~10 min, inga subagenter än)
 
-Läs `js/level.js` (särskilt `buildForest()` som mall — kortare och nyare än `buildHome()`), `README.md`
-("Editing a level" + banornas tabeller) och de tre `THEME`-objekten i `js/level.js`.
+Läs `js/level.js` (den senaste banan som liknar uppdraget som mall, samt `LEVELS` och ett par `THEME`-objekt),
+README ("Editing a level" och banornas tabeller) och `python tools/verify.py --windows` för jämförelsesiffror.
 
 Bestäm (fråga användaren bara om uppdraget är genuint tvetydigt, annars sunt förnuft):
-- **Tema och plats** (t.ex. rymden, vintern, ett slott) och **svårighetsgrad** 1 (Easy), 2 (Medium) eller 3
-  (Hard) — se difficulty-tabellen nedan.
-- **Bantid**: bana 1 ≈ 2:00, bana 2 ≈ 1:29, bana 3 ≈ 1:37, bana 4 ≈ 1:48. Längden styr inte svårigheten;
-  sikta på 1:30–2:00 om användaren inte ber om något annat.
-- **Antal checkpoints**: färre per minut = svårare (bana 1 har 16 på 2:00, bana 2 har 8 på 1:29,
-  bana 3 har 9 på 1:37).
-- **Lägesbyten**: bana 1 har ship + ball, bana 2 och 3 har samma. Nya lägen kräver ingen ny kod — bara
-  `b.portal(x, 'ship'|'ball'|'cube', {ceil, y})`.
-- **Svårighetsmål** (från README): easy ≥ 100 ms överallt, medium ~80 ms i de svåraste partierna
-  (strömskenan, krokodilhuvudena i Tunnelbanan), hard ~80 ms men fler sådana partier (trippelspikarna i skogen).
+- **Tema, plats och svårighet.** Placering i listan (`num`), `difficulty`/`diffName`/`reward` (jämför med `LEVELS`).
+- **Bantid** 1:30–2:00 om inget annat sägs. Längden styr inte svårigheten.
+- **Checkpoints:** färre per minut = svårare (se befintliga banor i verify-utdata).
+- **Svårighetsmål i ms:** easy ≥ 100 ms överallt, medium ~83 ms i de svåraste partierna, hard och very hard ~83 ms
+  på fler ställen och högst något enstaka på 67 ms. Jämför med grannbanorna i listan.
+- **Vad som är nytt:** minst en mekanik eller ett hindermönster som de andra banorna inte har. En bana som bara är
+  en omskinnad kopia av en annan blir underkänd av användaren (Djupet fick byggas om av den anledningen).
 
-Skriv en **sektionsplan** innan du delegerar: en lista av sektioner med x-intervall (i block, hastighet
-10.4 block/s), vad som händer i varje (hinder, landmärken, lägesbyte), var checkpoints ligger och vilken
-timing-marginal du siktar på. Det här är arbetsordern subagenten får — utan den blir resultatet planlöst.
+Skriv **sektionsplanen**: sektioner med x-intervall (block, 10.4 block/s), innehåll (hinder, landmärken,
+lägesbyten), checkpoints och ms-mål per sektion.
 
-Bestäm banans `id` (kort engelskt/svenskt ord, gemener, t.ex. `'winter'`), `num` (nästa lediga, troligen 4),
-`difficulty`/`diffName`/`reward` (50/100/150 följer difficulty — högre för en fjärde bana om den ska vara
-svårast) och namn på svenska + `route`-sträng (sektionsnamnen med `›` emellan, se `LEVELS` i `js/level.js`).
+## 2. Konceptkoll med användaren (ett meddelande)
 
-## 2. Delegera till subagenter (Sonnet — det här är riktig speldesign)
+Visa sektionstabellen och en rad om "det nya i banan". Fråga om det ska köras. Det kostar en minut och sparar en
+ombyggnad. Har användaren redan sagt "kör direkt", "hoppa över" eller liknande: gå vidare utan att fråga.
 
-Kör helst i **två omgångar**, inte parallellt, eftersom nästan allt arbete rör samma två filer
-(`js/level.js` och `js/render.js`) och två agenter inte får ändra samma fil samtidigt.
+## 3. Kontraktet (Opus skriver, alla agenter får det ordagrant)
 
-**Omgång 1 — en Sonnet-agent bygger banan och temat.** Ge den sektionsplanen ordagrant, samt:
-- Filer den får ändra: `js/level.js` (ny `build<Namn>()`-funktion + nytt `THEME`-objekt + ny post i
-  `LEVELS`), `js/render.js` (nya `ground`/`field`/`indoor`/`far`-stilar om temat kräver dem — sök var
-  befintliga stilar som `'peat'`, `'cave'` och `'metro'` hanteras och följ samma mönster), `js/art.js`
-  (nya dekor-/landmärkestyper och hinderstilar om temat kräver dem — sök `deco(`/`landmark(` i den nya
-  banan mot switch-satserna i art.js), `js/audio.js` (ny sång: kopiera mönstret för `forest`/`metro`:
-  ackordföljder i `PROG`, en post i `SONGS` med `sections` per bar, och koppling via temats `song`-nyckel).
-  Rör inte `js/game.js`, `css/style.css` eller README — det tar Opus/andra agenter senare.
-- Regler: bygg med `Builder`-metoderna i `js/level.js` (`b.spike`, `b.block`, `b.thorny`, `b.pad`, `b.orb`,
-  `b.portal`, `b.checkpoint`, `b.hole`, `b.train`/`b.croc`/`b.rail`/`b.snapper` om läge 3-liknande hinder
-  behövs, `b.deco`, `b.landmark`, `b.area`, `b.finish`). Följ enhetssystemet (block, 10.4 block/s, 156 BPM
-  = 4 block/slag — lägg hinder på slaget).
-- Den ska **inte** committa och ska rapportera exakt vilka filer och funktioner den lade till.
+Kontraktet låser allt som agenterna delar, så att de kan arbeta samtidigt:
+- Banans `id`, `num`, namn, `route` och `LEVELS`-fälten (`winTitle`, `winSub` med flera, som de befintliga).
+- Temaobjektet i sin helhet: `ground`/`field`/`indoor`/`far` **för varje area-id** (lint kräver det), himmel,
+  `beams`/`mist` och `song`-namnet.
+- **Nya stilnamn** med en rad beskrivning var: hinderstilar, blockstilar, deco- och landmärkestyper,
+  ground/field/indoor/far-stilar. Återanvänd befintliga stilar där det går. Varje ny stil kostar konsttid.
+- **Nya hinder med fysik** (som `b.pawn` eller `b.shark`): byggmetodens signatur, objektets fält och hitbox,
+  och hur render ska rita det (vilken Art-funktion och vilka parametrar).
+- Låtens sektioner per takt (en sektion per area, 4 block/slag, 156 BPM om inget annat).
 
-**Efter omgång 1** (när du granskat diffen): menyn, sifferknapparna och "Next level" i `js/game.js` läser
-redan `VD.LEVELS`, så `game.js` behöver inga ändringar. Kontrollera själv (litet) att `LEVELS`-posten har
-`winTitle`/`winSub` som de tre befintliga, och om banan fått en ny `difficulty`: `.lvl.d2`/`.lvl.d3` i
-`css/style.css` sätter cirkelns färg, så en ny svårighetsgrad behöver en egen `.lvl.d<N>`-regel (annars
-ärver den bana 1:s blå). Behövs fler justeringar skickar du tillbaka dem till omgång 1:s agent.
+## 4. Fyra agenter parallellt
 
-En **Haiku**-agent, parallellt med granskningen (annan fil, ingen konflikt), uppdaterar `README.md`: nytt
-banavsnitt i tabellform (som bana 1–3), lägg till i introraden, mynttabellen och "Editing a level" om nya
-byggarmetoder tillkom.
+Starta alla fyra i samma meddelande med `run_in_background`. Ingen fil ändras av två agenter.
 
-## 3. Verifiering (Opus kör själv innan godkännande)
+| Agent | Typ | Filer | Uppgift |
+|---|---|---|---|
+| **A, layout** | `banbyggare` | `js/level.js`, `js/physics.js` (bara nya hinder) | `build<Namn>()`, temat och `LEVELS`-posten enligt kontraktet. Nya byggmetoder och fysik. Justera mot målen med `python tools/verify.py <id> --target <ms>` tills sektionerna träffar. Kör `python tools/verify.py --compare <bas>` så att de andra banorna är orörda (Opus sparar basen med `--save` innan start och skickar sökvägen). |
+| **B, konst** | `sonnet-utvecklare` | `js/art.js`, `js/render.js` | Rita alla nya stilar från kontraktet. Kontrollera med kontaktarket (`python tools/shot.py "tools/sheet.html?level=<id>"`) och `python tools/lint.py <id>` när A:s bana finns. Innan dess: testa stilarna med en egen tillfällig sida eller `tools/skins.html`-mönstret. |
+| **C, musik** | `sonnet-utvecklare` | `js/audio.js` | Ny sång enligt kontraktet: ackord i `PROG`, en post i `SONGS` med `sections` per takt, och melodier som passar temat. |
+| **D, README** | `haiku-hjalp` | `README.md` | Nytt banavsnitt (tabell som de andra banorna), introraden, mynttabellen och "Editing a level" om nya byggmetoder tillkommer. Skrivs från planen. Siffrorna (tid, ms) fylls i av Opus i slutet. |
 
-1. `python tools/verify.py <id> --windows` — 0 fel, och titta på "tightest press"-raderna mot svårighetsmålet.
-2. `python tools/verify.py` (alla banor) — säkerställ att inget annat gick sönder.
-3. Karta: `python tools/shot.py "tools/map.html?level=<id>&windows"` (dela upp i `from`/`to`-intervall om
-   banan är lång) — läs PNG:erna, kolla att bothanen (den turkosa linjen) inte är röd någonstans.
-4. Skärmdumpar av varje sektion: `python tools/shot.py "index.html?debug&level=<id>&cp=<n>&freeze"` för
-   varje checkpoint — kolla att konsten faktiskt ser ut som temat (inte bara placeholder-fyrkanter).
-5. Meny-skärmdump: `python tools/shot.py "index.html" --realtime 1500` — kolla att 4 rader får plats i
-   panelen utan att klippas eller se trängda ut.
-6. En snabb genomspelning i webbläsarpreviewen (`preview_start` med `vippedash`, INTE Bash) med
-   `?debug&level=<id>&bot` för att se bottens väg, och en manuell koll av känslan.
-7. `sw.js` FILES: om nya filer laddas (osannolikt för en bana, men om ny konst kräver en ny fil) — annars
-   inget att göra här.
+Regler till alla: kontraktets namn gäller exakt. Committa inte. Rapportera ändrade filer och bevis (verktygsutdata,
+bildsökvägar). A och B kan behöva varandra i slutet: B ser inte banan förrän A lagt in den, och A:s nya hinder syns
+inte förrän B ritat dem. Det är väntat. Stilar som saknas ritas som standard (eller inte alls) under tiden, och
+`lint.py` pekar ut dem.
 
-Håller något inte måttet: skicka tillbaka till samma subagent med konkret feedback (x-koordinat, vad som
-är fel) eller fixa själv om det är litet.
+## 5. Opus godkännandelista (~10 min)
 
-## 4. Rapport till användaren
+Kör i den här ordningen. Stoppa vid första felet och skicka tillbaka till rätt agent med konkret feedback
+(x-koordinat, stilnamn, vad som är fel):
 
-Sammanfatta: banans namn/tema/svårighet, sektionerna, verify.py-resultat (inkl. tightaste ms), vilka filer
-som ändrades. Bifoga gärna en kart-skärmdump.
+1. `git diff --stat` och läs diffen.
+2. `python tools/lint.py <id>` — 0 fel (tema, okända stilar, LEVELS-fält, CSS-klass, låt, renderingsrök).
+3. `python tools/verify.py <id> --target <ms>` — alla segment klaras och träffar målen.
+4. `python tools/verify.py --compare <bas>` — inga andra banor ändrade.
+5. `python tools/shot.py "tools/sheet.html?level=<id>"` — läs arket. Ser alla sektioner ut som temat, inte som
+   placeholderfyrkanter? Detaljer vid behov: `python tools/shot.py --cps <id>`.
+6. Meny: `python tools/shot.py "index.html" --realtime 1500` — banan syns rätt i listan.
+7. Previewn (`preview_start` med `vippedash`, aldrig Bash): `?debug&level=<id>&bot` en gång genom banan, och
+   titta efter konsolfel.
+8. Fyll i siffrorna i README (eller låt D göra det) och läs README-diffen.
 
-## 5. Commit
+## 6. Rapport och commit
 
-Bara om användaren bett om det i uppdraget. Denna repo har ingen remote — föreslå aldrig push eller PR.
+Sammanfatta för användaren: namn, tema, svårighet, sektionerna, ms-siffror jämfört med grannbanorna, ändrade
+filer, och bifoga kontaktarket. Committa bara om användaren bett om det. Pusha bara när användaren ber om det
+(origin är MickeB75/vippedash, GitHub Pages från main).
