@@ -3185,6 +3185,28 @@
         ctx.stroke();
         break;
       }
+      case 'kelp': {
+        // a dense, springy mat of kelp you can stand on (on the floor, or floating in the current as a thin raft)
+        bevel(ctx, x, y, w, h, TL('#5f7a2a'), TL('#26380f'), TL('#0d1606'), Math.min(10, h * 0.4));
+        ctx.lineCap = 'round';
+        ctx.lineWidth = 3;
+        for (let xx = x + 6; xx < x + w - 3; xx += 9) {
+          // one frond per strip, swaying gently with the current
+          const sway = Math.sin(t * 1.6 + seed + xx * 0.07) * 2.5;
+          ctx.strokeStyle = rnd() < 0.5 ? TL('#86a83a') : TL('#4c6a1c');
+          ctx.beginPath();
+          ctx.moveTo(xx, y + h - 2);
+          ctx.quadraticCurveTo(xx + sway * 2, y + h * 0.5, xx + sway, y + 3);
+          ctx.stroke();
+        }
+        ctx.fillStyle = TL('#a8c85a');
+        for (let xx = x + 8; xx < x + w - 6; xx += 16) {
+          ctx.beginPath();
+          ctx.ellipse(xx + rnd() * 6, y + 3, 4, 2.5, 0, 0, Math.PI * 2); // gas bladders along the top
+          ctx.fill();
+        }
+        break;
+      }
       case 'turtle':
         Art.turtle(ctx, x, y, w, h, TL);
         break;
@@ -3588,6 +3610,7 @@
       }
       default: {
         if (METRO_BLOCKS[st]) return METRO_BLOCKS[st](ctx, x, y, w, h, bs, seed, t);
+        VD.lintMiss && VD.lintMiss('block', st);
         bevel(ctx, x, y, w, h, '#30303a', '#16161c', '#ffffff', 4);
       }
     }
@@ -3610,7 +3633,6 @@
     ctx.fill();
     // legs
     ctx.fillStyle = dark;
-        VD.lintMiss && VD.lintMiss('block', st);
     for (const lx of [0.3, 0.4, 0.66, 0.76]) rr(ctx, x + w * lx - 4, y + h * 0.5, 8, h * 0.5, 3), ctx.fill();
     // body
     ctx.fillStyle = fur;

@@ -69,8 +69,10 @@ html, body {
 .logo .a { color: #ffd634; -webkit-text-stroke: calc(var(--u) * 3px) #6b3a00; }
 .logo .b { color: #5cc8ff; -webkit-text-stroke: calc(var(--u) * 3px) #062a55; }
 /* ---------- main menu ---------- */
-.menubody { display: flex; align-items: center; gap: calc(var(--u) * 28px); }
-.herobox { display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 4px); }
+.menubody { display: flex; align-items: stretch; gap: calc(var(--u) * 28px); flex: 1 1 auto; min-height: 0; }
+.herobox { display: flex; flex: none; align-self: center; flex-direction: column; align-items: center; gap: calc(var(--u) * 4px); }
+/* the panel never outgrows the screen: whatever doesn't fit (many levels) scrolls inside the level list */
+#menu .panel { max-height: calc(100% - var(--u) * 8px); padding-top: calc(var(--u) * 20px); padding-bottom: calc(var(--u) * 20px); }
 .herobox .logo { margin-bottom: calc(var(--u) * 6px); }
 .herobox .btn.big { min-width: calc(var(--u) * 300px); margin-top: calc(var(--u) * 14px); }
 #hero { width: calc(var(--u) * 180px); height: calc(var(--u) * 195px); }
@@ -84,9 +86,28 @@ html, body {
   box-shadow: 0 calc(var(--u) * 5px) 0 #8a5a00;
 }
 .btn.shopbtn:hover { filter: brightness(1.08); background: linear-gradient(#ffe066, #f2b705); }
-.levelbox { display: flex; flex-direction: column; gap: calc(var(--u) * 8px); }
-.pick { margin: 0; text-align: left; font-size: calc(var(--u) * 20px); color: #aab6d8; }
-.levels { display: flex; flex-direction: column; gap: calc(var(--u) * 4px); }
+.levelbox { display: flex; flex-direction: column; justify-content: center; gap: calc(var(--u) * 8px); min-height: 0; }
+.pick { flex: none; margin: 0; text-align: left; font-size: calc(var(--u) * 20px); color: #aab6d8; }
+.levels {
+  position: relative; /* so js can measure a card's offsetTop inside the list */
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+  gap: calc(var(--u) * 4px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.levels > .lvl { flex: none; }
+/* slim, quiet scrollbar; only shows up when there are more levels than fit */
+.levels::-webkit-scrollbar { width: calc(var(--u) * 8px); }
+.levels::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: calc(var(--u) * 4px); }
+.levels::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.28); border-radius: calc(var(--u) * 4px); }
+.levels::-webkit-scrollbar-thumb:hover { background: rgba(255, 214, 52, 0.6); }
+@supports (-moz-appearance: none) { .levels { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.28) transparent; } }
 .lvl {
   display: flex;
   align-items: center;
@@ -135,9 +156,22 @@ html, body {
 .diff.d5 { color: #ff2a3a; }
 .lcoins { color: #ffd634; display: inline-flex; align-items: center; gap: calc(var(--u) * 5px); }
 .lprog { flex: none; display: flex; flex-direction: column; align-items: center; min-width: calc(var(--u) * 70px); }
+.lsub { display: flex; flex-direction: column; align-items: center; }
 .lprog b { font-weight: normal; font-size: calc(var(--u) * 26px); color: #5cc8ff; }
 .lprog b.done { color: #7dff9a; }
 .lprog small { font-size: calc(var(--u) * 13px); color: #aab6d8; }
+
+/* .tight is added by js (fitLevelList) when the cards don't fit: tighter cards (no route line); the list still scrolls beyond that */
+.levels.tight { gap: calc(var(--u) * 3px); }
+.tight .lvl { gap: calc(var(--u) * 12px); padding: calc(var(--u) * 2px) calc(var(--u) * 14px); border-radius: calc(var(--u) * 14px); }
+.tight .lnum { width: calc(var(--u) * 38px); height: calc(var(--u) * 38px); font-size: calc(var(--u) * 24px); }
+.tight .linfo b { font-size: calc(var(--u) * 22px); }
+.tight .linfo small { display: none; }
+.tight .lmeta { font-size: calc(var(--u) * 15px); }
+.tight .lprog { flex-direction: row; gap: calc(var(--u) * 6px); min-width: calc(var(--u) * 110px); justify-content: flex-end; }
+.tight .lprog b { font-size: calc(var(--u) * 22px); line-height: 1; }
+.tight .lsub { align-items: flex-start; }
+.tight .lprog small, .tight .lrank { font-size: calc(var(--u) * 12px); line-height: 1.1; min-height: 0; }
 
 /* ---------- coins ---------- */
 .coin {

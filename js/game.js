@@ -42,6 +42,9 @@
     bindUI();
     refreshMenu();
     if (G.debug) applyDebugStart();
+    revealSelectedLevel();
+    addEventListener('resize', revealSelectedLevel);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(revealSelectedLevel); // card heights depend on the font
     G.last = performance.now();
     requestAnimationFrame(loop);
   };
@@ -145,7 +148,8 @@
           return;
         }
         const n = /^Digit(\d)$/.exec(e.code);
-        if (n && VD.LEVELS[+n[1] - 1]) return pickLevel(VD.LEVELS[+n[1] - 1].id);
+        const pick = n && menuLevels()[(+n[1] + 9) % 10]; // 1..9 = levels 1..9, 0 = level 10
+        if (pick) return pickLevel(pick.id);
         if (e.code === 'KeyS') return openShop();
         if (e.code === 'KeyT' && VD.Board) return VD.Board.openBoard(G.levelDef.id);
         if (G.debug && e.code === 'KeyC') {
@@ -237,6 +241,8 @@
   // ------------------------------------------------------------------ debug URL params (debug mode only)
   // index.html?debug&level=forest&cp=5   or the same after the hash: index.html#debug&level=forest&cp=5
   // level, cp, x, skin, bot, god, freeze, mute, shop — lets a URL drop straight into a spot for screenshots.
+  // fakelevels=N (menu only) pads the level list with copies of the real levels up to N cards, to test the menu layout;
+  // menulevel=<id> selects that level in the menu without starting it (level= starts a run).
   function debugParams() {
     const out = {};
     const merge = (str) => {
@@ -289,6 +295,7 @@
         console.warn('VippeDash debug: unknown level "' + q.level + '"');
       }
     }
+    if ('menulevel' in q && VD.LEVELS.some((L) => L.id === q.menulevel) && q.menulevel !== G.levelDef.id) selectLevel(q.menulevel);
     if ('cp' in q) {
       const n = +q.cp;
       if (Number.isInteger(n) && n >= 0 && n < G.lvl.checkpoints.length) startCp = n;
@@ -366,12 +373,14 @@
       e.stopPropagation();
       toggleMute();
     };
-    // level cards
+    // level cards. The list scrolls (css/style.css) and gets tighter cards when they don't all fit (fitLevelList).
     const box = $('levels');
-    for (const L of VD.LEVELS) {
+    const list = menuLevels();
+    for (const L of list) {
       const b = document.createElement('button');
       b.className = 'lvl d' + L.difficulty;
       b.dataset.id = L.id;
+      if (L.fake) b.dataset.fake = '1';
       const r = levelReward(L, 0, false), lo = levelReward(L, 10, false);
       const badges = (L.age ? '<span class="age">16+</span>' : '') +
         (L.strobe ? '<span class="flashico" title="Flashing lights">⚡</span>' : '');
@@ -380,7 +389,7 @@
         '<span class="linfo"><b>' + L.name + badges + '</b><small>' + L.route + '</small>' +
         '<span class="lmeta"><span class="diff d' + L.difficulty + '">' + '★'.repeat(L.difficulty) + ' ' + L.diffName + '</span>' +
         '<span class="lcoins"><i class="coin"></i>' + lo.total + '–' + r.total + '</span></span></span>' +
-        '<span class="lprog"><b></b><small></small><span class="lrank"></span></span>';
+        '<span class="lprog"><b></b><span class="lsub"><small></small><span class="lrank"></span></span></span>';
       b.onclick = () => pickLevel(L.id);
       box.appendChild(b);
     }
@@ -414,11 +423,42 @@
     AU.sfx('click');
     if (id !== G.levelDef.id) selectLevel(id);
     refreshMenu();
+    revealSelectedLevel();
+  }
+  // the levels shown in the menu: VD.LEVELS, plus (debug ?fakelevels=N only) copies of them up to N cards
+  function menuLevels() {
+    if (G.menuList) return G.menuList;
+    let list = VD.LEVELS;
+    const n = G.debug ? parseInt(debugParams().fakelevels, 10) : 0;
+    if (n > list.length) {
+      list = list.slice();
+      for (let i = list.length; i < n; i++) {
+        list.push(Object.assign({}, VD.LEVELS[i % VD.LEVELS.length], { num: i + 1, fake: true }));
+      }
+    }
+    return (G.menuList = list);
+  }
+  // tighter cards (.tight) only when the normal ones don't fit the panel; beyond that the list just scrolls
+  function fitLevelList() {
+    const box = $('levels');
+    if ($('menu').classList.contains('hidden')) return;
+    box.classList.remove('tight');
+    if (box.scrollHeight > box.clientHeight + 1) box.classList.add('tight');
+  }
+  // scroll the level list so the selected card is fully in view (the list scrolls inside the menu panel)
+  function revealSelectedLevel() {
+    fitLevelList();
+    const box = $('levels'), on = box.querySelector('.lvl.on');
+    if (!on || !box.clientHeight) return;
+    const top = on.offsetTop, bottom = top + on.offsetHeight;
+    const pad = on.offsetHeight * 0.3; // leave a little of the neighbours visible
+    if (top - pad < box.scrollTop) box.scrollTop = Math.max(0, top - pad);
+    else if (bottom + pad > box.scrollTop + box.clientHeight) box.scrollTop = bottom + pad - box.clientHeight;
   }
   function refreshMenu() {
     for (const b of document.querySelectorAll('.lvl')) {
       const p = G.progress[b.dataset.id];
-      b.classList.toggle('on', b.dataset.id === G.levelDef.id);
+      b.classList.toggle('on', b.dataset.id === G.levelDef.id && !b.dataset.fake);
       const big = b.querySelector('.lprog b'), small = b.querySelector('.lprog small'), rank = b.querySelector('.lrank');
       big.className = p.wins ? 'done' : '';
       big.textContent = p.wins ? '✔ ' + p.wins : p.best + '%';
@@ -460,6 +500,7 @@
     show('shop', false);
     show('menu', true);
     refreshMenu();
+    revealSelectedLevel();
   }
   function shopClick(id, card) {
     AU.init();
@@ -639,6 +680,7 @@
     G.camV = G.camVT = 0;
     G.s = null;
     refreshMenu();
+    revealSelectedLevel();
     // a name that came back "taken" (e.g. after a queued registration was flushed) needs fixing
     if (VD.Board && VD.Board.nameStatus && VD.Board.nameStatus() === 'taken') VD.Board.openName();
   };

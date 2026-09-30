@@ -290,7 +290,8 @@
       this.decos = b.decos.sort((a, c) => a.x - c.x);
       this.landmarks = b.landmarks;
       this.corridors = b.corridors;
-      this.texts = b.texts;
+      // 'Level #' in a text is the level's number from LEVELS, so intro texts stay right when levels move
+      this.texts = b.texts.map((t) => (t.text.includes('Level #') ? { ...t, text: t.text.replace('Level #', 'Level ' + def.num) } : t));
       this.fx = b.fx || { dark: [], strobe: [], mirror: [], lightning: [] };
       this.scares = (b.scares || []).slice().sort((a, c) => a.x - c.x);
       this.finishX = b.finishX;
@@ -726,7 +727,7 @@
 
     // ============ SKOGSBRYNET (0 – 208) ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 3 · Vilda skogen', 0.55);
+    b.text(12, 4.6, 'Level # · Vilda skogen', 0.55);
     b.text(12, 3.9, 'Hedgehogs are spiky too!', 0.4);
     b.spike(24, 0, 'hedgehog');
     b.spike(32, 0, 'hedgehog');
@@ -1039,7 +1040,7 @@
 
     // ============ BRÄDET (0 – 208) ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 4 · Schackmatt', 0.55);
+    b.text(12, 4.6, 'Level # · Schackmatt', 0.55);
     b.text(12, 3.9, 'Pawns are spikes too!', 0.4);
     b.spike(22, 0, 'pawnspike');
     b.spike(32, 0, 'pawnspike');
@@ -1302,7 +1303,7 @@
 
     // ============ KORALLREVET (0 – 208) ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 5 · Djupet', 0.55);
+    b.text(12, 4.6, 'Level # · Djupet', 0.55);
     b.text(12, 3.9, 'Sea urchins are spiky too!', 0.4);
     b.spike(22, 0, 'urchin');
     b.half(27); // a low, fast hop — the forest never uses this
@@ -1635,7 +1636,7 @@
 
     // ============ SERGELS TORG (0 – 48) ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 2 · Tunnelbanan', 0.55);
+    b.text(12, 4.6, 'Level # · Tunnelbanan', 0.55);
     b.text(12, 3.9, 'Jump up onto the trains!', 0.4);
     b.spike(24, 0, 'cone');
     b.spikes(30, 2, 0, 'cone');
@@ -1895,7 +1896,7 @@
 
     // ============ KYRKOGÅRDEN (0 – 128) ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 6 · Mardrömmen', 0.55);
+    b.text(12, 4.6, 'Level # · Mardrömmen', 0.55);
     b.text(12, 3.9, '⚠ Flashing lights: turn them off in the pause menu (Esc)', 0.4);
     b.lightning(40, 128);
     b.spike(20, 0, 'fence');
@@ -2206,7 +2207,7 @@
 
     // ============ #1 NR 66 (0 – 96): candy from the doorway, no hazards at all ============
     b.checkpoint(0);
-    b.text(12, 4.6, 'Level 1 · Stratusvägens alla helgon', 0.55);
+    b.text(12, 4.6, 'Level # · Stratusvägens alla helgon', 0.55);
     b.text(12, 3.9, 'Hold to keep jumping. Bus eller godis!', 0.4);
     b.house(NR66.x, 66, 'far');
     b.house(50, 33, 'near');
