@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VippeDash level contact sheet</title>
+<style>
+  @font-face {
+    font-family: 'Lilita One';
+    src: url('../fonts/LilitaOne-Regular.ttf') format('truetype');
+    font-display: swap;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0b0e1a; color: #e8ecf6; font: 13px/1.3 system-ui, sans-serif; }
+  body { padding: 20px; }
+  h1 { font-family: 'Lilita One', 'Arial Black', Impact, sans-serif; font-size: 30px; font-weight: normal; margin: 0 0 4px; color: #ffd634; }
+  h1 small { font-size: 16px; color: #8fd3ff; margin-left: 10px; }
+  .info { color: #aab6d8; margin: 0 0 14px; }
+  .info code { color: #dfe8ff; background: rgba(255, 255, 255, 0.08); padding: 1px 5px; border-radius: 4px; }
+  #grid { display: grid; gap: 12px; }
+  .tile { min-width: 0; }
+  .label {
+    display: flex; align-items: baseline; gap: 8px; height: 24px; padding: 0 2px;
+    white-space: nowrap; overflow: hidden; font-size: 13px;
+  }
+  .label .x { font-family: Consolas, monospace; font-weight: bold; color: #fff; }
+  .label .cp { background: #33d6c0; color: #06201c; font-weight: bold; border-radius: 4px; padding: 0 6px; font-size: 12px; }
+  .label .after { color: #7d8aa8; font-size: 12px; }
+  .label .area { color: #ffd634; overflow: hidden; text-overflow: ellipsis; }
+  .label .warn { color: #ff8a80; font-size: 12px; }
+  canvas { display: block; background: #000; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.18); }
+  .err { color: #ff8a80; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<h1 id="title">VippeDash level sheet</h1>
+<p class="info" id="info"></p>
+<div id="grid"></div>
+<script src="../js/util.js"></script>
+<script src="../js/physics.js"></script>
+<script src="../js/level.js"></script>
+<script src="../js/solver.js"></script>
+<script src="../js/art.js"></script>
+<script src="../js/horror.js"></script>
+<script src="../js/stratus.js"></script>
+<script src="../js/render.js"></script>
+<script>
+/*
+  Contact sheet of a whole level in one picture: one tile per checkpoint plus one every `step` blocks in between,
+  each drawn with the game's own renderer (js/render.js), so it looks like index.html?debug&level=..&x=..&freeze.
+
+  Parameters: level=<id> (default: the first level) - step=<blocks> between tiles (40) - cols=<n> (4)
+              w=<px> tile width, the height is 16:9 (400) - cps: only the checkpoints - from=<x> / to=<x>: block range
+
+  Instead of one iframe per tile (each would load the whole game), the modules are loaded once and Render draws
+  every tile on one off-screen canvas, which is copied down to the tile. The player state at each x comes from
+  the same idea as game.js's fastForwardTo(): the solver bot plays from the checkpoint before x and the state is
+  captured when it passes x (one solve per checkpoint segment, not one per tile).
+*/
+(function () {
+  var VD = window.VD, Ph = VD.Physics, R = VD.Render, U = VD.U;
+  var W = R.W, H = R.H, PX = R.PX;
+  var q = new URLSearchParams(location.search);
+
+  function finish() {
+    // tools/shot.py reads this to size the screenshot window
+    document.body.dataset.shotSize = Math.ceil(document.documentElement.scrollWidth) + 'x' + Math.ceil(document.documentElement.scrollHeight);
+    window.SHEET_DONE = true;
+  }
+  function fail(msg) {
+    var p = document.createElement('p');
+    p.className = 'err';
+    p.textContent = msg;
+    document.body.insertBefore(p, document.getElementById('grid'));
+    document.body.style.minWidth = '700px';
+    finish();
+  }
+
+  var levelId = q.get('level') || VD.LEVELS[0].id;
+  if (!VD.LEVELS.some(function (L) { return L.id === levelId; })) {
+    fail('Unknown level "' + levelId + '". Ids: ' + VD.LEVELS.map(function (L) { return L.id; }).join(', '));
+    return;
+  }
+  var num = function (k, d, min) { return q.has(k) && isFinite(+q.get(k)) ? Math.max(min, +q.get(k)) : d; };
+  var step = num('step', 40, 4);
+  var cols = Math.floor(num('cols', 4, 1));
+  var tw = Math.round(num('w', 400, 80));
+  var th = Math.round(tw * 9 / 16);
+  var onlyCps = q.has('cps');
+
+  var def = VD.levelDef(levelId);
+  var lvl = VD.buildLevel(levelId);
+  var cps = lvl.checkpoints;
+  var fromX = num('from', -Infinity, -Infinity);
+  var toX = num('to', Infinity, -Infinity);
+
+  // ---------------------------------------------------------------- which x positions get a tile
+  var tiles = [];
+  cps.forEach(function (cp, i) {
+    tiles.push({ x: cp.x, cp: i, isCp: true });
+    if (onlyCps) return;
+    var next = i + 1 < cps.length ? cps[i + 1].x : lvl.finishX;
+    // a tile every `step` blocks after this checkpoint, unless it would land right next to the next one
+    for (var x = cp.x + step; x < next - step * 0.5; x += step) tiles.push({ x: x, cp: i, isCp: false });
+  });
+  if (!onlyCps) tiles.push({ x: lvl.finishX - 8, cp: lvl.checkpointAt(lvl.finishX - 8), isCp: false, finish: true });
+  tiles = tiles.filter(function (t) { return t.x >= fromX && t.x <= toX; });
+  tiles.sort(function (a, b) { return a.x - b.x; });
+
+  // ---------------------------------------------------------------- player state at each tile
+  // Ph.spawn() at a checkpoint; further along, the solver's path is replayed with the real physics until x
+  // (same as game.js fastForwardTo), so mode, gravity, floor and height are right.
+  function statesFor(list) {
+    var bySeg = {};
+    list.forEach(function (t) { (bySeg[t.cp] = bySeg[t.cp] || []).push(t); });
+    Object.keys(bySeg).forEach(function (k) {
+      var seg = bySeg[k];
+      var start = Ph.spawn(cps[+k]);
+      var later = seg.filter(function (t) { return !t.isCp; }).sort(function (a, b) { return a.x - b.x; });
+      seg.forEach(function (t) { if (t.isCp) t.s = Ph.clone(start); });
+      if (!later.length) return;
+      var res = VD.Solver.solve(lvl, Ph.clone(start), later[later.length - 1].x, { k: 4, maxNodes: 3000000 });
+      var s = Ph.clone(start), i = 0, dead = false;
+      if (res.ok) {
+        for (var d = 0; d < res.path.length && i < later.length && !dead; d++) {
+          for (var n = 0; n < res.K; n++) {
+            Ph.step(s, res.path[d], lvl, null);
+            if (s.dead) { dead = true; break; }
+            while (i < later.length && s.x >= later[i].x) later[i++].s = Ph.clone(s);
+            if (i >= later.length) break;
+          }
+        }
+      }
+      for (; i < later.length; i++) { later[i].s = Ph.clone(start); later[i].noPath = true; }
+    });
+  }
+
+  // ---------------------------------------------------------------- drawing
+  var off = document.createElement('canvas');
+  off.width = W;
+  off.height = H;
+  R.cv = off;
+  R.ctx = off.getContext('2d');
+  R.scale = 1;
+  R.build(lvl);
+
+  function fakeGame(t) {
+    var s = t.s, cp = cps[t.cp];
+    return {
+      clock: 1, flash: 0, shake: 0, particles: [], debug: false, fps: 60, strobeOn: true, skin: 'red',
+      state: 'play', s: s, camX: s.x - PX, camV: lvl.depthOf(s.layer), vis: { rot: 0, wheel: 0, oT: 0 },
+      hpMax: def.health || 0, hp: def.health || 0, hurt: null, scare: null, banner: null, lowHp: false,
+      got: new Set(), cpIndex: t.cp, attemptText: { x: cp.x, n: 1, layer: cp.layer },
+    };
+  }
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function build() {
+    document.getElementById('title').innerHTML = '';
+    var h = document.getElementById('title');
+    h.appendChild(document.createTextNode(def.name));
+    h.appendChild(el('small', null, 'level ' + def.num + ' · ' + levelId + ' · ' + def.route));
+    document.getElementById('info').textContent = tiles.length + ' tiles · ' + cps.length + ' checkpoints · finish at x ' +
+      Math.round(lvl.finishX) + (onlyCps ? ' · checkpoints only' : ' · every ' + step + ' blocks between checkpoints');
+    var grid = document.getElementById('grid');
+    grid.style.gridTemplateColumns = 'repeat(' + cols + ', ' + tw + 'px)';
+    document.body.style.width = (40 + cols * tw + (cols - 1) * 12) + 'px';
+    if (cols * tw + 40 < 640) document.body.style.width = '640px';
+
+    var t0 = Date.now();
+    statesFor(tiles);
+    var t1 = Date.now();
+
+    tiles.forEach(function (t) {
+      var box = el('div', 'tile');
+      var lab = el('div', 'label');
+      lab.appendChild(el('span', 'x', 'x ' + Math.round(t.x)));
+      if (t.isCp) lab.appendChild(el('span', 'cp', 'CP ' + t.cp));
+      else lab.appendChild(el('span', 'after', t.finish ? 'finish' : '› CP ' + t.cp));
+      lab.appendChild(el('span', 'area', lvl.areaAt(t.x).name));
+      if (t.noPath) lab.appendChild(el('span', 'warn', 'no bot path'));
+      box.appendChild(lab);
+      var cv = el('canvas');
+      cv.width = tw;
+      cv.height = th;
+      box.appendChild(cv);
+      grid.appendChild(box);
+      var cx = cv.getContext('2d');
+      try {
+        R.draw(fakeGame(t), 0);
+        cx.imageSmoothingEnabled = true;
+        cx.imageSmoothingQuality = 'high';
+        cx.drawImage(off, 0, 0, tw, th);
+      } catch (e) {
+        console.error('sheet: tile x=' + t.x + ': ' + (e && e.stack || e));
+        cx.fillStyle = '#300';
+        cx.fillRect(0, 0, tw, th);
+        cx.fillStyle = '#ff8a80';
+        cx.font = '12px monospace';
+        cx.fillText('render error: ' + (e && e.message), 8, 20);
+      }
+    });
+    var t2 = Date.now();
+    document.getElementById('info').textContent += ' · bot ' + (t1 - t0) + ' ms, drawing ' + (t2 - t1) + ' ms';
+    finish();
+  }
+
+  // the HUD and the level-name text use "Lilita One": wait for it (with a safety net) before drawing
+  var done = false;
+  function go() {
+    if (done) return;
+    done = true;
+    try {
+      build();
+    } catch (e) {
+      console.error(e && e.stack || e);
+      fail('Error: ' + (e && e.message));
+    }
+  }
+  if (document.fonts && document.fonts.load) {
+    Promise.all([document.fonts.load('20px "Lilita One"'), document.fonts.ready]).then(go, go);
+    setTimeout(go, 1500);
+  } else go();
+})();
+</script>
+</body>
+</html>

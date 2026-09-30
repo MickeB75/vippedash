@@ -4,25 +4,25 @@
     {
       "name": "vippedash",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1"],
+      "runtimeArgs": ["-u", "tools/serve.py", "8765"],
       "port": 8765
     },
     {
       "name": "vippedash-alt",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8766", "--bind", "127.0.0.1"],
+      "runtimeArgs": ["-u", "tools/serve.py", "8766"],
       "port": 8766
     },
     {
       "name": "vippedash-3",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8767", "--bind", "127.0.0.1"],
+      "runtimeArgs": ["-u", "tools/serve.py", "8767"],
       "port": 8767
     },
     {
       "name": "vippedash-mobile",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8768", "--bind", "127.0.0.1"],
+      "runtimeArgs": ["-u", "tools/serve.py", "8768"],
       "port": 8768
     },
     {

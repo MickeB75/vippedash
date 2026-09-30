@@ -8,13 +8,16 @@ taken without opening a browser. Nothing to install: it uses the Chrome or Edge 
     screenshot('tools/skins.html?t=0', 'out/skins.png')          # a PNG of the page
 
 Pages are given relative to the project folder (a query string is fine) and are opened straight from disk.
-A page can set data-shot-size="WxH" on <body> to tell screenshot() how big it wants the window.
+A page can set data-shot-size="WxH" on <body> to tell screenshot() how big it wants the window (the game itself,
+index.html, never does, so it is always 1280x720 and screenshot() skips the extra Chrome start that would ask).
+Every Chrome gets its own temporary profile, so several can run at the same time (shot.py does this).
 Set the CHROME environment variable to use a particular browser.
 """
 import os
 import pathlib
 import re
 import shutil
+import json
 import subprocess
 import tempfile
 
@@ -77,17 +80,42 @@ def shot_size(page):
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
-def screenshot(page, out, size=None, budget_ms=5000, timeout=900, realtime_ms=None):
+def checkpoint_counts():
+    """{level id: number of checkpoints} for every level, from one quick Chrome start (about 3-6 s).
+    Builds the levels with js/util.js, physics.js and level.js on a throwaway page and reads the numbers back
+    from its DOM; the levels are not drawn or solved, so it takes about as long as Chrome needs to start."""
+    scripts = ''.join('<script src="%s"></script>' % (ROOT / 'js' / n).as_uri() for n in ('util.js', 'physics.js', 'level.js'))
+    js = ('document.body.setAttribute("data-cps",JSON.stringify(VD.LEVELS.map(function(L)'
+          '{return [L.id,VD.buildLevel(L.id).checkpoints.length]})))')
+    with tempfile.TemporaryDirectory(prefix='vd-cps-') as d:
+        f = pathlib.Path(d) / 'cps.html'
+        f.write_text('<!doctype html><meta charset="utf-8"><body>%s<script>%s</script>' % (scripts, js), encoding='utf-8')
+        html = dump_dom(f.as_uri(), budget_ms=500, timeout=120)
+    m = re.search(r'data-cps="([^"]*)"', html)
+    if not m:
+        raise SystemExit('Could not read the checkpoint counts from Chrome.')
+    return dict(json.loads(m.group(1).replace('&quot;', '"')))
+
+
+def screenshot(page, out, size=None, budget_ms=None, timeout=900, realtime_ms=None):
     """Save a PNG of the page. size=(w, h); if None, use the page's data-shot-size, else 1280x720.
+    The game (index.html, any query) never sets data-shot-size, so for it 1280x720 is used without asking the page;
+    other pages are opened once first (shot_size) to see if they want a particular size.
 
     By default the page runs in virtual time (deterministic: timers are fast-forwarded and pending file loads,
     such as fonts, are waited for). A page that redraws a lot every frame (the shop) is slow to fast-forward;
-    pass realtime_ms to instead let it run for that many real milliseconds (then size isn't read from the page)."""
+    pass realtime_ms to instead let it run for that many real milliseconds (then size isn't read from the page).
+    budget_ms defaults to 1500 for the game (it draws every frame, and 1.5 s of virtual time is enough for the fonts
+    and a debug start; 5 s took about twice as long for the same picture) and 5000 for other pages."""
     if realtime_ms:
         size = size or (1280, 720)
         wait = ['--timeout=%d' % realtime_ms]
     else:
-        size = size or shot_size(page) or (1280, 720)
+        is_game = re.split(r'[?#]', page)[0] == 'index.html'
+        if not size and not is_game:
+            size = shot_size(page)
+        budget_ms = budget_ms or (1500 if is_game else 5000)
+        size = size or (1280, 720)
         wait = ['--virtual-time-budget=%d' % budget_ms]
     out = pathlib.Path(out).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)

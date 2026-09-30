@@ -1726,6 +1726,7 @@
       ctx.fill();
       return;
     }
+    if (style) VD.lintMiss && VD.lintMiss('spike', style);
     const g = ctx.createLinearGradient(0, down ? y + h : y, 0, down ? y : y + h);
     g.addColorStop(0, '#4a4a5c');
     g.addColorStop(1, '#101016');
@@ -1750,6 +1751,7 @@
   };
 
   Art.half = function (ctx, x, y, w, h, style, glow) {
+    if (style) VD.lintMiss && VD.lintMiss('half', style);
     // small thorny spike (rendered as a little rock shard)
     ctx.fillStyle = '#151519';
     tri(ctx, x + w * 0.15, y + h, x + w / 2, y + h * 0.1, x + w * 0.85, y + h);
@@ -1966,6 +1968,7 @@
   Art.bird = function (ctx, cx, cy, s, t, seed, glow, style) {
     if (style === 'jellyfish') return jellyfish(ctx, cx, cy, s, t, seed, glow);
     if (style === 'anglerfish') return anglerfish(ctx, cx, cy, s, t, seed, glow);
+    if (style && !BIRDS[style]) VD.lintMiss && VD.lintMiss('bird', style);
     const C = BIRDS[style] || BIRDS.crow;
     const flap = Math.sin(t * 11 + seed * 1.7);
     cy += Math.sin(t * 3 + seed) * 2;
@@ -2160,6 +2163,7 @@
     if (style === 'bog') return bogWater(ctx, x0, x1, ySurf, yBot, t);
     if (style === 'sludge') return sludge(ctx, x0, x1, ySurf, yBot, t);
     if (style === 'current') return current(ctx, x0, x1, ySurf, yBot, t);
+    if (style) VD.lintMiss && VD.lintMiss('water', style);
     const g = ctx.createLinearGradient(0, ySurf, 0, yBot);
     g.addColorStop(0, TL('#3f93d6'));
     g.addColorStop(1, TL('#0f355c'));
@@ -2258,6 +2262,7 @@
   }
 
   Art.pad = function (ctx, x, y, w, h, color, t) {
+    if (color !== 'pink' && color !== 'yellow') VD.lintMiss && VD.lintMiss('pad', color);
     const c = color === 'pink' ? '#ff5fd2' : '#ffd634';
     const g = ctx.createLinearGradient(0, y - 40, 0, y + h);
     g.addColorStop(0, U.rgba(c, 0));
@@ -2276,6 +2281,7 @@
   };
 
   Art.orb = function (ctx, cx, cy, r, color, t, used) {
+    if (color !== 'pink' && color !== 'yellow') VD.lintMiss && VD.lintMiss('orb', color);
     const c = color === 'pink' ? '#ff5fd2' : '#ffd634';
     const pulse = 1 + Math.sin(t * 7) * 0.08;
     const g = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r * 2);
@@ -3604,6 +3610,7 @@
     ctx.fill();
     // legs
     ctx.fillStyle = dark;
+        VD.lintMiss && VD.lintMiss('block', st);
     for (const lx of [0.3, 0.4, 0.66, 0.76]) rr(ctx, x + w * lx - 4, y + h * 0.5, 8, h * 0.5, 3), ctx.fill();
     // body
     ctx.fillStyle = fur;

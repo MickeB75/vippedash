@@ -9,10 +9,10 @@ A Geometry Dash–style runner starring **Vippe**. There are seven levels: **1 �
 **Option 2:** run a local server. This is handy on a phone on the same Wi-Fi.
 
 ```bash
-python -m http.server 8765
+python -u tools/serve.py
 ```
 
-Then open <http://localhost:8765>.
+This serves the project on <http://127.0.0.1:8765/> and sends `Cache-Control: no-store`, so the preview always shows the current files on disk. Pass a port number to use a different one: `python -u tools/serve.py 8766`. It only listens on this PC by default; for a phone on the same Wi-Fi, add `--bind 0.0.0.0` and open `http://<this PC's IP>:8765` on the phone.
 
 | Action | Keys |
 | --- | --- |
@@ -408,9 +408,26 @@ After changing a level, verify it with the command line:
 python tools/verify.py
 ```
 
-This runs the search bot from every checkpoint to the next one using the real game physics. Add a level name to check one level only: `python tools/verify.py forest`. Options: `--windows` to measure timing slack (slower; `!` marks a jump with less than 90 ms, `!!` less than 50 ms), `--json` to print the raw report. Exit code 0 when every level is beatable.
+This runs the search bot from every checkpoint to the next one using the real game physics. Add a level name to check one level only: `python tools/verify.py forest`. Exit code 0 when every level is beatable.
+
+Options:
+- `--windows` — measure timing slack (slower; `!` marks a jump with less than 90 ms, `!!` less than 50 ms)
+- `--json` — print the raw JSON report
+- `--target MS` — tune a level to a difficulty target in milliseconds (e.g. `--target 83`). Per segment it shows press count, min/median/max timing, and TIGHT presses (below target – 8 ms). Segments are marked LOOSE when even their tightest press is well above target (default: target + 40). Implies `--windows` and skips ship segments.
+- `--loose MS` — set the LOOSE threshold (default: target + 40)
+- `--all` — with `--target`, list every press, sorted on x and marked ok/TIGHT
+- `--save FILE` — save a JSON baseline of all levels (timing windows are included)
+- `--compare FILE` — compare against a saved baseline; lists only segments that differ and exit code reflects the new run
 
 Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 (Stratusvägen) is the easiest, with very wide timing windows. Level 2's tightest jumps are around 100 ms. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms. Level 4 is harder: its triple spikes have about 80 ms too, and it's longer. Level 5 (Schackmatt) sits between level 4 and level 6: most of its tightest presses are around 83 ms, with one 67 ms section in the queen's hall. Level 6's tightest presses are about 67 ms, with more of them than level 5.
+
+### Linting a level
+
+```bash
+python tools/lint.py
+```
+
+This catches mistakes that are otherwise only seen when you look at the level: a theme with no `ground` (or `glow`, `field`, `far`) for an area, style names that `art.js`/`render.js` don't know (drawn as a placeholder or not at all), a `LEVELS` entry with missing fields or no `.lvl.d<n>` colour in the CSS, a song that is missing or doesn't last to the finish, and crashes or console errors while the whole level is drawn (a frame every 10 blocks, at every checkpoint, in the win poses and at every jump scare). It checks all levels by default, or the ones you name: `python tools/lint.py chess forest`. Exit code 0 when there are no errors (warnings are printed but don't fail). Options: `--json` to print the raw report, `--step N` to draw a frame every N blocks (default 10), `--scale 1` to draw at full 1280x720 (default 0.5, about twice as fast), and `--drop LEVEL.MAP.KEY` (e.g. `chess.ground.board`) to delete a theme key before checking, to see that a check fires.
 
 To see a level's layout and rhythm at a glance, open `tools/map.html?level=<id>` in a browser. It draws a schematic top-down/side map of the level's hitboxes, obstacles and checkpoints. Options: `from=<x>&to=<x>` (show part of the level), `cols=<n>` (blocks per row), `scale=<px>` (pixels per block, default 12), `bot` (draw the bot's path from every checkpoint, red where it fails), `windows` (also colour each jump by its timing slack). Example: `tools/map.html?level=forest&from=380&to=500&windows&scale=20`.
 
@@ -427,6 +444,24 @@ python tools/shot.py "index.html?debug&level=forest&cp=5&freeze"
 ```
 
 This saves a PNG of any page (here `shots/index.png`) with Chrome running without a window, straight from disk, so no server is needed. `-o file.png` picks the file and `--size 1280x720` the window size (`map.html` and `skins.html` set their own size). The page normally runs in fast-forwarded virtual time, which gives the same PNG every time for the same code. The shop redraws every card each frame, which is slow to fast-forward, so use `--realtime 2500` for it. The `shots/` folder is git-ignored. `tools/headless.py` is the shared helper: it finds Chrome or Edge by itself, or set the `CHROME` environment variable.
+
+Several pages can be given at once. They run one after the other (about 3 s each for the game), because Chromes running in virtual time at the same time slow each other down badly. Use `--jobs N` to run parallel Chromes anyway (only worth trying on a big PC), `--outdir <folder>` to choose the output folder (default `shots/`), and pass multiple page URLs as arguments. With a single page, use `-o` to name the file; with multiple pages, files are named after the page and its query so different queries never overwrite each other.
+
+To take one screenshot per checkpoint of a level, use `--cps LEVEL`:
+
+```bash
+python tools/shot.py --cps forest
+```
+
+This saves `shots/forest_cp0.png`, `shots/forest_cp1.png`, etc., one per checkpoint.
+
+For a faster contact sheet of a whole level in one picture, use `tools/sheet.html`:
+
+```bash
+python tools/shot.py "tools/sheet.html?level=forest"
+```
+
+This draws one tile per checkpoint and one every `step` blocks in between (about 7 s total). Options: `level=<id>` (default: first level), `step=<blocks>` between tiles (default 40), `cols=<n>` number of columns (default 4), `w=<px>` tile width with 16:9 height (default 400), `cps` to show checkpoints only, `from=<x>` / `to=<x>` to show a block range.
 
 ### Debug mode
 
@@ -455,6 +490,8 @@ The hash (or query string) also accepts URL parameters to drop straight into a s
 | `mute` | Start muted (not saved) |
 | `freeze` | Stop the game at the start position (for screenshots); any key, click or tap continues |
 | `shop` | Open the shop (on the tab of the character you're wearing) |
+| `fakelevels=<n>` | (menu only) Pad the level list with copies of the real levels up to *n* cards, to test the menu layout |
+| `menulevel=<id>` | Select that level in the menu without starting a run (different from `level=`, which starts a run) |
 
 Examples: `index.html?debug&level=metro&x=500&freeze` or `index.html#debug&level=forest&cp=5`. Parameters can go after `?` or `#`.
 
@@ -469,6 +506,12 @@ The project includes Claude Code skills in `.claude/skills/` for common developm
 - `/mobil` — prepare a new build for the phone
 
 Each skill carries the checklist for that job. See `CLAUDE.md` in the project for the project rules that guide Claude's work.
+
+The project also includes agent types in `.claude/agents/` for different kinds of work. The main session runs **Opus 5.5** with high effort and reviews all changes. For implementing work, Opus delegates to subagents:
+
+- **banbyggare** — Sonnet 5.5 with high effort, for level design: layout, difficulty tuning and new obstacle physics
+- **sonnet-utvecklare** — Sonnet 5.5 with medium effort, for general development: graphics, audio, tools, menus and changes across multiple files
+- **haiku-hjalp** — Haiku 4.5 with low effort, for quick bounded tasks: code search, file summaries, README updates, simple text changes and renaming
 
 ## Notes
 

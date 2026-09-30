@@ -95,6 +95,7 @@
         far.push({ u, t: 'castlesil', w: 1.0 + rnd() * 1.6, h: 1.0 + rnd() * 1.8 });
         u += 0.5 + rnd() * 1.3;
       } else {
+        if (kind && kind !== 'pine' && kind !== 'mixed') VD.lintMiss && VD.lintMiss('far', kind);
         const pine = kind === 'pine' || rnd() < 0.55;
         far.push({ u, t: pine ? 'pine' : 'birch', h: 0.8 + rnd() * 1.1 });
         u += 0.35 + rnd() * 0.7;
@@ -471,6 +472,7 @@
           this.drawCathedral(ctx, camX, t);
           this.drawNear(ctx, camX, t, true, L);
         } else {
+          if (inKind !== 'hall') VD.lintMiss && VD.lintMiss('indoor', inKind);
           this.drawHall(ctx, camX, t);
           this.drawNear(ctx, camX, t, true, L);
         }
@@ -724,7 +726,7 @@
           ctx.lineTo(x + dx + 15, base - h - 18);
           ctx.fill();
         }
-      }
+      } else VD.lintMiss && VD.lintMiss('far', f.t);
     }
 
     // mid layer
@@ -745,6 +747,7 @@
       else if (m.t === 'dead1') Art.deadSnag(ctx, x, mb + 2, m.d.h * 0.8);
       else if (m.t === 'kelp1') Art.kelpSilhouette(ctx, x, mb + 2, m.d.h);
       else if (Art.mid[m.t]) Art.mid[m.t](ctx, x, mb + 2, m.d, t, FONT);
+      else VD.lintMiss && VD.lintMiss('landmark', m.t);
     }
     // light haze pushes the scenery back behind the gameplay layer
     ctx.fillStyle = U.rgba(sky.bot, 0.16);
@@ -2013,6 +2016,7 @@
       if (!!d.inside !== inside || (d.layer || 0) !== L) continue;
       const f = Art.near[d.type];
       if (f) f(ctx, sx(d.x, camX), GY, d, t, BS, FONT);
+      else VD.lintMiss && VD.lintMiss('deco', d.type);
     }
   };
 
@@ -2477,7 +2481,7 @@
         for (let x = gridStart(x0, camX * BS, 480); x < x1; x += 480) if (x >= x0) ctx.fillRect(x, GY, 5, Math.min(H - GY, x1 - x));
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
         ctx.fillRect(x0, GY + 50, x1 - x0, 30);
-      }
+      } else VD.lintMiss && VD.lintMiss('ground', st);
     }
   };
 
@@ -2801,6 +2805,7 @@
         ctx.fillStyle = 'rgba(232,200,90,0.4)';
         ctx.fillRect(x0, y - 2, x1 - x0, 2);
       } else {
+        if (c.style !== 'fyris') VD.lintMiss && VD.lintMiss('corridor', c.style);
         // leafy canopy of the riverside trees
         const g = ctx.createLinearGradient(0, 0, 0, y);
         g.addColorStop(0, Art.T('#123018'));

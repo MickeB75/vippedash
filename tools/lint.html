@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VippeDash level lint</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; background: #111; color: #eee; padding: 16px; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h2>VippeDash level lint</h2>
+<p>The page half of <code>python tools/lint.py</code>: for each level it checks the theme against the level's areas, then builds
+the level and draws it with the real renderer (js/render.js, 1280x720, offscreen) at x = 0, 10, 20, ... (step=) to the finish, at every
+checkpoint and with a few different times, collecting exceptions, unknown style names (the <code>VD.lintMiss</code> hooks in
+js/art.js and js/render.js) and console errors. The result is a JSON report in <code>#report</code>.
+Parameters: <code>level=a,b</code> (default all), <code>step=10</code> (x step in blocks), <code>scale=0.5</code> (pixel buffer scale),
+<code>drop=chess.ground.board,...</code> (delete <code>theme.&lt;map&gt;.&lt;key&gt;</code> of a level before checking, to prove
+that a check works without editing level.js).</p>
+<pre id="out">Running…</pre>
+<script src="../js/util.js"></script>
+<script src="../js/physics.js"></script>
+<script src="../js/level.js"></script>
+<script src="../js/art.js"></script>
+<script src="../js/horror.js"></script>
+<script src="../js/stratus.js"></script>
+<script src="../js/render.js"></script>
+<script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  const only = q.get('level');
+  const onlyIds = only ? only.split(',').map((s) => s.trim()).filter(Boolean) : null;
+  const STEP = Math.max(1, +q.get('step') || 5);
+  const drops = (q.get('drop') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const Ph = VD.Physics, R = VD.Render, U = VD.U;
+  const PX = R.PX, BS = R.BS;
+
+  // ---- console + uncaught errors -------------------------------------------------------------------------
+  const consoleErrors = [];
+  let phase = 'load';
+  const addConsole = (kind, msg) => {
+    const key = kind + '|' + msg;
+    const e = consoleErrors.find((c) => c.key === key);
+    if (e) e.count++;
+    else consoleErrors.push({ key, kind, msg, count: 1, phase });
+  };
+  const shortFile = (f) => (f || '').replace(/^.*[\\/]/, '').replace(/\?.*$/, '');
+  window.addEventListener('error', (e) => {
+    if (e.target && e.target !== window && (e.target.src || e.target.href)) addConsole('load', 'failed to load ' + shortFile(e.target.src || e.target.href));
+    else addConsole('onerror', (e.message || String(e.error)) + (e.filename ? ' (' + shortFile(e.filename) + ':' + e.lineno + ')' : ''));
+  }, true);
+  window.addEventListener('unhandledrejection', (e) => addConsole('rejection', String(e.reason && e.reason.message || e.reason)));
+  const origErr = console.error;
+  console.error = function () {
+    addConsole('console.error', Array.prototype.map.call(arguments, (a) => (a && a.stack) || String(a)).join(' '));
+    return origErr.apply(console, arguments);
+  };
+
+  // ---- style-miss hook (js/art.js + js/render.js call VD.lintMiss(kind, name) in their default branches) ----
+  // severity: 'error' = the renderer draws nothing / a placeholder; 'warn' = falls back to the generic look
+  const MISS_SEV = { deco: 'error', landmark: 'error', ground: 'error', far: 'error', block: 'error', indoor: 'error', corridor: 'error',
+    spike: 'warn', half: 'warn', bird: 'warn', water: 'warn', pad: 'warn', orb: 'warn' };
+  const MISS_WHAT = {
+    deco: 'has no Art.near[] entry, so it is not drawn',
+    landmark: 'has no Art.mid[] entry, so it is not drawn',
+    ground: 'has no case in drawGround, so no ground is drawn',
+    far: 'has no case in the far layer (render.js), so it is not drawn / falls back to pines and birches',
+    block: 'has no case in Art.block (nor METRO_BLOCKS / Art.horror.block), so it is drawn as a plain dark placeholder block',
+    indoor: 'has no drawing (drawScene falls back to the floorball hall interior)',
+    corridor: 'has no case in drawCorridors (falls back to the leafy riverside canopy)',
+    spike: 'is not a known spike style (falls back to the plain triangle)',
+    half: 'is not used by Art.half (always drawn as the plain shard)',
+    bird: 'is not a known bird style (falls back to the crow)',
+    water: 'is not a known water style (falls back to plain water)',
+    pad: 'is not a known pad colour (drawn yellow)',
+    orb: 'is not a known orb colour (drawn yellow)',
+  };
+  let misses = null; // Map for the level being rendered
+  const ctxInfo = { x: 0 };
+  VD.lintMiss = function (kind, name) {
+    if (!misses) return;
+    const key = kind + '\u0000' + name;
+    const m = misses.get(key);
+    if (m) m.count++;
+    else misses.set(key, { kind, name: String(name), count: 1, x: ctxInfo.x, sev: MISS_SEV[kind] || 'error', what: MISS_WHAT[kind] || 'is unknown' });
+  };
+
+  // ---- ?drop=level.map.key: remove a theme key, to prove a check catches it ----------------------------------
+  const dropped = [];
+  for (const spec of drops) {
+    const [lv, map, key] = spec.split('.');
+    const L = VD.LEVELS.find((l) => l.id === lv);
+    if (L && L.theme && L.theme[map] && typeof L.theme[map] === 'object' && key in L.theme[map]) {
+      delete L.theme[map][key];
+      dropped.push(spec);
+    } else dropped.push(spec + ' (NOT FOUND)');
+  }
+
+  // ---- theme checks --------------------------------------------------------------------------------------------
+  function themeChecks(L, lvl) {
+    const out = [];
+    const err = (msg) => out.push({ sev: 'error', check: 'theme', msg });
+    const warn = (msg) => out.push({ sev: 'warn', check: 'theme', msg });
+    const th = L.theme;
+    if (!th) return [{ sev: 'error', check: 'theme', msg: 'level has no theme' }];
+    const ids = [];
+    for (const a of lvl.areas) if (ids.indexOf(a.id) < 0) ids.push(a.id);
+    // sky: skyAt() reads SKY[i + 1], so it needs two entries, in increasing x, each with all five fields
+    if (!Array.isArray(th.sky) || th.sky.length < 2) err('theme.sky needs at least 2 entries');
+    else {
+      th.sky.forEach((k, i) => {
+        for (const f of ['x', 'top', 'bot', 'far', 'dark', 'sun']) if (k[f] == null) err('theme.sky[' + i + '] has no ' + f);
+        if (i && k.x <= th.sky[i - 1].x) err('theme.sky[' + i + '].x is not larger than the entry before it');
+      });
+    }
+    // per-area maps. ground and glow are looked up as map[area.id] with NO default fallback (render.js
+    // drawGround / drawObjects); field, far and midFill go through pick(): map[id] if the id is a key, else map.default.
+    const noGround = [], noGlow = [], noPick = { field: [], far: [], midFill: [] };
+    if (!th.ground || typeof th.ground !== 'object') err('theme.ground is missing (drawGround would crash)');
+    if (!th.glow || typeof th.glow !== 'object') err('theme.glow is missing (drawObjects would crash)');
+    for (const m of ['field', 'far', 'midFill']) if (!th[m] || typeof th[m] !== 'object') err('theme.' + m + ' is missing (R.build would crash)');
+    for (const id of ids) {
+      if (th.ground && th.ground[id] === undefined) noGround.push(id);
+      if (th.glow && th.glow[id] === undefined) noGlow.push(id);
+      for (const m of ['field', 'far', 'midFill']) if (th[m] && typeof th[m] === 'object' && !(id in th[m]) && !('default' in th[m])) noPick[m].push(id);
+    }
+    if (noGround.length) {
+      const msg = "theme.ground has no value for area" + (noGround.length > 1 ? 's' : '') + " '" + noGround.join("', '") +
+        "' (drawGround looks up ground[area.id] directly, with no 'default' fallback, so that ground is not drawn)";
+      if (th.lanes && noGround.length === ids.length) warn(msg + ' - hidden under the lane road band on this street level, but check it');
+      else err(msg);
+    }
+    if (noGlow.length) warn("theme.glow has no value for area" + (noGlow.length > 1 ? 's' : '') + " '" + noGlow.join("', '") +
+      "' (glow is looked up by area id with no 'default' fallback, so hazards there get a plain white outline)");
+    for (const m of ['field', 'far', 'midFill']) {
+      if (noPick[m].length) warn('theme.' + m + " has no entry for area" + (noPick[m].length > 1 ? 's' : '') + " '" + noPick[m].join("', '") + "' and no 'default'");
+    }
+    // keys that match no area of the level (typos, leftovers)
+    for (const m of ['ground', 'glow', 'field', 'far', 'midFill', 'indoor']) {
+      if (!th[m] || typeof th[m] !== 'object') continue;
+      const stray = Object.keys(th[m]).filter((k) => k !== 'default' && ids.indexOf(k) < 0);
+      if (stray.length) warn('theme.' + m + " has key" + (stray.length > 1 ? 's' : '') + " '" + stray.join("', '") + "' that is no area of this level");
+    }
+    for (const m of ['mist', 'beams', 'canopy', 'tilt']) {
+      if (!th[m]) continue;
+      const bad = th[m].filter((k) => ids.indexOf(k) < 0);
+      if (bad.length) err('theme.' + m + " lists '" + bad.join("', '") + "' which is no area of this level");
+    }
+    if (th.train && !(th.train.length === 2 && th.train[0] < th.train[1])) err('theme.train must be [x0, x1]');
+    if (!th.song) err('theme.song is missing');
+    return out;
+  }
+
+  // ---- simulated player / game state for R.draw(G, dt) -------------------------------------------------------
+  const cv = document.createElement('canvas');
+  // the scene is always laid out in 1280x720 units; ?scale=0.5 only shrinks the pixel buffer it is rasterised into
+  const SC = +q.get('scale') || 1;
+  cv.width = Math.round(1280 * SC);
+  cv.height = Math.round(720 * SC);
+  R.cv = cv;
+  R.ctx = cv.getContext('2d');
+  R.scale = SC;
+  R.cssScale = SC;
+
+  function baseG(lvl, def) {
+    return {
+      state: 'play', clock: 0, camX: -PX, camV: 0, camVT: 0, s: null, vis: { rot: 0, wheel: 0, oT: 0 }, skin: 'red', fps: 60,
+      particles: [], flash: 0, shake: 0, hpMax: def.health || 0, hp: def.health || 0, hurt: null, got: new Set(), cpIndex: 0,
+      banner: null, attemptText: null, scare: null, debug: false, strobeOn: true, lowHp: false, deadAge: 0, winAge: 0, lvl,
+    };
+  }
+  // a player standing at x, in the mode of the last checkpoint before x (like a run that reached it)
+  function playerG(lvl, def, x, t, o) {
+    o = o || {};
+    const ci = lvl.checkpointAt(x);
+    const cp = lvl.checkpoints[ci];
+    const s = Ph.spawn(cp);
+    s.x = x;
+    s.layer = lvl.layerAt(x);
+    if (o.lane != null) s.laneP = o.lane;
+    const G = baseG(lvl, def);
+    G.state = o.state || 'play';
+    G.clock = t;
+    G.s = s;
+    G.cpIndex = ci;
+    G.camX = x - PX;
+    G.camV = G.camVT = lvl.depthOf(s.layer);
+    G.vis.rot = (x * 0.07) % 6.28;
+    G.vis.oT = o.oT || 0;
+    G.attemptText = { x: cp.x, n: 1, layer: cp.layer };
+    const a = lvl.areaAt(x);
+    if (a && a.name && x - a.x0 < 12) G.banner = { name: a.name, sub: a.sub, t: 0.5 };
+    if (o.scare) G.scare = { kind: o.scare, t: 0.15 };
+    if (o.hurt) G.hurt = { n: 10, t: 0.1, x: 0, y: 0 };
+    if (o.state === 'dead') G.deadAge = 0.2;
+    if (o.state === 'winning' || o.state === 'won') G.winAge = 1;
+    return G;
+  }
+  function menuG(lvl, def, camX, t) {
+    const G = baseG(lvl, def);
+    G.state = 'menu';
+    G.clock = t;
+    G.camX = camX;
+    G.camV = lvl.depthOf(lvl.layerAt(camX + PX + 2));
+    return G;
+  }
+
+  function shortStack(err) {
+    const lines = String(err && err.stack || '').split('\n').slice(1);
+    const frames = [];
+    for (const ln of lines) {
+      const m = /at (?:(.*?) \()?(?:.*[\\/])?([\w.\-]+\.(?:js|html)):(\d+):\d+\)?/.exec(ln);
+      if (!m) continue;
+      if (m[2] === 'lint.html' && frames.length) continue;
+      frames.push((m[1] ? m[1].replace(/^Object\./, '') + ' ' : '') + m[2] + ':' + m[3]);
+      if (frames.length >= 4) break;
+    }
+    return frames;
+  }
+
+  // ---- per level ------------------------------------------------------------------------------------------------
+  function lintLevel(L) {
+    const rep = { id: L.id, num: L.num, name: L.name, theme: [], misses: [], exceptions: [], frames: 0, ms: 0, finishTime: 0, lengthTime: 0, song: L.theme && L.theme.song, areas: [] };
+    const t0 = performance.now();
+    let lvl;
+    misses = new Map();
+    ctxInfo.x = 0;
+    phase = L.id + ':build';
+    const exc = new Map();
+    const addExc = (e, where) => {
+      const frames = shortStack(e);
+      const msg = String(e && e.message || e);
+      const key = msg + '|' + (frames[0] || '');
+      let r = exc.get(key);
+      if (!r) exc.set(key, (r = { msg, name: e && e.name || 'Error', frames, where: where.what, first: where.x, last: where.x, count: 0, t: where.t }));
+      r.count++;
+      if (where.x < r.first) r.first = where.x;
+      if (where.x > r.last) r.last = where.x;
+    };
+    try {
+      lvl = VD.buildLevel(L.id);
+    } catch (e) {
+      addExc(e, { what: 'VD.buildLevel', x: 0, t: 0 });
+      rep.exceptions = Array.from(exc.values());
+      return rep;
+    }
+    rep.finishTime = Ph.timeAt(lvl, lvl.finishX);
+    rep.lengthTime = Ph.timeAt(lvl, lvl.length);
+    rep.finishX = lvl.finishX;
+    rep.areas = lvl.areas.map((a) => a.id);
+    // the field style each area resolves to (pick(): the area's own key, else 'default'), for the check against drawField
+    const fm = (L.theme && L.theme.field) || {};
+    rep.field_styles = Array.from(new Set(rep.areas.map((id) => (id in fm ? fm[id] : fm.default)).filter((v) => typeof v === 'string')));
+    rep.theme = themeChecks(L, lvl);
+    try {
+      R.build(lvl);
+    } catch (e) {
+      addExc(e, { what: 'Render.build', x: 0, t: 0 });
+      rep.exceptions = Array.from(exc.values());
+      return rep;
+    }
+
+    const draw = (G, x, what) => {
+      ctxInfo.x = x;
+      rep.frames++;
+      try {
+        R.draw(G, 1 / 60);
+      } catch (e) {
+        addExc(e, { what, x, t: G.clock });
+        cv.width = cv.width; // a throw can leave save() calls open: a resize resets the whole context state
+      }
+    };
+
+    // the run: x = 0, STEP, 2 STEP ... to the finish (+2 for the 'won' pose), each with its own time offset
+    phase = L.id + ':draw';
+    const offs = [0, 0.37, 1.9, 6.1];
+    const xs = [];
+    for (let x = 0; x < lvl.finishX + 2; x += STEP) xs.push(x);
+    for (const cp of lvl.checkpoints) xs.push(cp.x);
+    xs.push(lvl.finishX - 1, lvl.finishX + 2);
+    xs.sort((a, b) => a - b);
+    const lanes = !!(L.theme && L.theme.lanes);
+    xs.forEach((x, i) => {
+      const t = Ph.timeAt(lvl, x) + offs[i % offs.length];
+      draw(playerG(lvl, L, x, t, { lane: lanes ? i % 2 : null, oT: i % 5 === 0 ? 0.3 : 0, hurt: i % 9 === 4 }), x, 'play');
+    });
+    // several times at every checkpoint, plus the dead and won poses, so animations run at different phases
+    for (const cp of lvl.checkpoints) {
+      for (const t of [0, 0.25, 0.8, 2.3, 5.9, 13.7]) draw(playerG(lvl, L, cp.x, t), cp.x, 'play');
+      draw(playerG(lvl, L, cp.x, 1.1, { state: 'dead' }), cp.x, 'dead');
+    }
+    draw(playerG(lvl, L, lvl.finishX + 3, 4.4, { state: 'winning' }), lvl.finishX + 3, 'winning');
+    draw(playerG(lvl, L, lvl.finishX + 6, 5.4, { state: 'won' }), lvl.finishX + 6, 'won');
+    // jump scares (level 7) at their own x
+    for (const sc of lvl.scares) draw(playerG(lvl, L, sc.x, Ph.timeAt(lvl, sc.x), { scare: sc.kind }), sc.x, 'scare ' + sc.kind);
+    // the menu's attract mode (no player) along the level
+    for (let x = -4, i = 0; x < lvl.finishX - 20; x += 40, i++) draw(menuG(lvl, L, x, Ph.timeAt(lvl, Math.max(0, x)) + offs[i % offs.length]), x, 'menu');
+
+    rep.exceptions = Array.from(exc.values());
+    rep.misses = Array.from(misses.values());
+    misses = null;
+    rep.ms = Math.round(performance.now() - t0);
+    return rep;
+  }
+
+  // ---- LEVELS entries (checked in Python against css/style.css and audio.js) ---------------------------------------
+  function defOf(L) {
+    const o = { keys: Object.keys(L) };
+    for (const k of ['id', 'num', 'name', 'difficulty', 'diffName', 'reward', 'route', 'winTitle', 'winSub']) o[k] = L[k] == null ? null : L[k];
+    o.hasBuild = typeof L.build === 'function';
+    o.hasTheme = !!L.theme && typeof L.theme === 'object';
+    o.song = L.theme ? L.theme.song || null : null;
+    return o;
+  }
+
+  setTimeout(function () {
+    const report = { step: STEP, dropped, defs: VD.LEVELS.map(defOf), levels: [], console: [] };
+    const list = VD.LEVELS.filter((L) => !onlyIds || onlyIds.indexOf(L.id) >= 0);
+    report.unknown = (onlyIds || []).filter((id) => !VD.LEVELS.some((L) => L.id === id));
+    let i = 0;
+    (function next() {
+      if (i < list.length) {
+        const L = list[i++];
+        try {
+          report.levels.push(lintLevel(L));
+        } catch (e) {
+          report.levels.push({ id: L.id, num: L.num, name: L.name, theme: [], misses: [], frames: 0, ms: 0, exceptions: [{ msg: 'lint itself failed: ' + (e && e.message), frames: shortStack(e), where: 'lint', first: 0, last: 0, count: 1 }] });
+        }
+        setTimeout(next, 0);
+        return;
+      }
+      phase = 'done';
+      report.console = consoleErrors.map((c) => ({ kind: c.kind, msg: c.msg, count: c.count, phase: c.phase }));
+      const jsonText = JSON.stringify(report).replace(/</g, '\\u003c');
+      document.getElementById('out').innerHTML = 'Done.<script type="application/json" id="report">' + jsonText + '<' + '/script>';
+    })();
+  }, 50);
+})();
+</script>
+</body>
+</html>
