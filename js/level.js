@@ -2540,7 +2540,6 @@
     b.block(241, 0, 2, 1, 'riverstone');
     b.block(246, 0, 2, 0.3, 'lilypad');
     b.block(251, 0, 2, 1, 'riverstone');
-    b.piranha(245.5, { beats: 2, phase: 0.62 });
     b.spike(258, 0, 'thorn');
     b.water(264, 2, 'river');
     b.piranha(264.5, { beats: 2, phase: 0.46 });
