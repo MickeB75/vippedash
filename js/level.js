@@ -2486,12 +2486,12 @@
     b.area('chase', 944, 'JAGUARJAKTEN', 'RUN! The jaguar is after you!');
 
     // ---- the rapids' water zones come first: rock/piranha heights below are read off the real surface ----
-    // swells (long, gentle: the raft just rides them), then the real waves (8 blocks = 2 beats long, 1.8 high:
+    // swells (long, gentle: the raft just rides them), then the real waves (16 blocks = 4 beats long, 1.3 high:
     // the crest throws the raft), then a last roaring stretch above the waterfall. base 0 and a whole number
     // of wavelengths keep the surface continuous with the flat river on both sides.
     b.rapids(424, 488, { amp: 1.0, len: 16, base: 0 });
-    b.rapids(496, 560, { amp: 1.8, len: 8, base: 0 });
-    b.rapids(568, 600, { amp: 2.0, len: 8, base: 0 });
+    b.rapids(496, 560, { amp: 1.3, len: 16, base: 0 });
+    b.rapids(568, 600, { amp: 1.5, len: 16, base: 0 });
     const surf = (x) => VD.Physics.rapidsHeight({ rapids: b.rapidZones }, x);
     // a sharp rock standing in the water: sunk below the surface so its foot never floats on a slope
     const rock = (x, w = 1, h = 1.7) => b.thorny(x, +(surf(x + w / 2) - 0.6).toFixed(2) || 0.01, w, h, 'rapidrock');
@@ -2582,15 +2582,12 @@
     fish(480, { phase: 0.5 });
     fish(491, { phase: 0.2 });
     // the roaring part
-    fish(520, { phase: 0.0 });
-    rock(530, 1);
-    fish(540, { phase: 0.5 });
-    rock(555, 1);
-    fish(564, { phase: 0.5 });
-    rock(524, 1);
-    rock(546, 1);
-    rock(541, 3, 2.4);
-    b.block(540, 3.6, 5, 1, 'log');
+    rock(522, 1);
+    fish(530, { phase: 0.0 });
+    rock(538, 1);
+    fish(546, { phase: 0.5 });
+    rock(554, 1);
+    fish(564, { phase: 0.75 });
     rock(578, 1);
     fish(586);
     rock(594, 1);

@@ -402,7 +402,7 @@ Level 7 (Amazonas) adds:
 
 ```js
 b.portal(414, 'raft');       // raft mode: jumps like the cube, but the floor is the water surface
-b.rapids(496, 560, { amp: 1.8, len: 8 }); // waves: base + amp * sin(2π(x - x0) / len); a crest falling away throws the raft up
+b.rapids(496, 560, { amp: 1.3, len: 16 }); // waves: base + amp * sin(2π(x - x0) / len); a crest falling away throws the raft up
 b.piranha(x, { y, beats, phase, rise, air }); // a piranha leaping out of the water on the beat (hidden the rest of the time)
 b.jaguar(x, y, { from: [hx, hy], trigger, fall, arc }); // a jaguar leaping out of a bush at (hx, hy) and landing at x
 b.chase(946, 1240);          // a jaguar running right behind you (drawing and a roar only, no physics)
