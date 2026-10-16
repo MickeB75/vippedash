@@ -2564,7 +2564,6 @@
     b.block(368, 0, 2, 1, 'log');
     b.water(374, 4, 'river');
     b.block(375, 0, 2, 0.3, 'lilypad');
-    b.piranha(376, { beats: 2, phase: 0.26 });
     b.spike(388, 0, 'thorn');
 
     // ============ FORSEN (400 – 624) — by raft ============
