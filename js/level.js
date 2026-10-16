@@ -2542,11 +2542,10 @@
     b.block(251, 0, 2, 1, 'riverstone');
     b.spike(258, 0, 'thorn');
     b.water(264, 2, 'river');
-    b.piranha(264.5, { beats: 2, phase: 0.46 });
     b.thorny(272, 0, 1, 1, 'thornbush');
     b.water(280, 8, 'river');
     b.block(281, 0, 2, 0.3, 'lilypad');
-    b.block(285, 0, 2, 0.3, 'lilypad');
+    b.block(285, 0, 3.4, 0.3, 'lilypad'); // reaches the far bank (water ends at 288), so you run straight off it
     b.piranha(284, { beats: 2, phase: 0.49 });
     b.spikes(292, 2, 0, 'thorn');
     b.block(300, 0, 3, 1, 'log');
