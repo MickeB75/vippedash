@@ -290,8 +290,9 @@
       });
     }
     // ---- level 6: screen effects and jump scares ----
-    dark(x0, x1, { r = 7 } = {}) {
-      this.fx.dark.push({ x0, x1, r });
+    // dim (0..1): Amazonas' Tripp Troppen — the whole screen just gets darker by that much, no lantern hole
+    dark(x0, x1, { r = 7, dim = null } = {}) {
+      this.fx.dark.push({ x0, x1, r, dim });
     }
     strobe(x0, x1) {
       this.fx.strobe.push({ x0, x1 });
@@ -2596,7 +2597,7 @@
 
     // ============ TRIPP TROPPEN (624 – 768), dark ============
     b.checkpoint(624);
-    b.dark(624, 944, { r: 7 });
+    b.dark(624, 944, { dim: 0.5 }); // darker inside the hill, but you see the whole screen
     b.corridor(624, 770, 4.6, 'roots');
     b.text(630, 3.8, 'Nobody comes out of Tripp Troppen…', 0.4);
     b.spike(640, 0, 'stalagmite');

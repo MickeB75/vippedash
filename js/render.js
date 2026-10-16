@@ -332,7 +332,8 @@
     }
     let r = 7;
     const dz = lvl.fx && lvl.fx.dark;
-    if (dz) for (const z of dz) if (px >= z.x0 - 4 && px <= z.x1 + 4) { r = z.r || 7; break; }
+    let dim = null;
+    if (dz) for (const z of dz) if (px >= z.x0 - 4 && px <= z.x1 + 4) { r = z.r || 7; dim = z.dim; break; }
     const s = G.s;
     const ph = s ? VD.Physics.boxH(s) : 1;
     let holeX = PX * BS;
@@ -341,6 +342,18 @@
     const flick = 1 + Math.sin(t * 17.3) * 0.05 + Math.sin(t * 7.1 + 1) * 0.03;
     const rad = Math.max(12, r * BS * flick);
 
+    if (dim != null) {
+      // a dim zone (Amazonas' Tripp Troppen): just a darker screen, no lantern hole — everything stays visible
+      ctx.fillStyle = 'rgba(4,2,6,' + (dim * k).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      this.drawLantern(ctx, k, holeX, holeY, rad);
+    }
+
+    this.drawDarkGlows(ctx, t);
+  };
+
+  R.drawLantern = function (ctx, k, holeX, holeY, rad) {
     if (!this._darkCv) {
       this._darkCv = document.createElement('canvas');
       this._darkCv.width = W;
@@ -362,8 +375,10 @@
     dctx.fill();
     dctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(this._darkCv, 0, 0);
+  };
 
-    // glowing things (Amazonas' mushrooms) shine on through the darkness
+  // glowing things (Amazonas' mushrooms) and eyes, drawn on top of the darkness so they shine through it
+  R.drawDarkGlows = function (ctx, t) {
     if (this._glowSpots.length) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
