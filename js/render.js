@@ -5146,7 +5146,7 @@
       return;
     }
     const slide = U.smooth(U.clamp((s.x - z.x0) / 2, 0, 1));
-    const jx = s.x - 5 - (1 - slide) * 7;
+    const jx = s.x - 5.5 - (1 - slide) * 7;
     // the highest low thing under the jaguar right now, and just ahead of it
     let top = 0;
     for (const o of this.lvl.visible(jx - 1, jx + 3)) {
@@ -5162,7 +5162,7 @@
     else cy0 = Math.max(top, cy0 - dt * 10);
     this._chaseY = cy0;
     const air = cy0 > top + 0.05 || cy0 < top - 0.05;
-    const u = BS * 0.95;
+    const u = BS * 1.4; // a big cat, half again the size of the pouncing jaguars
     const jcx = sx(jx + 0.6, camX), gy = sy(cy0);
     // a shadow and a trail of dust and leaves
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
@@ -5173,16 +5173,23 @@
       const ph = ((t * 3 + i * 0.21) % 1);
       ctx.fillStyle = 'rgba(176,140,90,' + (0.4 * (1 - ph)) + ')';
       ctx.beginPath();
-      ctx.arc(jcx + u * 1.3 + ph * 50, sy(top) - 4 - ph * 16 - (i % 2) * 5, 3 + ph * 7, 0, TAU);
+      ctx.arc(jcx - u * 1.3 - ph * 50, sy(top) - 4 - ph * 16 - (i % 2) * 5, 3 + ph * 7, 0, TAU);
       ctx.fill();
     }
-    if (air) Art.jaguar(ctx, jcx, gy - 0.56 * u, u, 'leap', t, 101, null, 0, 0.35 - Math.min(1, (cy0 - top + 1) * 0.5) * 0.5);
+    // Art.jaguar draws the cat facing left (the pouncing jaguars leap at you from ahead); this one runs
+    // after you to the right, so mirror it around its centre
+    ctx.save();
+    ctx.translate(jcx * 2, 0);
+    ctx.scale(-1, 1);
+    // (the lean is negated: mirroring the canvas also mirrors the rotation, so nose-up would turn nose-down)
+    if (air) Art.jaguar(ctx, jcx, gy - 0.56 * u, u, 'leap', t, 101, null, 0, -(0.35 - Math.min(1, (cy0 - top + 1) * 0.5) * 0.5));
     else {
       // the running gait is the same few frames over and over: cached sprites
       const fr = Math.floor(((((t * 17) / TAU) % 1) + 1) % 1 * 12) % 12, sw = Math.ceil(u * 4), sh = Math.ceil(u * 2.2);
       const cv = this.getSprite('chasejag' + fr, sw, sh, (c) => Art.jaguar(c, u * 1.7, u * 1.5, u, 'run', 0, 101, null, ((fr + 0.5) / 12) * TAU, 0));
       ctx.drawImage(cv, jcx - u * 1.7, gy - 0.56 * u - u * 1.5);
     }
+    ctx.restore();
   };
 
   R.drawParticles = function (ctx, camX, G, L = 0) {
