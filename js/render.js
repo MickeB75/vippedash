@@ -26,6 +26,7 @@
     spruces: 6, tarn: 6, cranes: 4, deadtrees: 5, deer: 3, moosecalf: 4, foxrun: 2, rockhill: 9, firetower: 2, jakttorn: 2,
     whale: 15, reeftower: 7, shipwreck: 10, kelpforest: 8,
     rookpiece: 4, knightpiece: 4, bishoppiece: 3.5, queenpiece: 4.5,
+    tripptroppen: 10, waterfall: 8,
   };
   // 0..1: how much of x lies inside one of the listed areas, eased over `fade` blocks at each border
   function areaWeight(lvl, ids, x, fade = 12) {
@@ -90,6 +91,11 @@
         // a distant ridge of coral bumps and rock outcrops, fading into the murk
         far.push({ u, t: 'reefbg', h: 0.5 + rnd() * 1.2, w: 0.9 + rnd() * 1.4 });
         u += 0.3 + rnd() * 0.6;
+      } else if (kind === 'rainforest') {
+        // layers of rounded rainforest crowns, with the odd emergent giant poking up above the canopy
+        if (rnd() < 0.09) far.push({ u, t: 'giant', h: 3.2 + rnd() * 1.6, w: 1.6 + rnd() * 1.2, seed: Math.floor(rnd() * 1e6) });
+        else far.push({ u, t: 'crown', w: 1.1 + rnd() * 1.3, h: 0.8 + rnd() * 1.3, seed: Math.floor(rnd() * 1e6) });
+        u += 0.4 + rnd() * 0.7;
       } else if (kind === 'castle') {
         // distant castle silhouettes on the horizon, level 4 "Schackmatt"
         far.push({ u, t: 'castlesil', w: 1.0 + rnd() * 1.6, h: 1.0 + rnd() * 1.8 });
@@ -123,9 +129,10 @@
       else if (fill === 'spruce') type = rnd() < 0.75 ? 'spruce1' : 'pine1';
       else if (fill === 'dead') type = rnd() < 0.6 ? 'dead1' : 'pine1';
       else if (fill === 'kelp') type = 'kelp1';
+      else if (fill === 'jungletree') type = 'jungletree1';
       h = 90 + rnd() * 60;
       if (type === 'spruce1') h += 40;
-      mid.push({ u: uu, t: type, hw: 1.5, d: { h } });
+      mid.push({ u: uu, t: type, hw: type === 'jungletree1' ? 2.6 : 1.5, d: { h } });
     }
     mid.sort((a, b) => a.u - b.u);
     this.mid = mid;
@@ -161,6 +168,18 @@
     // a couple of bats flapping across the Halloween dusk sky, well apart so they read as occasional
     this.bats = [];
     if (th.bats) for (let i = 0; i < 2; i++) this.bats.push({ o: i * 0.5 + rnd() * 0.2, y: 60 + rnd() * 160, s: 0.7 + rnd() * 0.4, sp: 0.02 + rnd() * 0.012 });
+    // Amazonas: poison-dart frogs hopping about in the jungle background (theme.frogs), and macaws and toucans
+    // flying across the sky (theme.parrots)
+    this.bgFrogs = [];
+    if (th.frogs) {
+      const fr = U.rng(7071);
+      for (const f of this.fields) {
+        if (f.style !== 'jungle') continue;
+        for (let uu = f.u0 + 2; uu < f.u1 - 1; uu += 5 + fr() * 6) this.bgFrogs.push({ u: uu, step: 14 + fr() * 22, per: 2.2 + fr() * 2.4, o: fr() * 6, s: 15 + fr() * 9, seed: Math.floor(fr() * 90) });
+      }
+    }
+    this.parrotFlocks = [];
+    if (th.parrots) for (let i = 0; i < 5; i++) this.parrotFlocks.push({ o: i * 0.2 + rnd() * 0.08, y: 50 + rnd() * 190, s: 24 + rnd() * 10, n: 1 + Math.floor(rnd() * 3), sp: 0.03 + rnd() * 0.02, toucan: rnd() < 0.5, seed: Math.floor(rnd() * 50) });
     // Stratusvägen: the houses/terraces/background scenery along the street, computed once here and
     // cached — see buildStreetscape() and drawHouses() below
     this.streetProps = th.lanes ? buildStreetscape(lvl) : null;
@@ -174,6 +193,7 @@
     for (let i = 0; i < 14; i++) this.clouds.push({ u: i * 9 + sr() * 5, y: 60 + sr() * 170, s: 0.6 + sr() * 0.8 });
   };
 
+  const pm = (n, m) => ((n % m) + m) % m; // modulo that stays positive for negative n (grid indices left of x = 0)
   const sx = (wx, camX) => (wx - camX) * BS;
   const sy = (wy) => GY - wy * BS;
   R.sx = sx;
@@ -240,6 +260,8 @@
     const px = G.s ? G.s.x : camX + PX; // the player's x, or the camera's in the menu's attract mode
     this._eyeSpots = this._eyeSpots || [];
     this._eyeSpots.length = 0;
+    this._glowSpots = this._glowSpots || [];
+    this._glowSpots.length = 0;
     this._lB = menu ? 0 : this.lightningPulse(px) * zoneOf(lvl, 'lightning', px, 6);
 
     // mirror: the whole world flips horizontally, animated as a "turn" through the middle (never the HUD)
@@ -305,6 +327,7 @@
     const k = zoneOf(lvl, 'dark', px, 4);
     if (k <= 0.001) {
       this._eyeSpots.length = 0;
+      this._glowSpots.length = 0;
       return;
     }
     let r = 7;
@@ -339,6 +362,22 @@
     dctx.fill();
     dctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(this._darkCv, 0, 0);
+
+    // glowing things (Amazonas' mushrooms) shine on through the darkness
+    if (this._glowSpots.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const gs of this._glowSpots) {
+        const pulse = 0.8 + 0.2 * Math.sin(t * 1.7 + gs.seed);
+        const gg = ctx.createRadialGradient(gs.x, gs.y, 2, gs.x, gs.y, gs.r);
+        gg.addColorStop(0, U.rgba(gs.color, 0.5 * pulse));
+        gg.addColorStop(1, U.rgba(gs.color, 0));
+        ctx.fillStyle = gg;
+        ctx.fillRect(gs.x - gs.r, gs.y - gs.r, gs.r * 2, gs.r * 2);
+      }
+      ctx.restore();
+    }
+    this._glowSpots.length = 0;
 
     const AH = Art.horror;
     if (AH && AH.eyes) for (const e of this._eyeSpots) AH.eyes(ctx, e.x, e.y, e.size, t, e.seed, e.color);
@@ -465,6 +504,9 @@
         } else if (inKind === 'whale') {
           this.drawWhale(ctx, camX, t);
           this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'tripptroppen') {
+          this.drawTripptroppen(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
         } else if (inKind === 'rooktower') {
           this.drawRooktower(ctx, camX, t);
           this.drawNear(ctx, camX, t, true, L);
@@ -507,6 +549,7 @@
         this.drawSpeedFX(ctx, camX, t, px);
       } else {
         this.drawObjects(ctx, camX, t, G, L);
+        if (here && G.state !== 'menu') this.drawChase(ctx, camX, t, G, L);
         this.drawTexts(ctx, camX, G, L);
         if (here && G.state !== 'menu') this.drawPlayer(ctx, camX, G, t);
       }
@@ -617,6 +660,36 @@
     ctx.fill();
     ctx.fillStyle = farDark;
     const lit = sky.dark > 0.35;
+    // all the rainforest crowns at once: one path for the dark blobs, one for the lit tops (they share a colour)
+    if (this.far.some((f) => f.t === 'crown')) {
+      const crowns = [];
+      for (const f of this.far) {
+        if (f.t !== 'crown') continue;
+        const x = (f.u - off) * BS;
+        if (x < -120 || x > W + 120) continue;
+        crowns.push(f, x, farBase - hill(f.u) + 4);
+      }
+      ctx.beginPath();
+      for (let c = 0; c < crowns.length; c += 3) {
+        const f = crowns[c], x = crowns[c + 1], base = crowns[c + 2], w = f.w * 40, h = f.h * 34;
+        for (let k = 0; k < 3; k++) {
+          const bx = x + (k - 1) * w * 0.32 + (((f.seed >> k) & 7) - 3.5), by = base - h * (0.5 + 0.25 * (k === 1)), br = w * (0.3 + (((f.seed >> (k + 3)) & 7) / 7) * 0.12);
+          ctx.moveTo(bx + br, by);
+          ctx.arc(bx, by, br, 0, TAU);
+        }
+        ctx.rect(x - w * 0.4, base - h * 0.5, w * 0.8, h * 0.5 + 4);
+      }
+      ctx.fill();
+      ctx.fillStyle = U.mixHex(sky.far, sky.bot, 0.22);
+      ctx.beginPath();
+      for (let c = 0; c < crowns.length; c += 3) {
+        const f = crowns[c], x = crowns[c + 1], base = crowns[c + 2], w = f.w * 40, h = f.h * 34;
+        ctx.moveTo(x - w * 0.1 + w * 0.2, base - h * 0.95);
+        ctx.arc(x - w * 0.1, base - h * 0.95, w * 0.2, 0, TAU);
+      }
+      ctx.fill();
+      ctx.fillStyle = farDark;
+    }
     for (const f of this.far) {
       const x = (f.u - off) * BS;
       if (x < -120 || x > W + 120) continue;
@@ -712,6 +785,37 @@
         ctx.quadraticCurveTo(x + w * 0.4, base - h, x + w * 0.55, base);
         ctx.closePath();
         ctx.fill();
+      } else if (f.t === 'crown') {
+        // (drawn in one batch before this loop)
+      } else if (f.t === 'giant') {
+        // an emergent giant: a tall trunk with a flat, wide crown high above the rest, and hanging lianas
+        const h = f.h * 52, w = f.w * 44, r = U.rng(f.seed);
+        ctx.fillRect(x - 4, base - h, 8, h + 6);
+        ctx.beginPath();
+        ctx.moveTo(x - 14, base + 4);
+        ctx.quadraticCurveTo(x - 4, base - 18, x - 3, base - 30);
+        ctx.lineTo(x + 3, base - 30);
+        ctx.quadraticCurveTo(x + 4, base - 18, x + 14, base + 4);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(x, base - h, w, w * 0.26, 0, 0, TAU);
+        ctx.ellipse(x - w * 0.55, base - h + w * 0.08, w * 0.5, w * 0.2, 0, 0, TAU);
+        ctx.ellipse(x + w * 0.5, base - h + w * 0.06, w * 0.55, w * 0.22, 0, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = farDark;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let k = 0; k < 4; k++) {
+          const lx = x - w * 0.8 + r() * w * 1.6, ln = 22 + r() * 40;
+          ctx.moveTo(lx, base - h + 4);
+          ctx.quadraticCurveTo(lx + 3, base - h + ln * 0.5, lx - 1, base - h + ln);
+        }
+        ctx.stroke();
+        ctx.fillStyle = U.mixHex(sky.far, sky.bot, 0.2);
+        ctx.beginPath();
+        ctx.ellipse(x - w * 0.2, base - h - w * 0.06, w * 0.5, w * 0.1, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = farDark;
       } else if (f.t === 'castlesil') {
         // a distant castle silhouette: a keep with battlements and two corner towers
         const w = f.w * 50, h = f.h * 46;
@@ -755,6 +859,8 @@
     if (th.flocks) this.drawFlocks(ctx, camX, t, sky);
     if (th.fish) this.drawFishSchool(ctx, camX, t, sky);
     if (th.bats) this.drawBats(ctx, camX, t, sky);
+    if (th.frogs) this.drawBgFrogs(ctx, camX, t, mb, offM);
+    if (th.parrots) this.drawParrots(ctx, camX, t);
     if (th.mist) this.drawMist(ctx, camX, t, areaWeight(this.lvl, th.mist, center, 24));
     if (th.beams) this.drawBeams(ctx, camX, t, areaWeight(this.lvl, th.beams, center, 24) * (1 - sky.dark));
     // the regional train racing along the railway towards Storvreta
@@ -918,7 +1024,15 @@
       }
       return;
     }
-    const base = { meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93', graves: '#332b22', fairground: '#5f3f2e',
+    if (style === 'amazon') {
+      this.drawAmazonField(ctx, x0, x1, mb, offM, t);
+      return;
+    }
+    if (style === 'gorge') {
+      this.drawGorgeField(ctx, x0, x1, mb, offM, t);
+      return;
+    }
+    const base = { jungle: '#1f5a28', meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93', graves: '#332b22', fairground: '#5f3f2e',
       lagoon: '#0e5a68', wrecked: '#0a4048', openwater: '#083048', trench: '#04101c', shore: '#0e6a70', checker: '#241f38' }[style] || '#7dbb4e';
     ctx.fillStyle = T(base);
     ctx.fillRect(x0, mb - 6, w, GY - mb + 10);
@@ -933,7 +1047,31 @@
         ctx.fill();
       }
     }
-    if (style === 'forest') {
+    if (style === 'jungle') {
+      // dense undergrowth: layers of giant leaves, ferns and the odd bright flower (leaves and ferns are cached sprites)
+      ctx.fillStyle = T('#174a20');
+      ctx.beginPath();
+      for (let x = gridStart(x0, offM * BS, 38); x < x1 + 38; x += 38) {
+        const i = Math.round((x + offM * BS) / 38);
+        ctx.moveTo(x + 42, mb - 2);
+        ctx.ellipse(x + 18, mb - 2, 24, 18 + pm(i * 29, 22), 0, 0, Math.PI, true);
+      }
+      ctx.fill();
+      for (let x = gridStart(x0, offM * BS, 64) - 64; x < x1 + 64; x += 64) {
+        const i = Math.round((x + offM * BS) / 64);
+        if (x < x0 - 60 || x > x1 + 4) continue;
+        const kind = pm(i, 3);
+        if (kind === 0) this.drawFieldLeaf(ctx, x + 20, mb + 4, pm(i, 3), pm(i, 2), i);
+        else if (kind === 1) this.drawFern(ctx, x + 24, mb + 4, pm(i * 7, 14) < 7 ? 32 : 40, pm(i, 4), '#2f8a34', '#3f9a3e');
+        else this.drawFieldLeaf(ctx, x + 22, mb + 4, 3, 0, i);
+        if (pm(i, 5) === 0) {
+          ctx.fillStyle = T(['#ff6a3a', '#ffd23a', '#ff5a9a'][pm(i, 3)]);
+          ctx.beginPath();
+          ctx.arc(x + 40, mb - 14 - ((i * 3) & 7), 3.4, 0, TAU);
+          ctx.fill();
+        }
+      }
+    } else if (style === 'forest') {
       // mossy forest floor with blueberry bushes
       ctx.fillStyle = T('#2f5528');
       for (let x = gridStart(x0, offM * BS, 90); x < x1; x += 90) {
@@ -1060,6 +1198,242 @@
         ctx.quadraticCurveTo(x + 138, mb - 96, x + 258, mb - 110);
       }
       ctx.stroke();
+    }
+  };
+
+  // ------------------------------------------------------------------ Amazonas: backgrounds
+  // the broad brown river with the rainforest on the far bank (field 'amazon')
+  // a fern tuft as a cached sprite (h = height in px, v = which of a few variants, hex colours untinted)
+  R.drawFern = function (ctx, x, base, h, v, c1, c2) {
+    const pad = 4, w = Math.ceil(h * 2.1) + pad * 2, hh = Math.ceil(h * 1.15) + pad * 2;
+    const cv = this.getSprite('fern' + h + c1 + v, w, hh, (c) => Art.fernTuft(c, w / 2, hh - pad, h, v * 1.9, v, Art.T(c1), Art.T(c2)));
+    ctx.drawImage(cv, x - w / 2, base - hh + pad);
+  };
+  // the giant-leaf bits of the jungle undergrowth, cached: kind 0..2 = an elephant-ear leaf in three heights, 3 = a palm fan
+  R.drawFieldLeaf = function (ctx, x, base, kind, flip, i) {
+    const w = 100, hh = 110;
+    const cv = this.getSprite('fleaf' + kind + flip, w, hh, (c) => {
+      const T2 = Art.T;
+      if (kind === 3) {
+        for (let k = -2; k <= 2; k++) Art.leaf(c, w / 2, hh - 6, 36 - Math.abs(k) * 5, -Math.PI / 2 + k * 0.42, 6, T2(['#2f7a30', '#3f9a38', '#256a2c'][(k + 2) % 3]), T2('#16401a'));
+      } else {
+        const lh = 34 + kind * 10;
+        c.strokeStyle = T2('#1f5a24');
+        c.lineWidth = 2.5;
+        c.beginPath();
+        c.moveTo(w / 2, hh - 6);
+        c.quadraticCurveTo(w / 2 + 2, hh - 6 - lh * 0.6, w / 2 + 6, hh - 6 - lh);
+        c.stroke();
+        Art.leaf(c, w / 2 + 6, hh - 6 - lh, 34, flip ? 0.4 : 2.7, 15, T2(['#2f7a30', '#3f9a38', '#256a2c'][kind]), T2('#16401a'));
+      }
+    });
+    ctx.drawImage(cv, x - w / 2, base - hh + 6);
+  };
+  R.drawAmazonField = function (ctx, x0, x1, mb, offM, t) {
+    const T = Art.T, w = x1 - x0;
+    const bankY = mb - 74;
+    // far bank: a dark green wall of rainforest along the opposite shore (two paths, one per green), palms leaning out
+    ctx.fillStyle = T('#1f4a26');
+    ctx.fillRect(x0, bankY - 6, w, 12);
+    const c0 = Math.floor((offM * BS + x0) / 26) - 2, c1 = Math.ceil((offM * BS + x1) / 26) + 1;
+    for (let c = 0; c < 2; c++) {
+      ctx.fillStyle = T(c ? '#2f7a34' : '#1f5a28');
+      ctx.beginPath();
+      for (let i = c0; i <= c1; i++) {
+        if ((pm(i, 3) === 0) !== !!c) continue;
+        const x = i * 26 - offM * BS, r = 12 + pm(i * 11, 14);
+        ctx.moveTo(x + 13 - r, bankY - 4 - pm(i * 7, 12));
+        ctx.arc(x + 13, bankY - 4 - pm(i * 7, 12), r, Math.PI, 0);
+      }
+      ctx.fill();
+    }
+    ctx.strokeStyle = T('#3a2c1c');
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    for (let i = c0; i <= c1; i++) {
+      if (pm(i, 6) !== 0) continue;
+      const x = i * 26 - offM * BS;
+      ctx.moveTo(x + 12, bankY + 2);
+      ctx.quadraticCurveTo(x + 5, bankY - 34, x + 14, bankY - 52);
+    }
+    ctx.stroke();
+    for (let i = c0; i <= c1; i++) if (pm(i, 6) === 0) this.drawPalmTop(ctx, i * 26 - offM * BS + 14, bankY - 52);
+    ctx.fillStyle = T('#c8a868');
+    ctx.fillRect(x0, bankY + 4, w, 3);
+    // the river: sky reflected near the far bank, deepening to muddy brown nearby
+    const g = ctx.createLinearGradient(0, bankY + 6, 0, GY + 4);
+    g.addColorStop(0, T('#6f9a94'));
+    g.addColorStop(0.16, T('#7a5a2c'));
+    g.addColorStop(1, T('#3a2410'));
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, bankY + 6, w, GY + 4 - bankY - 6);
+    // reflections of the far trees (one path)
+    ctx.fillStyle = 'rgba(31,74,38,0.4)';
+    ctx.beginPath();
+    for (let i = c0; i <= c1; i++) ctx.rect(i * 26 - offM * BS + 4 + Math.sin(t * 2 + i) * 2, bankY + 8, 18, 5 + pm(i * 5, 9));
+    ctx.fill();
+    // flowing streaks and bright glints: one stroke per row, rows moving downstream at different speeds
+    ctx.lineCap = 'round';
+    for (let row = 0; row < 5; row++) {
+      const yy = bankY + 18 + row * 11, sp = 6 + row * 7;
+      ctx.strokeStyle = row < 2 ? 'rgba(255,255,235,0.55)' : 'rgba(255,235,190,0.4)';
+      ctx.lineWidth = 1.5 + row * 0.35;
+      const step = 40 + row * 10;
+      ctx.beginPath();
+      for (let x = gridStart(x0, offM * BS, step) - step; x < x1 + step; x += step) {
+        const i = Math.round((x + offM * BS) / step);
+        const len = 12 + pm(i * 7 + row, 14) + row * 3;
+        const dx = ((t * sp + pm(i * 13, 30)) % 40) - 10;
+        const y = yy + Math.sin(t * 1.3 + i) * 1.2;
+        ctx.moveTo(x + dx, y);
+        ctx.lineTo(x + dx + len, y);
+      }
+      ctx.stroke();
+    }
+    // dugout canoes and the odd river steamboat far out on the water
+    for (let x = gridStart(x0, offM * BS, 520) - 520; x < x1 + 220; x += 520) {
+      const i = Math.round((x + offM * BS) / 520);
+      const cx = x + 220, cy = bankY + 30 + pm(i, 3) * 6 + Math.sin(t * 0.8 + i) * 1.2;
+      if (pm(i, 3) === 0) {
+        ctx.fillStyle = T('#e8e0d0');
+        ctx.fillRect(cx - 26, cy - 14, 40, 10);
+        ctx.fillStyle = T('#c8c0b0');
+        ctx.fillRect(cx - 16, cy - 22, 22, 8);
+        ctx.fillStyle = T('#a82a22');
+        ctx.fillRect(cx - 4, cy - 32, 6, 10);
+        ctx.fillStyle = T('#2a2a30');
+        ctx.beginPath();
+        ctx.moveTo(cx - 32, cy - 4);
+        ctx.lineTo(cx + 24, cy - 4);
+        ctx.lineTo(cx + 16, cy + 2);
+        ctx.lineTo(cx - 26, cy + 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(240,240,240,0.5)';
+        ctx.beginPath();
+        for (let k = 0; k < 3; k++) {
+          ctx.moveTo(cx + k * 8 + ((t * 8) % 8) + 3 + k, cy - 36 - k * 5);
+          ctx.arc(cx + k * 8 + ((t * 8) % 8), cy - 36 - k * 5, 3 + k, 0, TAU);
+        }
+        ctx.fill();
+      } else {
+        ctx.fillStyle = T('#2a1c10');
+        ctx.beginPath();
+        ctx.moveTo(cx - 32, cy - 2);
+        ctx.quadraticCurveTo(cx, cy + 7, cx + 34, cy - 4);
+        ctx.lineTo(cx + 26, cy - 7);
+        ctx.lineTo(cx - 26, cy - 7);
+        ctx.closePath();
+        ctx.rect(cx - 4, cy - 19, 4, 12);
+        ctx.moveTo(cx + 2, cy - 22);
+        ctx.arc(cx - 2, cy - 22, 4, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = T('#2a1c10');
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx + 6, cy - 14);
+        ctx.lineTo(cx + 20, cy - 2);
+        ctx.stroke();
+      }
+    }
+  };
+  // a palm crown as a cached sprite (the far bank has dozens of them)
+  R.drawPalmTop = function (ctx, x, y) {
+    const w = 64, h = 40;
+    const cv = this.getSprite('palmtop', w, h, (c) => {
+      for (let k = -2; k <= 2; k++) Art.leaf(c, w / 2, h - 6, 24, -Math.PI / 2 + k * 0.6, 4, Art.T('#2a6a2c'));
+    });
+    ctx.drawImage(cv, x - w / 2, y - h + 6);
+  };
+
+  // steep rocky walls of the gorge, mist between them and little waterfalls trickling down
+  R.drawGorgeField = function (ctx, x0, x1, mb, offM, t) {
+    const T = Art.T, w = x1 - x0;
+    ctx.fillStyle = T('#3a4a46');
+    ctx.fillRect(x0, mb - 6, w, GY - mb + 10);
+    for (let x = gridStart(x0, offM * BS, 120) - 120; x < x1 + 120; x += 120) {
+      const i = Math.round((x + offM * BS) / 120);
+      const h = 80 + pm(i * 53, 90), ww = 96 + pm(i * 17, 40);
+      const cx = x + 60;
+      ctx.fillStyle = T(pm(i, 2) ? '#56665e' : '#4a5a52');
+      ctx.beginPath();
+      ctx.moveTo(cx - ww / 2, mb + 4);
+      ctx.lineTo(cx - ww * 0.42, mb - h * 0.7);
+      ctx.lineTo(cx - ww * 0.16, mb - h);
+      ctx.lineTo(cx + ww * 0.12, mb - h * 0.92);
+      ctx.lineTo(cx + ww * 0.4, mb - h * 0.6);
+      ctx.lineTo(cx + ww / 2, mb + 4);
+      ctx.closePath();
+      ctx.fill();
+      // the shaded side and strata
+      ctx.fillStyle = 'rgba(10,20,20,0.25)';
+      ctx.beginPath();
+      ctx.moveTo(cx + ww * 0.1, mb + 4);
+      ctx.lineTo(cx + ww * 0.12, mb - h * 0.92);
+      ctx.lineTo(cx + ww * 0.4, mb - h * 0.6);
+      ctx.lineTo(cx + ww / 2, mb + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(10,20,20,0.22)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let k = 1; k < 4; k++) {
+        ctx.moveTo(cx - ww * 0.4, mb - (h * k) / 4.4);
+        ctx.lineTo(cx + ww * 0.4, mb - (h * k) / 4.4 - 6);
+      }
+      ctx.stroke();
+      // a green tuft of jungle on the top
+      ctx.fillStyle = T('#2a6a2c');
+      ctx.beginPath();
+      ctx.ellipse(cx - ww * 0.02, mb - h * 0.97, ww * 0.2, 8, 0, 0, TAU);
+      ctx.fill();
+      // a thin waterfall down some of the walls
+      if (pm(i, 3) === 0) {
+        const wx = cx - ww * 0.18;
+        ctx.fillStyle = 'rgba(240,252,255,0.8)';
+        ctx.fillRect(wx, mb - h * 0.92, 3, h * 0.92);
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        const off = (t * 70 + i * 40) % (h * 0.9);
+        ctx.fillRect(wx, mb - h * 0.92 + off, 3, 12);
+      }
+    }
+    // foam on the river at the foot of the walls
+    ctx.fillStyle = 'rgba(235,248,252,0.6)';
+    for (let x = gridStart(x0, offM * BS, 44); x < x1; x += 44) {
+      const i = Math.round((x + offM * BS) / 44);
+      ctx.beginPath();
+      ctx.ellipse(x + Math.sin(t * 2 + i) * 4, mb + 8, 18, 3, 0, 0, TAU);
+      ctx.fill();
+    }
+  };
+
+  // little poison-dart frogs hopping about in the jungle undergrowth
+  R.drawBgFrogs = function (ctx, camX, t, mb, offM) {
+    for (const f of this.bgFrogs) {
+      const bx = (f.u - offM) * BS;
+      if (bx < -60 || bx > W + 60) continue;
+      const c = t / f.per + f.o, n = Math.floor(c), fr = c - n;
+      const p = fr < 0.22 ? fr / 0.22 : 1;
+      const even = n % 2 === 0;
+      const move = even ? p : 1 - p;
+      const x = bx + move * f.step;
+      const hop = fr < 0.22 ? Math.sin(p * Math.PI) : 0;
+      ctx.save();
+      ctx.translate(x, mb + 2 - hop * 12);
+      if (!even) ctx.scale(-1, 1);
+      Art.dartFrogSide(ctx, 0, 0, f.s, fr < 0.22 ? p : 0, f.seed);
+      ctx.restore();
+    }
+  };
+  // macaws and toucans crossing the sky in twos and threes
+  R.drawParrots = function (ctx, camX, t) {
+    for (const f of this.parrotFlocks) {
+      const span = W + 700;
+      const x0 = (((t * f.sp + f.o) * span - camX * 3) % span + span) % span - 350;
+      for (let i = 0; i < f.n; i++) {
+        const bx = x0 - i * 54 * (f.s / 28), by = f.y + i * 16 * (pm(i, 2) ? 1 : -1) + Math.sin(t * 1.2 + f.seed + i) * 5;
+        Art.flyBird(ctx, bx, by, f.s, t + i * 0.3, f.seed + i, (f.toucan ? pm(i, 2) === 0 : pm(i, 2) === 1) ? 'toucan' : 'macaw');
+      }
     }
   };
 
@@ -1264,6 +1638,136 @@
     const pulse = Math.max(0, Math.sin(t * 1.1)) * 0.12;
     if (pulse > 0.01) {
       ctx.fillStyle = 'rgba(180,20,40,' + pulse + ')';
+      ctx.fillRect(0, 0, W, GY);
+    }
+  };
+
+  // ------------------------------------------------------------------ inside Tripp Troppen (level 7, Amazonas)
+  // an earth cave under the hill: roots hanging from the roof, glowing fungi on the walls, cobwebs and a sick green glow
+  R.drawTripptroppen = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#040c07');
+    g.addColorStop(0.6, '#0e2415');
+    g.addColorStop(1, '#183222');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    // two layers of earthen wall, the far one slower, with roots hanging from the roof between
+    for (let layer = 0; layer < 2; layer++) {
+      const off = camX * BS * (0.3 + layer * 0.25), step = 170 - layer * 30;
+      const start = -((off % step) + step) % step - step;
+      ctx.fillStyle = layer ? '#2a2216' : '#1a1710';
+      ctx.beginPath();
+      const roots = [];
+      for (let x = start; x < W + step; x += step) {
+        const i = Math.floor((x + off) / step);
+        const h = 120 + U.hash(i * 1.7 + layer * 9) * 150;
+        ctx.moveTo(x - step * 0.2, GY);
+        ctx.quadraticCurveTo(x + step * 0.1, GY - h, x + step * 0.5, GY - h * (0.9 + 0.1 * U.hash(i)));
+        ctx.quadraticCurveTo(x + step * 0.9, GY - h, x + step * 1.2, GY);
+        // soil hanging from the roof
+        const hh = 40 + U.hash(i * 2.3 + layer) * 80;
+        ctx.moveTo(x, 0);
+        ctx.quadraticCurveTo(x + step * 0.35, hh, x + step * 0.5, hh * 1.1);
+        ctx.quadraticCurveTo(x + step * 0.65, hh, x + step, 0);
+        roots.push(x, i);
+      }
+      ctx.fill();
+      // thick roots dangling out of the roof (one path for the thick ones, one for the thin)
+      ctx.strokeStyle = layer ? '#4a3420' : '#33241a';
+      ctx.lineWidth = layer ? 5 : 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let c = 0; c < roots.length; c += 2) {
+        const x = roots[c], i = roots[c + 1];
+        const rl = 90 + U.hash(i * 4.1 + layer * 3) * 170, sw = Math.sin(t * 0.7 + i + layer) * 6;
+        ctx.moveTo(x + step * 0.2, 0);
+        ctx.bezierCurveTo(x + step * 0.2 + sw, rl * 0.35, x + step * 0.28 - sw, rl * 0.7, x + step * 0.24 + sw, rl);
+      }
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let c = 0; c < roots.length; c += 2) {
+        const x = roots[c], i = roots[c + 1];
+        const rl = 90 + U.hash(i * 4.1 + layer * 3) * 170, sw = Math.sin(t * 0.7 + i + layer) * 6;
+        ctx.moveTo(x + step * 0.7, 0);
+        ctx.quadraticCurveTo(x + step * 0.68 - sw, rl * 0.5, x + step * 0.74 + sw * 0.5, rl * 0.85);
+      }
+      ctx.stroke();
+    }
+    // glowing fungi patches on the walls: a cached soft glow sprite per colour, and the caps in one path per colour
+    const FCOL = ['90,255,200', '150,255,110', '110,210,255'];
+    const glowCv = FCOL.map((col, c) => this.getSprite('fglow' + c, 52, 52, (cc) => {
+      const gl = cc.createRadialGradient(26, 26, 1, 26, 26, 26);
+      gl.addColorStop(0, 'rgba(' + col + ',0.35)');
+      gl.addColorStop(1, 'rgba(' + col + ',0)');
+      cc.fillStyle = gl;
+      cc.fillRect(0, 0, 52, 52);
+    }));
+    const fp = [];
+    for (let i = 0; i < 26; i++) {
+      const x = ((U.hash(i * 7.3) * W * 1.6 - camX * BS * 0.42) % (W * 1.6) + W * 1.6) % (W * 1.6) - W * 0.3;
+      if (x < -30 || x > W + 30) continue;
+      fp.push(i, x, 140 + U.hash(i * 3.7) * 330, 0.55 + 0.45 * Math.sin(t * 1.6 + i * 1.9));
+    }
+    for (let c = 0; c < 3; c++) {
+      ctx.fillStyle = 'rgba(' + FCOL[c] + ',0.8)';
+      ctx.beginPath();
+      for (let k = 0; k < fp.length; k += 4) {
+        if (fp[k] % 3 !== c) continue;
+        const x = fp[k + 1], y = fp[k + 2];
+        ctx.globalAlpha = 1;
+        ctx.moveTo(x + 5, y);
+        ctx.ellipse(x, y, 5, 3, 0, 0, Math.PI, true);
+        ctx.rect(x - 0.8, y, 1.6, 4);
+      }
+      ctx.fill();
+      for (let k = 0; k < fp.length; k += 4) {
+        if (fp[k] % 3 !== c) continue;
+        ctx.globalAlpha = fp[k + 3];
+        ctx.drawImage(glowCv[c], fp[k + 1] - 26, fp[k + 2] - 26);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // pairs of dim eyes far off in the cracks of the wall, blinking
+    ctx.fillStyle = 'rgba(255,225,80,0.55)';
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const x = ((U.hash(i * 11.7) * W * 1.8 - camX * BS * 0.36) % (W * 1.8) + W * 1.8) % (W * 1.8) - W * 0.4;
+      const y = 150 + U.hash(i * 5.3) * 280;
+      const bl = ((t * 0.4 + i * 1.3) % 4) > 3.8 ? 0.1 : 1;
+      ctx.moveTo(x - 3.4, y);
+      ctx.ellipse(x - 6, y, 2.6, 1.8 * bl, 0.2, 0, TAU);
+      ctx.moveTo(x + 8.6, y);
+      ctx.ellipse(x + 6, y, 2.6, 1.8 * bl, -0.2, 0, TAU);
+    }
+    ctx.fill();
+    // spores drifting up in the green light (one path)
+    ctx.fillStyle = 'rgba(170,255,190,0.28)';
+    ctx.beginPath();
+    for (let i = 0; i < 34; i++) {
+      const x = ((U.hash(i * 5.1) * W * 1.5 - camX * BS * 0.5 + t * 6) % (W * 1.5) + W * 1.5) % (W * 1.5) - W * 0.25;
+      const y = GY - ((U.hash(i * 2.9) * 460 + t * 12 + i * 20) % 470);
+      ctx.rect(x, y, 2, 2);
+    }
+    ctx.fill();
+    // an eerie green mist hugging the floor
+    ctx.fillStyle = 'rgba(110,200,140,0.1)';
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const x = ((i * 300 - camX * BS * (0.3 + i * 0.03) + t * 9) % 1500 + 1500) % 1500 - 220;
+      ctx.moveTo(x + 170, GY - 20 - (i % 3) * 22);
+      ctx.ellipse(x, GY - 20 - (i % 3) * 22, 170, 22, 0, 0, TAU);
+    }
+    ctx.fill();
+    // cobwebs in the corners of the screen
+    ctx.strokeStyle = 'rgba(225,235,225,0.28)';
+    ctx.lineWidth = 1;
+    drawCobweb(ctx, 0, 0, 1);
+    drawCobweb(ctx, W, 0, -1);
+    // a slow, sickly pulse of green light
+    const pulse = Math.max(0, Math.sin(t * 0.9)) * 0.07;
+    if (pulse > 0.01) {
+      ctx.fillStyle = 'rgba(60,200,110,' + pulse + ')';
       ctx.fillRect(0, 0, W, GY);
     }
   };
@@ -2017,6 +2521,9 @@
       const f = Art.near[d.type];
       if (f) f(ctx, sx(d.x, camX), GY, d, t, BS, FONT);
       else VD.lintMiss && VD.lintMiss('deco', d.type);
+      // Amazonas' glowing eyes and mushrooms are also lifted above the darkness mask (see drawDarkness)
+      if (d.type === 'eyes') this._eyeSpots.push({ x: sx(d.x, camX), y: GY - (d.y != null ? d.y : 1.6) * BS, size: (d.size || 1) * BS * 0.34, seed: d.x, color: Art.eyeColor(d.x * 3) });
+      else if (d.type === 'fungus') this._glowSpots.push({ x: sx(d.x, camX), y: GY - 18, r: 58, seed: d.x, color: ['#5affc8', '#9dff6a', '#6ad2ff'][Math.floor(d.x) % 3] });
     }
   };
 
@@ -2481,7 +2988,388 @@
         for (let x = gridStart(x0, camX * BS, 480); x < x1; x += 480) if (x >= x0) ctx.fillRect(x, GY, 5, Math.min(H - GY, x1 - x));
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
         ctx.fillRect(x0, GY + 50, x1 - x0, 30);
+      } else if (st === 'junglefloor') {
+        // rainforest floor: dark rich soil under leaf litter, roots creeping through it, ferns along the edge.
+        // (Many small shapes are batched into one path per colour and the ferns are cached sprites: this ground
+        // is on screen for the whole of two sections and has to be cheap on a phone.)
+        ctx.fillStyle = T('#3a2512');
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        const bi0 = Math.floor(camX + x0 / BS), bi1 = Math.ceil(camX + x1 / BS);
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.beginPath();
+        for (let i = bi0; i <= bi1; i++) {
+          if (i & 1) continue;
+          const x = (i - camX) * BS, a0 = Math.max(x0, x), a1 = Math.min(x1, x + BS);
+          if (a1 > a0) ctx.rect(a0, GY + 36, a1 - a0, BS);
+        }
+        ctx.fill();
+        // creeping roots under the surface: one dark stroke and one light stroke for all of them
+        const r0 = Math.floor((camX * BS + x0) / 130) - 1, r1 = Math.ceil((camX * BS + x1) / 130);
+        ctx.lineCap = 'round';
+        for (let pass = 0; pass < 2; pass++) {
+          ctx.strokeStyle = pass ? T('#7a5430') : T('#5a3a1e');
+          ctx.lineWidth = pass ? 2 : 6;
+          ctx.beginPath();
+          for (let i = r0; i <= r1; i++) {
+            const x = i * 130 - camX * BS + pm(i * 41, 40);
+            const y = GY + 26 + pm(i * 23, 70) + (pass ? -2 : 0);
+            if (x < x0 - 150 || x > x1 + 20) continue;
+            ctx.moveTo(x, y);
+            ctx.bezierCurveTo(x + 40, y - 14, x + 80, y + 14, x + 130, y - 4);
+          }
+          ctx.stroke();
+        }
+        // fallen leaves and seeds in the soil, one path per colour
+        const lc = ['#8a4a1e', '#b0702a', '#6a5a22', '#7a3a1a'];
+        const l0 = Math.floor((camX * BS + x0) / 22) - 1, l1 = Math.ceil((camX * BS + x1) / 22);
+        for (let c = 0; c < 4; c++) {
+          ctx.fillStyle = T(lc[c]);
+          ctx.beginPath();
+          for (let i = l0; i <= l1; i++) {
+            if (pm(i, 4) !== c) continue;
+            const x = i * 22 - camX * BS + pm(i * 11, 13);
+            if (x < x0 || x > x1) continue;
+            ctx.moveTo(x + 5, GY + 16 + pm(i * 19, 90));
+            ctx.ellipse(x, GY + 16 + pm(i * 19, 90), 5, 2.2, pm(i * 7, 10) / 6, 0, TAU);
+          }
+          ctx.fill();
+        }
+        // the mossy surface and a bright lip, with a fringe of moss lumps (one path)
+        ctx.fillStyle = T('#2d6428');
+        ctx.fillRect(x0, GY, x1 - x0, 14);
+        ctx.fillStyle = T('#5fb83a');
+        ctx.fillRect(x0, GY, x1 - x0, 4);
+        ctx.fillStyle = T('#2d6428');
+        ctx.beginPath();
+        for (let i = Math.floor((camX * BS + x0) / 12); i <= Math.ceil((camX * BS + x1) / 12); i++) {
+          const x = i * 12 - camX * BS;
+          if (x >= x0 && x + 6 <= x1) {
+            ctx.moveTo(x + 8, GY + 13);
+            ctx.ellipse(x + 3, GY + 13, 5, 3 + ((i * 7) & 3), 0, 0, Math.PI);
+          }
+        }
+        ctx.fill();
+        // ferns (cached sprites), mushrooms and a few flowers breaking through along the edge
+        for (let i = Math.floor((camX * BS + x0) / 48) - 1; i <= Math.ceil((camX * BS + x1) / 48); i++) {
+          const x = i * 48 - camX * BS + pm(i * 17, 20);
+          if (x < x0 - 20 || x > x1 + 20) continue;
+          if (pm(i, 3) !== 0) this.drawFern(ctx, x, GY + 2, pm(i, 2) ? 22 : 16, pm(i, 4), '#3f9a34', '#5ab845');
+          else if (pm(i, 6) === 0) {
+            ctx.fillStyle = T('#e8dcc0');
+            ctx.fillRect(x - 1, GY - 6, 2.5, 7);
+            ctx.fillStyle = T('#d84a2a');
+            ctx.beginPath();
+            ctx.ellipse(x, GY - 6, 5, 3.2, 0, Math.PI, 0);
+            ctx.fill();
+          } else {
+            ctx.fillStyle = T(['#ff8a3a', '#ffd23a', '#ff5a9a'][pm(i, 3)]);
+            ctx.beginPath();
+            ctx.arc(x, GY - 3, 2.6, 0, TAU);
+            ctx.fill();
+          }
+        }
+        // dappled golden light moving over the floor
+        ctx.fillStyle = 'rgba(255,225,120,0.12)';
+        ctx.beginPath();
+        for (let i = Math.floor((camX * BS * 0.5 + x0) / 210) - 1; i <= Math.ceil((camX * BS * 0.5 + x1) / 210); i++) {
+          const x = i * 210 - camX * BS * 0.5 + Math.sin(t * 0.6 + i) * 14;
+          ctx.moveTo(x + 106, GY + 6);
+          ctx.ellipse(x + 60, GY + 6, 46, 6, 0, 0, TAU);
+        }
+        ctx.fill();
+      } else if (st === 'riverbank') {
+        this.drawBankGround(ctx, camX, t, x0, x1);
+      } else if (st === 'rapids') {
+        // the stretch of the area where the river runs: white water around the rapids zones, a muddy bank before and after
+        const zs = (this.lvl.rapids || []).filter((z) => z.x1 > a.x0 && z.x0 < a.x1);
+        if (!zs.length) this.drawRapidsWater(ctx, camX, t, x0, x1);
+        else {
+          let w0 = Infinity, w1 = -Infinity;
+          for (const z of zs) {
+            w0 = Math.min(w0, z.x0 - 5);
+            w1 = Math.max(w1, z.x1 + 5);
+          }
+          const sw0 = U.clamp(sx(Math.max(a.x0, w0), camX), x0, x1), sw1 = U.clamp(sx(Math.min(a.x1, w1), camX), x0, x1);
+          this.drawBankGround(ctx, camX, t, x0, sw0);
+          this.drawBankGround(ctx, camX, t, sw1, x1);
+          this.drawRapidsWater(ctx, camX, t, sw0, sw1);
+        }
+      } else if (st === 'hillcave') {
+        // dark earth inside the hill: roots in the soil, small bones and stones, a faint green glimmer on top
+        ctx.fillStyle = T('#241810');
+        ctx.fillRect(x0, GY, x1 - x0, H - GY);
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        for (let i = Math.floor(camX + x0 / BS); i <= Math.ceil(camX + x1 / BS); i++) {
+          if (i & 1) continue;
+          const x = (i - camX) * BS, a0 = Math.max(x0, x), a1 = Math.min(x1, x + BS);
+          if (a1 > a0) ctx.fillRect(a0, GY + 36, a1 - a0, BS);
+        }
+        ctx.lineCap = 'round';
+        for (let i = Math.floor((camX * BS + x0) / 130) - 1; i <= Math.ceil((camX * BS + x1) / 130); i++) {
+          const x = i * 130 - camX * BS + pm(i * 37, 50);
+          const y = GY + 22 + pm(i * 29, 80);
+          if (x < x0 - 150 || x > x1 + 20) continue;
+          ctx.strokeStyle = T('#4a3220');
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.bezierCurveTo(x + 30, y + 14, x + 90, y - 16, x + 130, y + 6);
+          ctx.stroke();
+          ctx.strokeStyle = 'rgba(214,190,150,0.22)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        // pebbles and little bones half-buried (a rodent skull, a rib)
+        for (let i = Math.floor(camX * 1.2 + x0 / 40) - 1; i <= Math.ceil(camX * 1.2 + x1 / 40); i++) {
+          const x = i * 40 - camX * BS + pm(i * 23, 24);
+          if (x < x0 - 12 || x > x1 + 4) continue;
+          const yy = GY + 16 + pm(i * 31, 100);
+          if (pm(i, 5) === 0) {
+            ctx.fillStyle = T('#c8bda0');
+            ctx.beginPath();
+            ctx.ellipse(x, yy, 6, 4.4, 0, 0, TAU);
+            ctx.fill();
+            ctx.fillStyle = '#120c08';
+            ctx.fillRect(x - 3, yy - 1, 2, 2.4);
+            ctx.fillRect(x + 1, yy - 1, 2, 2.4);
+          } else if (pm(i, 5) === 2) {
+            ctx.strokeStyle = T('#c8bda0');
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            ctx.arc(x, yy + 6, 9, Math.PI * 1.15, Math.PI * 1.85);
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = T('#5a4a3a');
+            ctx.beginPath();
+            ctx.ellipse(x, yy, 4 + (pm(i, 3)), 3, 0.3, 0, TAU);
+            ctx.fill();
+          }
+        }
+        ctx.fillStyle = T('#3a281a');
+        ctx.fillRect(x0, GY, x1 - x0, 10);
+        ctx.fillStyle = T('#5a4028');
+        ctx.fillRect(x0, GY, x1 - x0, 3);
+        ctx.fillStyle = 'rgba(120,255,160,0.32)';
+        ctx.fillRect(x0, GY, x1 - x0, 2);
+        // thin roots and moss tufts along the lip
+        ctx.strokeStyle = T('#5a3a22');
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (let i = Math.floor(camX * 3 + x0 / 16); i <= Math.ceil(camX * 3 + x1 / 16); i++) {
+          const x = i * 16 - camX * BS;
+          if (x >= x0 && x + 6 <= x1 && (i * 5) % 3 === 0) {
+            ctx.moveTo(x, GY + 9);
+            ctx.lineTo(x + 2, GY + 15 + ((i * 7) & 3));
+          }
+        }
+        ctx.stroke();
       } else VD.lintMiss && VD.lintMiss('ground', st);
+    }
+  };
+
+  // ------------------------------------------------------------------ Amazonas: river bank and rapids ground
+  // the muddy river bank (x0..x1 in screen px): clay, pebbles and reeds along the edge
+  R.drawBankGround = function (ctx, camX, t, x0, x1) {
+    const T = Art.TL, w = x1 - x0;
+    if (w <= 0) return;
+    // dark wet clay below, drying to pale sand-coloured silt in a band under the edge
+    const g = ctx.createLinearGradient(0, GY, 0, H);
+    g.addColorStop(0, T('#a88458'));
+    g.addColorStop(0.18, T('#7a5a38'));
+    g.addColorStop(0.55, T('#4a3420'));
+    g.addColorStop(1, T('#2a1c10'));
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, GY, w, H - GY);
+    // tide-line strata: wavy darker and lighter silt layers (two strokes)
+    ctx.lineWidth = 3;
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.strokeStyle = pass ? 'rgba(20,10,0,0.25)' : 'rgba(210,180,130,0.18)';
+      ctx.beginPath();
+      for (let r = pass; r < 4; r += 2) {
+        for (let x = x0; x <= x1 + 12; x += 12) {
+          const y = GY + 30 + r * 30 + Math.sin((camX * BS + x) * 0.018 + r * 2) * 5;
+          if (x === x0) ctx.moveTo(x, y);
+          else ctx.lineTo(Math.min(x, x1), y);
+        }
+      }
+      ctx.stroke();
+    }
+    // pebbles and shells scattered in the silt, one path per kind
+    const p0 = Math.floor((camX * BS + x0) / 46) - 1, p1 = Math.ceil((camX * BS + x1) / 46);
+    for (let k = 0; k < 3; k++) {
+      ctx.fillStyle = k === 0 ? T('#c8c0aa') : k === 1 ? T('#7a7468') : T('#e8dcc0');
+      ctx.beginPath();
+      for (let i = p0; i <= p1; i++) {
+        if (pm(i, 4) !== k) continue;
+        const x = i * 46 - camX * BS + pm(i * 29, 30);
+        if (x < x0 - 10 || x > x1 + 4) continue;
+        const yy = GY + 14 + pm(i * 31, 110);
+        ctx.moveTo(x + 6, yy);
+        ctx.ellipse(x, yy, k === 2 ? 5 : 6, k === 1 ? 3 : 4, 0.3, 0, TAU);
+        if (k === 1) {
+          ctx.moveTo(x + 11, yy + 3);
+          ctx.ellipse(x + 8, yy + 3, 3, 2.2, 0, 0, TAU);
+        }
+      }
+      ctx.fill();
+    }
+    // the wet shiny edge: dark mud with a glossy sheen and small puddles
+    ctx.fillStyle = T('#5a3c22');
+    ctx.fillRect(x0, GY, w, 15);
+    ctx.fillStyle = 'rgba(255,235,200,0.22)';
+    ctx.fillRect(x0, GY + 2, w, 3);
+    const q0 = Math.floor((camX * BS + x0) / 90) - 1, q1 = Math.ceil((camX * BS + x1) / 90);
+    ctx.fillStyle = T('#4a2e18');
+    ctx.beginPath();
+    for (let i = q0; i <= q1; i++) {
+      const x = i * 90 - camX * BS + pm(i * 17, 40);
+      ctx.moveTo(x + 42, GY + 9);
+      ctx.ellipse(x + 20, GY + 9, 22, 3.6, 0, 0, TAU);
+    }
+    ctx.fill();
+    ctx.fillStyle = 'rgba(190,215,225,0.4)';
+    ctx.beginPath();
+    for (let i = q0; i <= q1; i++) ctx.rect(i * 90 - camX * BS + pm(i * 17, 40) + 8, GY + 8, 16, 1.5);
+    ctx.fill();
+    ctx.fillStyle = T('#c8a468');
+    ctx.fillRect(x0, GY, w, 3);
+    // footprints pressed into the mud
+    ctx.fillStyle = 'rgba(20,10,0,0.3)';
+    ctx.beginPath();
+    for (let i = Math.floor((camX * BS + x0) / 70) - 1; i <= Math.ceil((camX * BS + x1) / 70); i++) {
+      if (pm(i, 3)) continue;
+      const x = i * 70 - camX * BS + 12;
+      ctx.moveTo(x + 3, GY + 11);
+      ctx.ellipse(x, GY + 11, 3, 1.6, 0, 0, TAU);
+      ctx.moveTo(x + 12, GY + 9);
+      ctx.ellipse(x + 9, GY + 9, 3, 1.6, 0, 0, TAU);
+    }
+    ctx.fill();
+    // reeds and cattails along the top edge (kept low so they never hide an obstacle): two greens, one stroke each
+    const e0 = Math.floor((camX * BS + x0) / 34) - 1, e1 = Math.ceil((camX * BS + x1) / 34);
+    ctx.lineCap = 'round';
+    for (let c = 0; c < 2; c++) {
+      ctx.strokeStyle = T(c ? '#5a7a2e' : '#7a9a3e');
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      for (let i = e0; i <= e1; i++) {
+        if (pm(i, 2) !== c) continue;
+        const x = i * 34 - camX * BS + pm(i * 13, 16);
+        if (x < x0 - 8 || x > x1 + 8) continue;
+        const sw = Math.sin(t * 1.5 + i) * 1.8;
+        for (let k = -1; k <= 1; k++) {
+          const hh = 15 + pm(i * 11 + k * 5, 11);
+          ctx.moveTo(x + k * 3, GY + 3);
+          ctx.quadraticCurveTo(x + k * 5 + sw * 0.5, GY - hh * 0.6, x + k * 8 + sw, GY - hh);
+        }
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = T('#5a3a1e');
+    ctx.lineWidth = 3.4;
+    ctx.beginPath();
+    for (let i = e0; i <= e1; i++) {
+      if (pm(i, 4) !== 0) continue;
+      const x = i * 34 - camX * BS + pm(i * 13, 16), sw = Math.sin(t * 1.5 + i) * 1.8;
+      ctx.moveTo(x + 2 + sw, GY - 15);
+      ctx.lineTo(x + 2 + sw * 1.2, GY - 24);
+    }
+    ctx.stroke();
+  };
+
+  // the white water of the rapids (x0..x1 in screen px): the surface follows VD.Physics.rapidsHeight, foam and spray on top
+  R.drawRapidsWater = function (ctx, camX, t, x0, x1) {
+    const T = Art.TL, w = x1 - x0;
+    if (w <= 0) return;
+    const lvl = this.lvl, rh = VD.Physics && VD.Physics.rapidsHeight;
+    const hAt = (X) => (rh ? rh(lvl, X) : 0);
+    const step = 4;
+    const n = Math.ceil(w / step);
+    const ys = [], hs = [];
+    for (let i = 0; i <= n; i++) {
+      const sxp = Math.min(x1, x0 + i * step), X = camX + sxp / BS;
+      const h = hAt(X);
+      hs.push(h);
+      ys.push(GY - h * BS + Math.sin(X * 2.4 + t * 5) * (h > 0.05 ? 1.2 : 1.6));
+    }
+    const slopeAt = (i) => (hs[Math.min(n, i + 1)] - hs[Math.max(0, i - 1)]) / (Math.min(n, i + 1) - Math.max(0, i - 1)) / (step / BS);
+    // the deep water under the troughs (the surface dips below the ground line)
+    ctx.fillStyle = T('#164a60');
+    ctx.fillRect(x0, GY, w, H - GY);
+    // body of the water
+    const g = ctx.createLinearGradient(0, GY - BS * 1.8, 0, H);
+    g.addColorStop(0, T('#cdeff6'));
+    g.addColorStop(0.25, T('#7ec4d8'));
+    g.addColorStop(0.6, T('#3a8aa4'));
+    g.addColorStop(1, T('#164a60'));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x0, H);
+    for (let i = 0; i <= n; i++) ctx.lineTo(Math.min(x1, x0 + i * step), ys[i]);
+    ctx.lineTo(x1, H);
+    ctx.closePath();
+    ctx.fill();
+    // a foamy band just under the surface, thicker where the water is rough
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const sxp = Math.min(x1, x0 + i * step);
+      if (i === 0) ctx.moveTo(sxp, ys[i]);
+      else ctx.lineTo(sxp, ys[i]);
+    }
+    for (let i = n; i >= 0; i--) {
+      const sxp = Math.min(x1, x0 + i * step), rough = U.clamp(hs[i] * 0.9 + Math.abs(slopeAt(i)) * 0.5, 0, 1);
+      ctx.lineTo(sxp, ys[i] + 7 + rough * 14);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // flow lines streaming downstream (right), world-aligned
+    ctx.lineCap = 'round';
+    for (let i = Math.floor(camX * 0.6 + x0 / 53) - 1; i <= Math.ceil(camX * 0.6 + x1 / 53); i++) {
+      const drift = (t * 3.2 * BS) % (53 * 6);
+      const lx = i * 53 - camX * BS + pm(i * 29, 40) + drift * 0.15;
+      if (lx < x0 || lx > x1) continue;
+      const idx = U.clamp(Math.round((lx - x0) / step), 0, n);
+      const depth = 12 + pm(i * 17, 70);
+      const len = 18 + pm(i * 7, 28);
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.18 + pm(i * 5, 4) * 0.08) + ')';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(lx, ys[idx] + depth);
+      ctx.quadraticCurveTo(lx + len * 0.5, ys[idx] + depth - 3, lx + len, ys[idx] + depth + 1);
+      ctx.stroke();
+    }
+    // bright foam line along the surface itself
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const sxp = Math.min(x1, x0 + i * step);
+      if (i === 0) ctx.moveTo(sxp, ys[i]);
+      else ctx.lineTo(sxp, ys[i]);
+    }
+    ctx.stroke();
+    // foam caps and flying spray, where the water heaps up or breaks
+    for (let i = 1; i < n; i++) {
+      const rough = hs[i] * 0.9 + Math.abs(slopeAt(i)) * 0.6;
+      if (rough < 0.35) continue;
+      const sxp = x0 + i * step;
+      const crest = hs[i] >= hs[i - 1] && hs[i] >= hs[i + 1] && hs[i] > 0.15;
+      if (crest) {
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        for (let k = 0; k < 3; k++) {
+          ctx.beginPath();
+          ctx.arc(sxp + (k - 1) * 6, ys[i] - 1 + (k % 2) * 2, 5 + ((i + k) % 3) * 1.6, Math.PI, 0);
+          ctx.fill();
+        }
+      }
+      if (pm(i, 2) === 0) {
+        const ph = ((t * 1.7 + i * 0.37) % 1 + 1) % 1;
+        ctx.fillStyle = 'rgba(255,255,255,' + (0.85 * (1 - ph)) + ')';
+        ctx.beginPath();
+        ctx.arc(sxp + (ph - 0.3) * 18 * Math.sign(slopeAt(i) || 1), ys[i] - 3 - Math.sin(ph * Math.PI) * (10 + rough * 16), 1.5 + (1 - ph) * 1.5, 0, TAU);
+        ctx.fill();
+      }
     }
   };
 
@@ -2803,6 +3691,76 @@
         ctx.fillStyle = '#1c1028';
         ctx.fillRect(x0, y - 4, x1 - x0, 4);
         ctx.fillStyle = 'rgba(232,200,90,0.4)';
+        ctx.fillRect(x0, y - 2, x1 - x0, 2);
+      } else if (c.style === 'roots') {
+        // an earth roof with roots hanging down out of it (Tripp Troppen)
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#0a0705');
+        g.addColorStop(1, '#3a2616');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x0, 0, x1 - x0, y + 90);
+        ctx.clip();
+        // ragged soil edge with small stones
+        ctx.fillStyle = '#2a1a10';
+        ctx.beginPath();
+        ctx.moveTo(x0, y - 4);
+        for (let x = gridStart(x0, camX * BS, 28) - 28; x < x1 + 28; x += 28) {
+          const i = Math.round((x + camX * BS) / 28);
+          ctx.lineTo(x + 8, y + 3 + pm(i * 7, 5));
+          ctx.lineTo(x + 18, y + 8 + pm(i * 11, 7));
+          ctx.lineTo(x + 28, y + 1);
+        }
+        ctx.lineTo(x1, y - 4);
+        ctx.closePath();
+        ctx.fill();
+        // hanging roots: thick ropes (one path, then a pale highlight on top), side shoots and root hairs in their own paths
+        const cols = [];
+        for (let x = gridStart(x0, camX * BS, 46) - 46; x < x1 + 46; x += 46) cols.push(Math.round((x + camX * BS) / 46), x);
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#4a3220';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let c = 0; c < cols.length; c += 2) {
+          const i = cols[c], x = cols[c + 1], len = 14 + pm(i * 37, 52), sw = Math.sin(t * 0.9 + i * 1.3) * 3;
+          const rx = x + 14 + pm(i * 13, 18);
+          ctx.moveTo(rx, y - 4);
+          ctx.bezierCurveTo(rx + sw * 0.4, y + len * 0.4, rx - sw, y + len * 0.7, rx + sw * 0.6, y + len);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(214,190,150,0.25)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.strokeStyle = '#5a3e26';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let c = 0; c < cols.length; c += 2) {
+          const i = cols[c], x = cols[c + 1];
+          if (pm(i, 3) !== 0) continue;
+          const len = 14 + pm(i * 37, 52), sw = Math.sin(t * 0.9 + i * 1.3) * 3, rx = x + 14 + pm(i * 13, 18);
+          ctx.moveTo(rx + 1, y + len * 0.5);
+          ctx.quadraticCurveTo(rx + 10, y + len * 0.7, rx + 8 + sw, y + len * 0.95 + 8);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(160,125,85,0.55)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let c = 0; c < cols.length; c += 2) {
+          const i = cols[c], x = cols[c + 1];
+          if (pm(i, 4) !== 1) continue;
+          const sw = Math.sin(t * 0.9 + i * 1.3) * 3, rx = x + 14 + pm(i * 13, 18);
+          for (let k = 0; k < 4; k++) {
+            ctx.moveTo(rx - 8 + k * 5, y);
+            ctx.quadraticCurveTo(rx - 8 + k * 5 + sw, y + 20, rx - 10 + k * 5 + sw * 1.4, y + 28 + k * 5);
+          }
+        }
+        ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = '#1a100a';
+        ctx.fillRect(x0, y - 4, x1 - x0, 4);
+        ctx.fillStyle = 'rgba(120,255,160,0.32)';
         ctx.fillRect(x0, y - 2, x1 - x0, 2);
       } else {
         if (c.style !== 'fyris') VD.lintMiss && VD.lintMiss('corridor', c.style);
@@ -3930,6 +4888,49 @@
             const bf = AH && AH.block && AH.block[o.style];
             if (bf) bf(ctx, x, y, w, h, BS, o.id, t);
             else Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
+          } else if (o.kind === 'piranha') {
+            // Amazonas: a piranha leaps out of the water in time with the music (moveOf 'leap'); nothing while it is under
+            const mv = VD.Physics.moveOf(o, px, lvl);
+            if (mv.k >= 0) {
+              const p = mv.k, rapids = this.theme.ground[this.areaIn(L, o.x).id] === 'rapids';
+              const surf = sy(o.y + (rapids ? 0 : 0.22));
+              // it rises out of the surface and falls back into it: held a little low at both ends, and cut off at the water line
+              const low = (1 - U.smooth(Math.min(1, p / 0.16))) * 0.3 + (1 - U.smooth(Math.min(1, (1 - p) / 0.16))) * 0.3;
+              const pcx = sx(o.x + 0.5, camX), pcy = sy(o.y + 0.45 + mv.dy - low);
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(pcx - BS * 2, 0, BS * 4, surf + 1);
+              ctx.clip();
+              Art.piranha(ctx, pcx, pcy, BS * 1.0, mv.a, t, o.id, glow(o.x));
+              ctx.restore();
+              Art.splash(ctx, pcx, surf, p < 0.2 ? 1 - p / 0.2 : p > 0.8 ? (p - 0.8) / 0.2 : 0, t);
+            }
+          } else if (o.kind === 'jaguar') {
+            // Amazonas: a jaguar waiting in a bush (just a pair of eyes), leaping out when you come close (moveOf 'throw'),
+            // then crouched hissing where it lands
+            const mv = VD.Physics.moveOf(o, px, lvl);
+            const ju = BS * 0.68;
+            const jcx = sx(o.x + o.w / 2 + mv.dx, camX), jcy = sy(o.y + mv.dy) - 0.56 * ju;
+            if (mv.k < 0.012) {
+              const blink = ((t * 0.5 + o.id) % 3) > 2.85 ? 0.15 : 1;
+              ctx.save();
+              ctx.shadowColor = '#e8ff3a';
+              ctx.shadowBlur = 8;
+              ctx.fillStyle = '#e8ff3a';
+              for (const ex of [-1, 1]) {
+                ctx.beginPath();
+                ctx.ellipse(jcx - BS * 0.12 + ex * BS * 0.11, jcy + BS * 0.02, 4, 3 * blink, ex * 0.2, 0, TAU);
+                ctx.fill();
+              }
+              ctx.restore();
+            } else if (mv.k < 1) Art.jaguar(ctx, jcx, jcy, ju, 'leap', t, o.id, glow(o.x), 0, (0.5 - mv.k) * 0.8);
+            else Art.jaguar(ctx, jcx, jcy, ju, 'crouch', t, o.id, glow(o.x), 0, 0);
+          } else if (o.kind === 'frog') {
+            // Amazonas: a poison-dart frog hanging from a liana in the roof, swinging (moveOf 'bob')
+            const mv = VD.Physics.moveOf(o, px, lvl);
+            const fcx = sx(o.x + 0.5, camX), ftop = sy(o.y + o.h - 0.3 + mv.dy), roofY = sy(o.y + o.h);
+            Art.liana(ctx, fcx, roofY - 8, ftop + 0.1 * BS * 0.78, t, o.id, Art.T('#2a5a24'), 3);
+            Art.dartFrog(ctx, fcx, ftop, BS * 0.78, t, o.id, glow(o.x));
           } else if (o.kind === 'croc') Art.crocHead(ctx, x, y, w, h, o.dir, t, o.id, glow(o.x));
           else if (o.kind === 'snapper') Art.snapper(ctx, x, y, w, h, t, o.id, glow(o.x));
           else if (o.kind === 'shark') Art.sharkHead(ctx, x, y, w, h, o.dir, t, o.id, glow(o.x));
@@ -4087,6 +5088,14 @@
       const boardScale = 1 - (1 - LANE_SCALE) * laneP;
       if (VDS && VDS.skateboard) VDS.skateboard(ctx, cx, footY, boardScale, t, { on: true });
     }
+    // Amazonas' raft mode: Vippe rides a log raft on the white water, tilting with the waves
+    let raftTilt = 0;
+    if (s.mode === 'raft') {
+      const rh = VD.Physics.rapidsHeight;
+      if (s.grounded && rh) raftTilt = Math.atan2(-(rh(this.lvl, s.x + 1.3) - rh(this.lvl, s.x - 0.3)) * BS, 1.6 * BS);
+      else raftTilt = U.clamp(-s.vy * 0.025, -0.3, 0.3);
+      Art.raft(ctx, cx, sy(s.y), BS * 1.55, s.grounded ? raftTilt : raftTilt * 0.4, t);
+    }
     ctx.save();
     ctx.translate(cx, cy);
     if (laneP) {
@@ -4094,8 +5103,8 @@
       ctx.scale(sc, sc);
     }
     const expr = G.state === 'won' || G.state === 'winning' ? 'happy' : v.oT > 0 ? 'o' : 'grin';
-    if (s.mode === 'cube' || s.mode === 'lane') {
-      ctx.rotate(v.rot);
+    if (s.mode === 'cube' || s.mode === 'lane' || s.mode === 'raft') {
+      ctx.rotate(s.mode === 'raft' ? raftTilt * 0.8 : v.rot);
       if (s.gdir > 0) ctx.scale(1, -1); // a gravity portal flipped him: run on the ceiling
       Art.cube(ctx, BS, expr, G.skin, 1);
     } else if (s.mode === 'ship') {
@@ -4105,6 +5114,60 @@
       Art.ball(ctx, BS, expr, G.skin, v.rot, s.gdir > 0);
     }
     ctx.restore();
+  };
+
+  // Amazonas: the jaguar that hunts you down the last stretch, ~5 blocks behind the player (graphics only, no physics).
+  // It runs on the ground and hops up onto or over whatever low is in its way.
+  R.drawChase = function (ctx, camX, t, G, L) {
+    const zs = this.lvl.chases;
+    const s = G.s;
+    if (!zs || !zs.length || !s || (s.layer || 0) !== L) return;
+    let z = null;
+    for (const c of zs) if (s.x >= c.x0 && s.x <= c.x1) { z = c; break; }
+    const dt = U.clamp(t - (this._chaseT || t), 0, 0.1);
+    this._chaseT = t;
+    if (!z) {
+      this._chaseY = 0;
+      return;
+    }
+    const slide = U.smooth(U.clamp((s.x - z.x0) / 2, 0, 1));
+    const jx = s.x - 5 - (1 - slide) * 7;
+    // the highest low thing under the jaguar right now, and just ahead of it
+    let top = 0;
+    for (const o of this.lvl.visible(jx - 1, jx + 3)) {
+      if ((o.layer || 0) !== L) continue;
+      if (o.t === 'solid') {
+        if (o.x < jx + 1.6 && o.x + o.w > jx - 0.6 && o.y < 1.2) top = Math.max(top, o.y + o.h);
+      } else if (o.t === 'haz' && o.hx0 != null && o.kind !== 'water' && o.kind !== 'rail' && o.kind !== 'bump' && !o.mv) {
+        if (o.hx0 < jx + 1.6 && o.hx1 > jx - 0.6 && o.hy0 < 1.2) top = Math.max(top, o.hy1 + 0.25);
+      }
+    }
+    let cy0 = this._chaseY || 0;
+    if (top > cy0) cy0 = Math.min(top, cy0 + dt * 14);
+    else cy0 = Math.max(top, cy0 - dt * 10);
+    this._chaseY = cy0;
+    const air = cy0 > top + 0.05 || cy0 < top - 0.05;
+    const u = BS * 0.95;
+    const jcx = sx(jx + 0.6, camX), gy = sy(cy0);
+    // a shadow and a trail of dust and leaves
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(jcx, sy(top) + 3, u * 0.9, 5, 0, 0, TAU);
+    ctx.fill();
+    for (let i = 0; i < 5; i++) {
+      const ph = ((t * 3 + i * 0.21) % 1);
+      ctx.fillStyle = 'rgba(176,140,90,' + (0.4 * (1 - ph)) + ')';
+      ctx.beginPath();
+      ctx.arc(jcx + u * 1.3 + ph * 50, sy(top) - 4 - ph * 16 - (i % 2) * 5, 3 + ph * 7, 0, TAU);
+      ctx.fill();
+    }
+    if (air) Art.jaguar(ctx, jcx, gy - 0.56 * u, u, 'leap', t, 101, null, 0, 0.35 - Math.min(1, (cy0 - top + 1) * 0.5) * 0.5);
+    else {
+      // the running gait is the same few frames over and over: cached sprites
+      const fr = Math.floor(((((t * 17) / TAU) % 1) + 1) % 1 * 12) % 12, sw = Math.ceil(u * 4), sh = Math.ceil(u * 2.2);
+      const cv = this.getSprite('chasejag' + fr, sw, sh, (c) => Art.jaguar(c, u * 1.7, u * 1.5, u, 'run', 0, 101, null, ((fr + 0.5) / 12) * TAU, 0));
+      ctx.drawImage(cv, jcx - u * 1.7, gy - 0.56 * u - u * 1.5);
+    }
   };
 
   R.drawParticles = function (ctx, camX, G, L = 0) {
@@ -4375,9 +5438,11 @@
     const env = scareEnvelope(tt);
     if (env.alpha <= 0.002) return;
     const backA = Math.min(0.6, env.alpha), faceA = Math.min(0.9, env.alpha);
+    // the jungle scares glow green and amber instead of red
+    const tint = sc.kind === 'spider' ? '20,70,30' : sc.kind === 'jaguar' ? '150,90,10' : '120,4,10';
     const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.75);
-    bg.addColorStop(0, 'rgba(120,4,10,' + backA.toFixed(3) + ')');
-    bg.addColorStop(1, 'rgba(120,4,10,0)');
+    bg.addColorStop(0, 'rgba(' + tint + ',' + backA.toFixed(3) + ')');
+    bg.addColorStop(1, 'rgba(' + tint + ',0)');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
@@ -4387,13 +5452,15 @@
       ctx.globalAlpha = faceA;
       ctx.translate(x, cy);
       ctx.scale(env.scale, env.scale);
-      fn(ctx, 0, 0, size, clock, faceA);
+      fn(ctx, 0, 0, size, clock, faceA, tt);
       ctx.restore();
     };
 
     if (sc.kind === 'nun' || sc.kind === 'final') face(AH && AH.face && AH.face.nun, cx);
     else if (sc.kind === 'clown') face(AH && AH.face && AH.face.clown, cx);
     else if (sc.kind === 'skull') face(AH && AH.face && AH.face.skull, cx);
+    else if (sc.kind === 'spider') face(AH && AH.face && AH.face.spider, cx);
+    else if (sc.kind === 'jaguar') face(AH && AH.face && AH.face.jaguar, cx);
     else if (sc.kind === 'duo') {
       face(AH && AH.face && AH.face.nun, cx - size * 0.32);
       face(AH && AH.face && AH.face.clown, cx + size * 0.32);

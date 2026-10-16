@@ -28,6 +28,10 @@
       this.scares = [];
       // level 4 "Schackmatt": the king boss span, null unless the level calls king()
       this.boss = null;
+      // level 7 "Amazonas": raft water zones (kept here as rapidZones because the method is called rapids();
+      // Level exposes them as lvl.rapids) and the jaguar chase zones (graphics only)
+      this.rapidZones = [];
+      this.chases = [];
     }
     add(o) {
       o.id = this.nextId++;
@@ -242,6 +246,49 @@
     balloon(x, y, { bob = 0.6, beats = 4, phase = 0 } = {}) {
       return this.add({ t: 'haz', kind: 'balloon', x, y, w: 1, h: 1.6, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.55, hy1: y + 1.5, dmg: 12, mv: { type: 'bob', amp: bob, beats, phase } });
     }
+    // ---- level 7 "Amazonas": the rainforest river, the rapids (raft mode), piranhas and jaguars ----
+    // a stretch of white-water: inside [x0, x1] the water surface is a travelling sine wave of height amp and
+    // wavelength len blocks (plus `base`), fading in/out over the first/last 4 blocks — see physics.js rapidsAt()
+    // and VD.Physics.rapidsHeight(lvl, x). The 'raft' player mode rides that surface. Keep x1 - x0 a multiple of
+    // len and base 0 and the surface stays continuous with the flat river on both sides.
+    rapids(x0, x1, { amp = 1.2, len = 16, base = 0.4 } = {}) {
+      this.rapidZones.push({ x0, x1, amp, len, base });
+    }
+    // a piranha leaping straight up out of the water at y (mv.type 'leap' in physics.js moveOf): it flies a
+    // parabola of height `rise` during the first `air` of every `beats` beats and hides under the surface the
+    // rest of the time (nothing to hit while hidden)
+    piranha(x, { y = 0, beats = 2, phase = 0, rise = 2.6, air = 0.5 } = {}) {
+      return this.add({
+        t: 'haz', kind: 'piranha', x, y, w: 1, h: 1,
+        hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.2, hy1: y + 0.7, dmg: 10,
+        mv: { type: 'leap', beats, phase, rise, air },
+      });
+    }
+    // a jaguar that leaps out of a bush at from = [hx, hy] and lands at (x, y) in front of you, then crouches
+    // there snarling. Same 'throw' motion and the same safety rule as lob()/pawn(): the leap is over well
+    // before you are within 4 blocks of the landing spot. Also puts a 'bush' deco at the bush.
+    jaguar(x, y = 0, { from, trigger = 14, fall = 8, arc = 2.5 } = {}) {
+      if (trigger - fall < 4) throw new Error('jaguar(): trigger - fall must be >= 4');
+      const [hx, hy] = from;
+      this.deco('bush', hx);
+      return this.add({
+        t: 'haz', kind: 'jaguar', x, y, w: 2, h: 1.1,
+        hx0: x + 0.25, hx1: x + 1.75, hy0: y, hy1: y + 0.85, dmg: 12,
+        mv: { type: 'throw', trigger, fall, arc, hx, hy },
+      });
+    }
+    // the jaguar that chases you: drawn ~5 blocks behind the player while x is inside [x0, x1] (no physics)
+    chase(x0, x1) {
+      this.chases.push({ x0, x1 });
+    }
+    // a poison-dart frog hanging from the ceiling at `top` on a short vine, swaying up and down
+    frogDown(x, top, { bob = 0.25, beats = 4, phase = 0 } = {}) {
+      return this.add({
+        t: 'haz', kind: 'frog', x, y: top - 1.2, w: 1, h: 1.2,
+        hx0: x + 0.2, hx1: x + 0.8, hy0: top - 1.05, hy1: top - 0.3, dmg: 10,
+        mv: { type: 'bob', amp: bob, beats, phase },
+      });
+    }
     // ---- level 6: screen effects and jump scares ----
     dark(x0, x1, { r = 7 } = {}) {
       this.fx.dark.push({ x0, x1, r });
@@ -312,6 +359,9 @@
       // always arrays, empty by default on every other level
       this.swings = b.swings || [];
       this.boards = b.boards || [];
+      // Amazonas: raft water zones (VD.Physics.rapidsHeight) and jaguar chase zones — always arrays, empty elsewhere
+      this.rapids = (b.rapidZones || []).slice().sort((a, c) => a.x0 - c.x0);
+      this.chases = (b.chases || []).slice().sort((a, c) => a.x0 - c.x0);
       this.houses = b.houses || [];
       this.people = b.people || [];
       for (const list of [this.objs, this.checkpoints, this.decos, this.texts]) for (const o of list) if (o.layer == null) o.layer = this.layerAt(o.x);
@@ -2417,6 +2467,309 @@
   }
 
   // ======================================================================
+  // LEVEL 7 — Amazonas. Harder than Djupet, easier than the nightmare. The new tricks: a RAFT section
+  // (physics.js 'raft' mode: the rapids' waves lift the raft and throw it into the air, and a jump off a
+  // rising wave goes much higher than one off a falling wave), piranhas that leap out of the water on the
+  // beat, jaguars that spring out of bushes, and the terrifying Tripp Troppen hill (dark, spiders, poison
+  // frogs, a flight through its depths) before the final jaguar chase to the sunset on the Amazon.
+  // Rainforest -> river with lily pads -> rapids by raft -> the hill -> its depths by ship -> the chase.
+  // ======================================================================
+  function buildAmazonas() {
+    const b = new Builder();
+
+    // ============ AREAS (each starts on a bar of the music) ============
+    b.area('jungle', -60, 'REGNSKOGEN', 'Into the rainforest');
+    b.area('river', 208, 'FLODEN', 'Watch out for piranhas!');
+    b.area('rapids', 400, 'FORSEN', 'Ride the rapids — the waves throw you!');
+    b.area('hill', 624, 'TRIPP TROPPEN', 'Nobody comes out of Tripp Troppen…');
+    b.area('hilldeep', 768, 'TRIPP TROPPENS DJUP', 'Hold to fly — deeper into the dark');
+    b.area('chase', 944, 'JAGUARJAKTEN', 'RUN! The jaguar is after you!');
+
+    // ---- the rapids' water zones come first: rock/piranha heights below are read off the real surface ----
+    // swells (long, gentle: the raft just rides them), then the real waves (8 blocks = 2 beats long, 1.8 high:
+    // the crest throws the raft), then a last roaring stretch above the waterfall. base 0 and a whole number
+    // of wavelengths keep the surface continuous with the flat river on both sides.
+    b.rapids(424, 488, { amp: 1.0, len: 16, base: 0 });
+    b.rapids(496, 560, { amp: 1.8, len: 8, base: 0 });
+    b.rapids(568, 600, { amp: 2.0, len: 8, base: 0 });
+    const surf = (x) => VD.Physics.rapidsHeight({ rapids: b.rapidZones }, x);
+    // a sharp rock standing in the water: sunk below the surface so its foot never floats on a slope
+    const rock = (x, w = 1, h = 1.7) => b.thorny(x, +(surf(x + w / 2) - 0.6).toFixed(2) || 0.01, w, h, 'rapidrock');
+    // a piranha leaping out of the rapids at x
+    const fish = (x, o = {}) => b.piranha(x, Object.assign({ y: +surf(x + 0.5).toFixed(2) }, o));
+
+    // ============ REGNSKOGEN (0 – 208) ============
+    b.checkpoint(0);
+    b.text(12, 4.6, 'Level # · Amazonas', 0.55);
+    b.text(12, 3.9, 'Thorns, roots and mud!', 0.4);
+    b.spike(26, 0, 'thorn');
+    b.thorny(36, 0, 1, 1, 'thornbush');
+    b.block(44, 0, 3, 1, 'log');
+    b.spikes(50, 2, 0, 'thorn');
+    b.block(58, 0, 3, 1, 'root');
+    b.block(61, 0, 3, 2, 'root');
+    b.spike(68, 0, 'thorn');
+    b.water(74, 2, 'mud');
+    b.thorny(82, 0, 1, 1, 'thornbush');
+    b.spikes(90, 2, 0, 'thorn');
+    // the first jaguar: it springs out of the bush ahead and lands in front of you
+    b.text(100, 4.6, 'A jaguar!', 0.45);
+    b.jaguar(112, 0, { from: [115, 0.4] });
+    b.block(124, 0, 3, 1, 'log');
+    b.spike(128, 0, 'thorn');
+    b.water(136, 2, 'mud');
+    b.thorny(142, 0, 1, 1, 'thornbush');
+    b.thorny(146, 0, 1, 1, 'thornbush');
+    b.block(154, 0, 2, 1, 'root');
+    b.spikes(158, 2, 0, 'thorn');
+    b.block(166, 0, 3, 1, 'log');
+    b.block(169, 0, 3, 2, 'root');
+    b.water(176, 2, 'mud');
+    b.thorny(184, 0, 1, 1, 'thornbush');
+    b.jaguar(196, 0, { from: [199, 0.4] });
+    b.water(204, 2.5, 'mud');
+
+    // ============ FLODEN (208 – 400) ============
+    b.checkpoint(208);
+    b.spike(216, 0, 'thorn');
+    b.water(224, 2, 'river');
+    b.piranha(224.5, { beats: 2, phase: 0.92 });
+    b.spikes(232, 2, 0, 'thorn');
+    // stepping stones and lily pads across a wide channel
+    b.water(240, 12, 'river');
+    b.block(241, 0, 2, 1, 'riverstone');
+    b.block(246, 0, 2, 0.3, 'lilypad');
+    b.block(251, 0, 2, 1, 'riverstone');
+    b.piranha(245.5, { beats: 2, phase: 0.62 });
+    b.spike(258, 0, 'thorn');
+    b.water(264, 2, 'river');
+    b.piranha(264.5, { beats: 2, phase: 0.46 });
+    b.thorny(272, 0, 1, 1, 'thornbush');
+    b.water(280, 8, 'river');
+    b.block(281, 0, 2, 0.3, 'lilypad');
+    b.block(285, 0, 2, 0.3, 'lilypad');
+    b.piranha(284, { beats: 2, phase: 0.49 });
+    b.spikes(292, 2, 0, 'thorn');
+    b.block(300, 0, 3, 1, 'log');
+    b.water(308, 2, 'river');
+    b.piranha(308.5, { beats: 2, phase: 0.4 });
+    b.spike(314, 0, 'thorn');
+    b.water(320, 10, 'river');
+    b.block(321, 0, 2, 1, 'riverstone');
+    b.block(325, 0, 2, 0.3, 'lilypad');
+    b.block(328, 0, 2, 1, 'riverstone');
+    b.piranha(325.5, { beats: 2, phase: 0.6 });
+    b.jaguar(340, 0, { from: [343, 0.4] });
+    b.spikes(352, 2, 0, 'thorn');
+    b.water(360, 2, 'river');
+    b.piranha(360.5, { beats: 2, phase: 0.92 });
+    b.block(368, 0, 2, 1, 'log');
+    b.water(374, 4, 'river');
+    b.block(375, 0, 2, 0.3, 'lilypad');
+    b.piranha(376, { beats: 2, phase: 0.26 });
+    b.spike(388, 0, 'thorn');
+
+    // ============ FORSEN (400 – 624) — by raft ============
+    b.checkpoint(400);
+    b.text(404, 4.6, 'Ride the rapids!', 0.45);
+    b.spike(408, 0, 'thorn');
+    b.portal(414, 'raft');
+    b.text(426, 5.4, 'The waves throw the raft — jump off the rising ones!', 0.4);
+    // swells
+    fish(434, { phase: 0.3 });
+    rock(446, 1);
+    rock(452, 1);
+    fish(458, { phase: 0.7 });
+    rock(468, 1);
+    rock(474, 1);
+    fish(480, { phase: 0.5 });
+    fish(491, { phase: 0.2 });
+    // the roaring part
+    rock(511.1, 1);
+    fish(520, { phase: 0.0 });
+    rock(530, 1);
+    fish(540, { phase: 0.5 });
+    rock(555, 1);
+    fish(564, { phase: 0.5 });
+    rock(524, 1);
+    rock(546, 1);
+    rock(541, 3, 2.4);
+    b.block(540, 3.6, 5, 1, 'log');
+    rock(578, 1);
+    fish(586);
+    rock(594, 1);
+    b.portal(612, 'cube', { y: 1 });
+    b.spike(618, 0, 'thorn');
+
+    // ============ TRIPP TROPPEN (624 – 768), dark ============
+    b.checkpoint(624);
+    b.dark(624, 944, { r: 7 });
+    b.corridor(624, 770, 4.6, 'roots');
+    b.text(630, 3.8, 'Nobody comes out of Tripp Troppen…', 0.4);
+    b.spike(640, 0, 'stalagmite');
+    b.frogDown(650, 4.6, { bob: 0.6, beats: 4, phase: 0.2 });
+    b.spikes(656, 2, 0, 'stalagmite');
+    b.block(668, 0, 2, 1, 'earth');
+    b.bird(678.4, 2.0, 'bat');
+    b.spike(680, 0, 'stalagmite');
+    b.scare(700, 'spider');
+    b.frogDown(704, 4.6, { bob: 0.6, beats: 4, phase: 0.5 });
+    b.spikes(708, 2, 0, 'stalagmite');
+    b.block(718, 0, 3, 1, 'earth');
+    b.block(721, 0, 3, 2, 'earth');
+    b.spikeDown(730, 3.2, 'stalactite');
+    b.spike(731, 0, 'stalagmite');
+    b.spikes(740, 2, 0, 'stalagmite');
+    b.frogDown(741, 4.2, { bob: 0.3, beats: 4, phase: 0.8 });
+    b.spike(752, 0, 'stalagmite');
+
+    // ============ TRIPP TROPPENS DJUP — ship (768 – 944) ============
+    b.checkpoint(768, 'ship', 3.65, 8);
+    b.portal(770, 'ship', { ceil: 8 });
+    b.corridor(770, 934, 8, 'roots');
+    b.text(776, 4.2, 'HOLD to fly — deeper into the dark', 0.4);
+    b.block(790, 0, 2, 1.1, 'earth');
+    b.block(790, 4.9, 2, 3.1, 'earth');
+    b.block(798, 0, 2, 3.1, 'earth');
+    b.block(798, 6.9, 2, 1.1, 'earth');
+    b.spike(798.5, 3.1, 'stalagmite');
+    b.block(806, 0, 2, 1.7, 'earth');
+    b.block(806, 5.5, 2, 2.5, 'earth');
+    b.frogDown(806, 5.5, { bob: 0.3, beats: 4, phase: 0.0 });
+    b.block(814, 0, 2, 0.5, 'earth');
+    b.block(814, 4.3, 2, 3.7, 'earth');
+    b.block(822, 0, 2, 2.3, 'earth');
+    b.block(822, 6.1, 2, 1.9, 'earth');
+    b.spikeDown(822.5, 6.1, 'stalactite');
+    b.block(830, 0, 2, 3.3, 'earth');
+    b.block(830, 7.1, 2, 0.9, 'earth');
+    b.frogDown(830, 7.1, { bob: 0.3, beats: 4, phase: 0.5 });
+    b.block(838, 0, 2, 1.3, 'earth');
+    b.block(838, 5.1, 2, 2.9, 'earth');
+    b.spike(838.5, 1.3, 'stalagmite');
+    b.block(846, 0, 2, 2.9, 'earth');
+    b.block(846, 6.7, 2, 1.3, 'earth');
+    b.frogDown(846, 6.7, { bob: 0.3, beats: 4, phase: 0.25 });
+    b.block(854, 0, 2, 1.2, 'earth');
+    b.block(854, 4.8, 2, 3.2, 'earth');
+    b.spikeDown(854.5, 4.8, 'stalactite');
+    b.block(862, 0, 2, 3.2, 'earth');
+    b.block(862, 6.8, 2, 1.2, 'earth');
+    b.frogDown(862, 6.8, { bob: 0.3, beats: 4, phase: 0.75 });
+    b.block(870, 0, 2, 1.6, 'earth');
+    b.block(870, 5.2, 2, 2.8, 'earth');
+    b.spike(870.5, 1.6, 'stalagmite');
+    b.block(877, 0, 2, 0.8, 'earth');
+    b.block(877, 4.4, 2, 3.6, 'earth');
+    b.block(884, 0, 2, 2.6, 'earth');
+    b.block(884, 6.2, 2, 1.8, 'earth');
+    b.frogDown(884, 6.2, { bob: 0.3, beats: 4, phase: 0.0 });
+    b.block(892, 0, 2, 3.6, 'earth');
+    b.block(892, 7.2, 2, 0.8, 'earth');
+    b.spikeDown(892.5, 7.2, 'stalactite');
+    b.block(899, 0, 2, 1.6, 'earth');
+    b.block(899, 5.2, 2, 2.8, 'earth');
+    b.frogDown(899, 5.2, { bob: 0.3, beats: 4, phase: 0.5 });
+    b.block(906, 0, 2, 2.8, 'earth');
+    b.block(906, 6.4, 2, 1.6, 'earth');
+    b.spike(906.5, 2.8, 'stalagmite');
+    b.block(914, 0, 2, 1.1, 'earth');
+    b.block(914, 4.9, 2, 3.1, 'earth');
+    b.frogDown(914, 4.9, { bob: 0.3, beats: 4, phase: 0.25 });
+    b.block(922, 0, 2, 2.5, 'earth');
+    b.block(922, 6.3, 2, 1.7, 'earth');
+    b.spikeDown(922.5, 6.3, 'stalactite');
+    b.scare(860, 'jaguar');
+    b.portal(932, 'cube', { y: 2 });
+
+    // ============ JAGUARJAKTEN (944 – finish) — no checkpoint after this ============
+    b.checkpoint(944);
+    b.chase(946, 1240);
+    b.text(954, 4.6, 'RUN!', 0.55);
+    b.spike(968, 0, 'thorn');
+    b.block(976, 0, 3, 1, 'log');
+    b.spike(981, 0, 'thorn');
+    b.jaguar(992, 0, { from: [995, 0.4] });
+    b.thorny(1004, 0, 1, 1, 'thornbush');
+    b.spikes(1012, 2, 0, 'thorn');
+    b.block(1022, 0, 3, 1, 'root');
+    b.block(1025, 0, 3, 2, 'root');
+    b.water(1034, 2, 'mud');
+    b.jaguar(1046, 0, { from: [1049, 0.4] });
+    b.spikes(1060, 2, 0, 'thorn');
+    b.block(1068, 0, 3, 1, 'log');
+    b.spike(1072, 0, 'thorn');
+    b.thorny(1080, 0, 2, 1.2, 'thornbush');
+    b.jaguar(1092, 0, { from: [1095, 0.4] });
+    b.spikes(1104, 3, 0, 'thorn');
+    b.block(1116, 0, 2, 1, 'root');
+    b.water(1124, 2, 'mud');
+    b.block(1130, 0, 3, 1, 'log');
+    b.spikes(1135, 2, 0, 'thorn');
+    b.jaguar(1144, 0, { from: [1147, 0.4] });
+    b.thorny(1156, 0, 1, 1, 'thornbush');
+    b.spikes(1164, 2, 0, 'thorn');
+    b.block(1174, 0, 3, 1, 'log');
+    b.block(1177, 0, 3, 2, 'root');
+    b.jaguar(1192, 0, { from: [1195, 0.4] });
+    b.spikes(1204, 2, 0, 'thorn');
+    b.thorny(1214, 0, 1, 1, 'thornbush');
+    b.spike(1222, 0, 'thorn');
+    b.water(1228, 2.75, 'mud');
+    b.finish(1240);
+
+    // ============ NEAR SCENERY ============
+    b.deco('trailsign', 4, { text: 'Amazonas' });
+    b.deco('toucan', 18, { y: 4.2 });
+    b.deco('macaw', 52, { y: 4.6 });
+    b.deco('monkey', 78, { y: 3.4 });
+    b.deco('sloth', 104, { y: 3.8 });
+    b.deco('toucan', 132, { y: 4.4 });
+    b.deco('anaconda', 160, { y: 3.2 });
+    b.deco('macaw', 186, { y: 4.4 });
+    b.deco('trailsign', 210, { text: 'Floden' });
+    b.deco('capybara', 218);
+    b.deco('toucan', 246, { y: 4.2 });
+    b.deco('capybara', 268);
+    b.deco('macaw', 296, { y: 4.6 });
+    b.deco('monkey', 330, { y: 3.4 });
+    b.deco('capybara', 352);
+    b.deco('sloth', 384, { y: 3.8 });
+    b.deco('trailsign', 402, { text: 'Forsen' });
+    b.deco('toucan', 436, { y: 4.4 });
+    b.deco('macaw', 520, { y: 4.6 });
+    b.deco('eyes', 640, { inside: true, y: 2.6 });
+    b.deco('fungus', 648, { inside: true });
+    b.deco('cobweb', 660, { inside: true, y: 3.6 });
+    b.deco('eyes', 684, { inside: true, y: 1.6 });
+    b.deco('fungus', 700, { inside: true });
+    b.deco('cobweb', 716, { inside: true, y: 3.8 });
+    b.deco('eyes', 740, { inside: true, y: 2.8 });
+    b.deco('fungus', 756, { inside: true });
+    b.deco('fungus', 788, { inside: true });
+    b.deco('eyes', 812, { inside: true, y: 4.2 });
+    b.deco('cobweb', 836, { inside: true, y: 6 });
+    b.deco('fungus', 866, { inside: true });
+    b.deco('eyes', 888, { inside: true, y: 5 });
+    b.deco('cobweb', 912, { inside: true, y: 6.4 });
+    b.deco('trailsign', 948, { text: 'Jaguarjakten' });
+    b.deco('macaw', 980, { y: 4.6 });
+    b.deco('toucan', 1030, { y: 4.2 });
+    b.deco('monkey', 1070, { y: 3.4 });
+    b.deco('macaw', 1110, { y: 4.4 });
+    b.deco('sloth', 1150, { y: 3.8 });
+    b.deco('toucan', 1186, { y: 4.4 });
+    b.deco('finish', 1240);
+
+    // ============ MID-LAYER LANDMARKS ============
+    b.landmark('waterfall', 598);
+    b.landmark('tripptroppen', 616, { side: 'entrance' });
+    b.landmark('tripptroppen', 944, { side: 'exit' });
+
+    return b;
+  }
+
+  // ======================================================================
   // THEMES — everything the renderer and the music need to know per level
   // ======================================================================
   const HOME_THEME = {
@@ -2563,6 +2916,32 @@
     song: 'nightmare',
   };
 
+  const AMAZONAS_THEME = {
+    // green-gold daylight under the canopy -> brighter over the river -> misty gorge -> (dark inside the hill) -> orange sunset
+    sky: [
+      { x: -100, top: '#2f7a4a', bot: '#cfe8a0', far: '#2a5a34', dark: 0.08, sun: 0.3 },
+      { x: 200, top: '#3f8fb0', bot: '#e8f0b8', far: '#3a6a44', dark: 0.04, sun: 0.38 },
+      { x: 400, top: '#5a8a9a', bot: '#d8e8e0', far: '#46665a', dark: 0.12, sun: 0.45 },
+      { x: 600, top: '#6a9aa0', bot: '#e8ecd0', far: '#4a6a5c', dark: 0.1, sun: 0.5 }, // still bright above the waterfall
+      { x: 622, top: '#0c1a12', bot: '#1c3020', far: '#0a140c', dark: 0.7, sun: 0.6 },
+      { x: 940, top: '#7a4a8a', bot: '#ffb070', far: '#3a2a30', dark: 0.12, sun: 0.82 },
+      { x: 1300, top: '#5a3070', bot: '#ff8a50', far: '#2e1e2a', dark: 0.2, sun: 0.95 },
+    ],
+    field: { jungle: 'jungle', river: 'amazon', rapids: 'gorge', chase: 'jungle', default: 'jungle' },
+    ground: { jungle: 'junglefloor', river: 'riverbank', rapids: 'rapids', hill: 'hillcave', hilldeep: 'hillcave', chase: 'junglefloor' },
+    glow: { jungle: '#d9ffb0', river: '#ffe9a8', rapids: '#e6fbff', hill: '#9dffb0', hilldeep: '#9dffb0', chase: '#ffc27a' },
+    far: { default: 'rainforest' },
+    farExtra: [],
+    midFill: { hill: null, hilldeep: null, rapids: null, default: 'jungletree' },
+    midStep: [3, 5],
+    indoor: { hill: 'tripptroppen', hilldeep: 'tripptroppen' },
+    beams: ['jungle'], // sunbeams through the canopy
+    mist: ['rapids'], // spray over the rapids
+    frogs: true, // harmless poison-dart frogs hopping in the background (render.js)
+    parrots: true, // macaws and toucans flying across instead of bird flocks (render.js)
+    song: 'amazonas',
+  };
+
   const STRATUS_THEME = {
     // a Halloween dusk on a quiet suburban horseshoe street: warm porch-light orange sinking into deep
     // purple night by the time Vippe reaches nr 1
@@ -2650,7 +3029,14 @@
       build: buildOcean, theme: OCEAN_THEME,
     },
     {
-      id: 'nightmare', num: 7, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
+      id: 'amazonas', num: 7, name: 'Amazonas', route: 'Regnskogen › Floden › Forsen › Tripp Troppen › Jaguarjakten',
+      difficulty: 4, diffName: 'Very Hard', reward: 225,
+      winTitle: 'Djungelns konung!',
+      winSub: 'Past the piranhas, down the rapids, through the terrifying Tripp Troppen hill and away from the jaguar, all the way to the Amazon at sunset.',
+      build: buildAmazonas, theme: AMAZONAS_THEME,
+    },
+    {
+      id: 'nightmare', num: 8, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
       difficulty: 5, diffName: 'Nightmare', reward: 250, health: 135, age: 16, strobe: true,
       winTitle: 'Du överlevde natten!',
       winSub: 'Past the graves, the bloody nuns, the catacombs and the clowns, and out before the bell struck one.',

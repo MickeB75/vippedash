@@ -922,6 +922,14 @@
         triggerScare(sc);
       }
     }
+    // Amazonas: the jaguar roars once per run as the player enters a chase zone
+    const chases = (G.lvl && G.lvl.chases) || [];
+    for (let i = 0; i < chases.length; i++) {
+      if (!G.scared['c' + i] && prevX < chases[i].x0 && chases[i].x0 <= x) {
+        G.scared['c' + i] = true;
+        AU.sfx('roar');
+      }
+    }
   }
   function triggerScare(sc) {
     G.scare = { kind: sc.kind, t: 0 };
@@ -945,6 +953,12 @@
         AU.sfx('scare_nun');
         AU.sfx('scare_clown');
         break;
+      case 'spider':
+        AU.sfx('scare_spider');
+        break;
+      case 'jaguar':
+        AU.sfx('scare_jaguar');
+        break;
     }
   }
 
@@ -966,6 +980,12 @@
       }
       if (s.grounded && !wasGrounded) for (let i = 0; i < 5; i++) particle({ x: s.x + Math.random(), y: s.y, vx: -2 - Math.random() * 3, vy: 1 + Math.random() * 2, life: 0.3, size: 5, color: 'rgba(255,255,255,0.8)' });
       if (s.grounded && G.tickN % 8 === 0) particle({ x: s.x, y: s.y + 0.08, vx: -2, vy: 0.6 + Math.random(), life: 0.35, size: 5, color: 'rgba(255,255,255,0.7)' });
+    } else if (s.mode === 'raft') {
+      // Amazonas: riding the log raft down the rapids (render.js drawPlayer tilts it with the wave) — no
+      // cube spin, just a gentle tilt with the climb, and spray off the back while it's on the water
+      const target = U.clamp(-s.vy * 0.12, -0.35, 0.35);
+      v.rot += (target - v.rot) * 0.2;
+      if (s.grounded && G.tickN % 4 === 0) particle({ x: s.x - 0.1, y: s.y + 0.05, vx: -3 - Math.random() * 2, vy: 1 + Math.random() * 2, life: 0.4, size: 5, color: 'rgba(235,250,255,0.85)', grav: 10 });
     } else if (s.mode === 'ship') {
       const a = -Math.atan2(s.vy, P.SPEED) * 0.85;
       v.rot += (a - v.rot) * 0.15;

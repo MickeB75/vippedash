@@ -39,6 +39,7 @@
 
   // The player's x-based "level clock" offset/state of a moving hazard, at player position x.
   // mv.type: 'bob' (sine bob), 'pop' (jack-in-the-box), 'drop' (falling/rising nun), 'swing' (pendulum),
+  // 'leap' (a piranha jumping out of the river, see Builder.piranha()),
   // 'throw' (a pawn thrown by the level 4 king boss, see level.js Builder.pawn() — or, with mv.hx set, a
   // hazard/coin thrown by a stationary thrower standing at a fixed point, see Builder.lob()).
   // `lvl` (optional) is only used for the beat clock (bob/pop/swing): when the level has speed zones,
@@ -88,6 +89,20 @@
       MV.a = a;
       MV.dx = mv.len * Math.sin(a);
       MV.dy = mv.len * (1 - Math.cos(a));
+    } else if (mv.type === 'leap') {
+      // Amazonas' piranhas: a fish leaping straight up out of the water (Builder.piranha()). For the first
+      // `air` of each period it flies a parabola (dy 0 -> rise -> 0, k = 0..1, a = nose-up then nose-down);
+      // the rest of the time it hides under the surface (dy -2, k = -1: nothing to hit and nothing to draw).
+      const f = u - Math.floor(u);
+      if (f < mv.air) {
+        const q = f / mv.air;
+        MV.dy = mv.rise * 4 * q * (1 - q);
+        MV.k = q;
+        MV.a = (0.5 - q) * 2.2;
+      } else {
+        MV.dy = -2;
+        MV.k = -1;
+      }
     }
     return MV;
   }
@@ -167,6 +182,43 @@
     return t;
   }
 
+  // ---- Amazonas' rapids (raft mode) ----
+  // lvl.rapids (always an array, empty by default — see level.js Builder.rapids()/Level) holds
+  // { x0, x1, amp, len, base } water zones. Inside one the surface is base + amp * sin(2 pi (x - x0) / len) * env,
+  // where env ramps 0 -> 1 over the first 4 blocks and 1 -> 0 over the last 4; outside every zone it is 0.
+  // rapidsAt fills RS with the height (h) and the slope (dh, blocks per block) and returns h. The raft mode
+  // below rides this surface: its floor is the height at the middle of the player (x + RAFT_CX).
+  const RS = { h: 0, dh: 0 };
+  const RAMP = 4;
+  function rapidsAt(lvl, x) {
+    RS.h = 0;
+    RS.dh = 0;
+    const zs = lvl && lvl.rapids;
+    if (!zs || !zs.length) return 0;
+    for (let i = 0; i < zs.length; i++) {
+      const z = zs[i];
+      if (x < z.x0 || x >= z.x1) continue;
+      const d = x - z.x0, e = z.x1 - x, kk = (2 * Math.PI) / z.len;
+      let env = 1, denv = 0;
+      if (d < RAMP && d <= e) {
+        env = d / RAMP;
+        denv = 1 / RAMP;
+      } else if (e < RAMP) {
+        env = e / RAMP;
+        denv = -1 / RAMP;
+      }
+      const sn = Math.sin(kk * d);
+      RS.h = z.base + z.amp * sn * env;
+      RS.dh = z.amp * (Math.cos(kk * d) * kk * env + sn * denv);
+      return RS.h;
+    }
+    return 0;
+  }
+  function rapidsHeight(lvl, x) {
+    return rapidsAt(lvl, x);
+  }
+  const RAFT_CX = 0.5;
+
   function setMode(s, portal) {
     const oldH = boxH(s);
     s.mode = portal.mode;
@@ -213,6 +265,19 @@
       s.vy += (held ? P.SHIP_UP : -P.SHIP_DOWN) * up * dt;
       if (s.vy > P.SHIP_VUP) s.vy = P.SHIP_VUP;
       else if (s.vy < -P.SHIP_VDOWN) s.vy = -P.SHIP_VDOWN;
+    } else if (s.mode === 'raft') {
+      // the raft: jumps like a cube, but its floor is the rapids' water surface (see rapidsAt). While it
+      // rides the surface, s.vy is the surface's own vertical speed, so a jump (P.JUMP_V on top of it) off a
+      // rising wave goes higher and off a falling one lower; when the surface falls away faster than gravity
+      // can follow, the raft is thrown into the air.
+      if (s.grounded && (held || fresh)) {
+        s.vy = -s.gdir * P.JUMP_V + s.vy;
+        s.grounded = false;
+        s.pressAge = 99;
+        if (ev) ev.push('jump');
+      }
+      s.vy += s.gdir * P.G * dt;
+      if (s.gdir < 0 ? s.vy < -P.MAX_FALL : s.vy > P.MAX_FALL) s.vy = s.gdir * P.MAX_FALL;
     } else if (s.mode === 'lane') {
       // Stratusvägen's two-lane street: runs on the ground like cube (same gravity, no ceiling flip),
       // but a fresh press never jumps — it toggles which lane (0 near, 1 far) the player is headed to.
@@ -251,12 +316,23 @@
     const prevY = s.y;
     s.x += speedAt(lvl, s.x) * dt;
     s.y += s.vy * dt;
+    // the raft integrates exactly (y += v0 dt + g dt^2 / 2 instead of v1 dt): then a raft riding a wave lets go
+    // as soon as the surface falls away faster than gravity (not 2x as fast, as the plain step would need)
+    if (s.mode === 'raft') s.y -= 0.5 * s.gdir * P.G * dt * dt;
     s.grounded = false;
 
     // a hole in the floor: no ground under you, and once you've fallen deep enough you come out of the
     // roof of the layer below (same x, y shifted up so the fall is continuous)
-    const hole = lvl.drops.length ? holeAt(lvl, s) : null;
-    if (hole) {
+    const hole = lvl.drops.length && s.mode !== 'raft' ? holeAt(lvl, s) : null;
+    if (s.mode === 'raft') {
+      // the water surface under the middle of the raft is the floor (it can lie below 0 in a trough)
+      const fy = rapidsAt(lvl, s.x + RAFT_CX);
+      if (s.y <= fy) {
+        s.y = fy;
+        s.vy = RS.dh * speedAt(lvl, s.x);
+        s.grounded = true;
+      }
+    } else if (hole) {
       if (s.y < -hole.depth) {
         s.y += hole.shift;
         s.layer++;
@@ -283,8 +359,9 @@
       if (o.lane != null && Math.abs(s.laneP - o.lane) >= P.LANE_HIT) continue;
       if (s.x < o.x + o.w && s.x + 1 > o.x && s.y < o.y + o.h && s.y + ph > o.y) {
         const top = o.y + o.h, bot = o.y;
-        const canTop = s.mode !== 'cube' || s.gdir < 0;
-        const canBot = s.mode !== 'cube' || s.gdir > 0;
+        const cubeLike = s.mode === 'cube' || s.mode === 'raft';
+        const canTop = !cubeLike || s.gdir < 0;
+        const canBot = !cubeLike || s.gdir > 0;
         if (canTop && s.vy <= 0 && prevY >= top - P.LAND_TOL) {
           s.y = top;
           s.vy = 0;
@@ -351,5 +428,5 @@
     return s;
   }
 
-  VD.Physics = { spawn, clone, step, boxH, moveOf, speedAt, timeAt };
+  VD.Physics = { spawn, clone, step, boxH, moveOf, speedAt, timeAt, rapidsHeight };
 })();

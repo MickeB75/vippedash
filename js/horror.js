@@ -1463,6 +1463,266 @@
     ctx.stroke();
   };
 
+  // ---- Amazonas (level 7): the two jungle scares. No blood; (ctx, cx, cy, size, t, k, age) like the faces above,
+  // where age is the seconds since the scare started (so the spider can drop in and the jaguar can lunge) ----
+
+  // a giant bird-eating spider dropping down on its thread, legs spread, eyes glowing
+  horror.face.spider = function (ctx, cx, cy, size, t, k, age) {
+    const s = size, a = age == null ? 0.2 : age;
+    // it falls from above in the first ~0.13 s, then bounces on the thread
+    const drop = U.smooth(U.clamp(a / 0.13, 0, 1));
+    const bounce = a > 0.13 ? Math.sin((a - 0.13) * 30) * Math.exp(-(a - 0.13) * 7) * s * 0.07 : 0;
+    const by = cy - s * 0.1 + (drop - 1) * s * 1.1 + bounce;
+    const wob = Math.sin(a * 55) * (a > 0.13 ? 0.015 : 0);
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // the silk thread
+    ctx.strokeStyle = 'rgba(230,236,230,0.7)';
+    ctx.lineWidth = s * 0.008;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s * 1.6);
+    ctx.lineTo(cx, by - s * 0.14);
+    ctx.stroke();
+    ctx.translate(cx, by);
+    ctx.rotate(wob);
+    const fur = '#241812', furHi = '#4a3424', joint = '#6a4a30';
+    // eight legs, each three hairy segments, curling out and down (and twitching)
+    const leg = (side, i) => {
+      const spread = [-0.55, -0.15, 0.25, 0.65][i];
+      const tw = Math.sin(t * 9 + i * 1.7 + (side > 0 ? 0.8 : 0)) * 0.05;
+      const sx0 = side * s * 0.1, sy0 = s * (-0.02 + i * 0.045);
+      const kx = side * s * (0.34 + i * 0.015), ky = sy0 - s * (0.3 - spread * 0.22 + tw);
+      const ex = side * s * (0.62 + (i === 1 || i === 2 ? 0.14 : 0)), ey = sy0 + s * (spread * 0.34 - 0.06 + tw);
+      const px = side * s * (0.7 + (i === 1 || i === 2 ? 0.2 : 0.02)), py = sy0 + s * (0.22 + spread * 0.3 + tw * 2);
+      ctx.strokeStyle = fur;
+      ctx.lineWidth = s * 0.05;
+      ctx.beginPath();
+      ctx.moveTo(sx0, sy0);
+      ctx.lineTo(kx, ky);
+      ctx.lineTo(ex, ey);
+      ctx.lineTo(px, py);
+      ctx.stroke();
+      ctx.strokeStyle = furHi;
+      ctx.lineWidth = s * 0.012;
+      ctx.beginPath();
+      ctx.moveTo(sx0, sy0 - s * 0.012);
+      ctx.lineTo(kx, ky - s * 0.012);
+      ctx.lineTo(ex, ey - s * 0.012);
+      ctx.stroke();
+      ctx.fillStyle = joint;
+      circle(ctx, kx, ky, s * 0.028);
+      ctx.fill();
+      circle(ctx, ex, ey, s * 0.024);
+      ctx.fill();
+      // coarse hairs along the leg
+      ctx.strokeStyle = fur;
+      ctx.lineWidth = s * 0.005;
+      ctx.beginPath();
+      for (const [ax, ay, bx2, by2] of [[sx0, sy0, kx, ky], [kx, ky, ex, ey], [ex, ey, px, py]]) {
+        for (let h = 0; h < 5; h++) {
+          const u = (h + 0.5) / 5;
+          const hx = ax + (bx2 - ax) * u, hy = ay + (by2 - ay) * u;
+          ctx.moveTo(hx, hy);
+          ctx.lineTo(hx + side * s * 0.02, hy - s * 0.035);
+        }
+      }
+      ctx.stroke();
+    };
+    for (const side of [-1, 1]) for (let i = 0; i < 4; i++) leg(side, i);
+    // abdomen, big and bristly
+    const ag = ctx.createRadialGradient(-s * 0.05, s * 0.18, s * 0.02, 0, s * 0.22, s * 0.3);
+    ag.addColorStop(0, '#3a281c');
+    ag.addColorStop(1, '#120a07');
+    ctx.fillStyle = ag;
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.2, s * 0.2, s * 0.25, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(140,100,60,0.5)';
+    ctx.lineWidth = s * 0.006;
+    ctx.beginPath();
+    for (let h = 0; h < 22; h++) {
+      const aa = (h / 22) * TAU, rr0 = 0.9 + (h % 3) * 0.06;
+      ctx.moveTo(Math.cos(aa) * s * 0.2, s * 0.2 + Math.sin(aa) * s * 0.25);
+      ctx.lineTo(Math.cos(aa) * s * 0.2 * rr0 * 1.06, s * 0.2 + Math.sin(aa) * s * 0.25 * rr0 * 1.06);
+    }
+    ctx.stroke();
+    // cephalothorax + head
+    ctx.fillStyle = fur;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.02, s * 0.15, s * 0.13, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = furHi;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.06, s * 0.08, s * 0.05, 0, 0, TAU);
+    ctx.fill();
+    // fangs and the pedipalps
+    ctx.fillStyle = '#d8c8a8';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * s * 0.05, s * 0.06);
+      ctx.quadraticCurveTo(side * s * 0.1, s * 0.15, side * s * 0.05, s * 0.22);
+      ctx.quadraticCurveTo(side * s * 0.05, s * 0.14, side * s * 0.02, s * 0.07);
+      ctx.fill();
+    }
+    ctx.strokeStyle = fur;
+    ctx.lineWidth = s * 0.03;
+    ctx.beginPath();
+    for (const side of [-1, 1]) {
+      ctx.moveTo(side * s * 0.1, s * 0.0);
+      ctx.quadraticCurveTo(side * s * 0.2, s * 0.08, side * s * 0.14, s * 0.18);
+    }
+    ctx.stroke();
+    // eight glowing eyes
+    ctx.shadowColor = '#ff7a30';
+    ctx.shadowBlur = s * 0.04;
+    ctx.fillStyle = '#ff9a40';
+    for (const [ex, ey, er] of [[-0.05, -0.07, 0.016], [0.05, -0.07, 0.016], [-0.095, -0.05, 0.011], [0.095, -0.05, 0.011], [-0.03, -0.09, 0.01], [0.03, -0.09, 0.01], [-0.075, -0.09, 0.008], [0.075, -0.09, 0.008]]) {
+      circle(ctx, ex * s, ey * s, er * s);
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+
+  // a jaguar roaring straight at the screen: big golden face, open jaws, fangs
+  horror.face.jaguar = function (ctx, cx, cy, size, t, k, age) {
+    const s = size, a = age == null ? 0.2 : age;
+    // lunges in over the first ~0.1 s, then shakes with the roar
+    const lunge = 1.35 - 0.35 * U.smooth(U.clamp(a / 0.1, 0, 1));
+    const jit = a > 0.1 ? Math.sin(a * 70) * s * 0.006 : 0;
+    ctx.save();
+    ctx.translate(cx + jit, cy + s * 0.04 - jit);
+    ctx.scale(lunge, lunge);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const fur = '#e6a226', furHi = '#f4c85a', cream = '#f7e6b0', dark = '#2a1606', rose = '#4a2808';
+    // ears
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = fur;
+      ctx.strokeStyle = dark;
+      ctx.lineWidth = s * 0.012;
+      ctx.beginPath();
+      ctx.arc(side * s * 0.34, -s * 0.34, s * 0.1, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = dark;
+      ctx.beginPath();
+      ctx.arc(side * s * 0.34, -s * 0.33, s * 0.06, 0, TAU);
+      ctx.fill();
+    }
+    // the lower jaw (open wide) behind the face
+    ctx.fillStyle = '#7a2a38';
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.2, s * 0.26, s * 0.2, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#e07a82';
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.27, s * 0.13, s * 0.08, 0, 0, TAU);
+    ctx.fill();
+    // the head: a big warm oval with a cream muzzle
+    const hg = ctx.createRadialGradient(0, -s * 0.12, s * 0.05, 0, 0, s * 0.5);
+    hg.addColorStop(0, furHi);
+    hg.addColorStop(1, fur);
+    ctx.fillStyle = hg;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.06, s * 0.42, s * 0.38, 0, Math.PI * 1.02, Math.PI * 1.98 + 0.001);
+    ctx.bezierCurveTo(s * 0.46, s * 0.1, s * 0.3, s * 0.18, s * 0.22, s * 0.1);
+    ctx.lineTo(-s * 0.22, s * 0.1);
+    ctx.bezierCurveTo(-s * 0.3, s * 0.18, -s * 0.46, s * 0.1, -s * 0.42, -s * 0.06);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = s * 0.014;
+    ctx.stroke();
+    // forehead + cheek spots, in rows
+    ctx.fillStyle = rose;
+    for (let i = 0; i < 12; i++) {
+      const ux = (i % 6 - 2.5) * s * 0.1, uy = -s * 0.32 + Math.floor(i / 6) * s * 0.07 + Math.abs(i % 6 - 2.5) * s * 0.02;
+      circle(ctx, ux, uy, s * 0.016);
+      ctx.fill();
+    }
+    for (const side of [-1, 1]) for (let i = 0; i < 4; i++) {
+      circle(ctx, side * (s * 0.3 + (i % 2) * s * 0.05), -s * 0.02 + i * s * 0.04, s * 0.014);
+      ctx.fill();
+    }
+    // the muzzle
+    ctx.fillStyle = cream;
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.04, s * 0.2, s * 0.1, 0, 0, TAU);
+    ctx.fill();
+    // wide-open mouth: dark cavern under the nose
+    ctx.fillStyle = '#2a0a10';
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.2, s * 0.1);
+    ctx.quadraticCurveTo(0, s * 0.02, s * 0.2, s * 0.1);
+    ctx.quadraticCurveTo(s * 0.18, s * 0.32, 0, s * 0.34);
+    ctx.quadraticCurveTo(-s * 0.18, s * 0.32, -s * 0.2, s * 0.1);
+    ctx.fill();
+    // fangs: two long upper canines and two lower, plus small teeth
+    ctx.fillStyle = '#fffaf0';
+    ctx.strokeStyle = '#7a6a50';
+    ctx.lineWidth = s * 0.004;
+    for (const side of [-1, 1]) {
+      tri(ctx, side * s * 0.15 - s * 0.03, s * 0.09, side * s * 0.15 + s * 0.03, s * 0.09, side * s * 0.15, s * 0.27);
+      ctx.fill();
+      ctx.stroke();
+      tri(ctx, side * s * 0.1 - s * 0.025, s * 0.33, side * s * 0.1 + s * 0.025, s * 0.33, side * s * 0.1, s * 0.2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    for (let i = -3; i <= 3; i++) {
+      if (Math.abs(i) === 2 || Math.abs(i) === 3) continue;
+      tri(ctx, i * s * 0.035 - s * 0.012, s * 0.1, i * s * 0.035 + s * 0.012, s * 0.1, i * s * 0.035, s * 0.15);
+      ctx.fill();
+    }
+    // nose
+    ctx.fillStyle = '#e07a82';
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.06, -s * 0.0);
+    ctx.lineTo(s * 0.06, -s * 0.0);
+    ctx.lineTo(0, s * 0.07);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = s * 0.008;
+    ctx.stroke();
+    // furious eyes: yellow-green, slit pupils, heavy brows
+    ctx.save();
+    ctx.shadowColor = '#e8ff3a';
+    ctx.shadowBlur = s * 0.03 + k * s * 0.04;
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = '#e8ff3a';
+      ctx.beginPath();
+      ctx.ellipse(side * s * 0.17, -s * 0.12, s * 0.08, s * 0.055, side * -0.3, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.fillStyle = '#100a04';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(side * s * 0.17, -s * 0.12, s * 0.014, s * 0.05, 0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = s * 0.032;
+    ctx.beginPath();
+    for (const side of [-1, 1]) {
+      ctx.moveTo(side * s * 0.3, -s * 0.22);
+      ctx.lineTo(side * s * 0.08, -s * 0.15);
+    }
+    ctx.stroke();
+    // whiskers
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = s * 0.004;
+    ctx.beginPath();
+    for (const side of [-1, 1]) for (let i = -1; i <= 1; i++) {
+      ctx.moveTo(side * s * 0.14, s * 0.05);
+      ctx.quadraticCurveTo(side * s * 0.32, s * 0.02 + i * s * 0.04, side * s * 0.5, s * 0.04 + i * s * 0.09);
+    }
+    ctx.stroke();
+    ctx.restore();
+  };
+
   // a glowing pair of eyes, blinking now and then; drawn above the darkness
   horror.eyes = function (ctx, cx, cy, size, t, seed, color) {
     const cyc = (t * 0.3 + seed) % 4;

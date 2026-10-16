@@ -1,6 +1,6 @@
 # VippeDash
 
-A Geometry Dash–style runner starring **Vippe**. There are seven levels: **1 · Stratusvägens alla helgon** (very easy, about 2:00) rides down a quiet suburban street on Halloween: candy, zucchini, footballs and dumbbells from four neighbours, then a rocket skateboard to the finish. **2 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **3 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **4 · Vilda skogen** (hard, about 1:37) runs through the wild forest, **5 · Schackmatt** (very hard, about 1:38) plays on a giant chessboard with **Brädet › Springarna › Tornet › Kungens tron**, **6 · Djupet** (very hard, about 1:38) dives through **Korallrevet › Manetsvärmen › Valens buk › Ytan**, and **7 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
+A Geometry Dash–style runner starring **Vippe**. There are eight levels: **1 · Stratusvägens alla helgon** (very easy, about 2:00) rides down a quiet suburban street on Halloween: candy, zucchini, footballs and dumbbells from four neighbours, then a rocket skateboard to the finish. **2 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **3 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **4 · Vilda skogen** (hard, about 1:37) runs through the wild forest, **5 · Schackmatt** (very hard, about 1:38) plays on a giant chessboard with **Brädet › Springarna › Tornet › Kungens tron**, **6 · Djupet** (very hard, about 1:38) dives through **Korallrevet › Manetsvärmen › Valens buk › Ytan**, **7 · Amazonas** (very hard, about 2:00) runs through the rainforest along the Amazon with the new raft mode on the rapids, the scary Tripp Troppen hill, and a jaguar chase, and **8 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
 
 ## Play
 
@@ -20,7 +20,7 @@ This serves the project on <http://127.0.0.1:8765/> and sends `Cache-Control: no
 | Hold to keep jumping or keep flying | hold any of the above |
 | Pause | **Esc** / **P** / ⏸ button |
 | Mute | **M** / 🔊 button |
-| Pick a level in the menu | click it, or **1** / **2** / **3** / **4** / **5** / **6** / **7** |
+| Pick a level in the menu | click it, or **1** / **2** / **3** / **4** / **5** / **6** / **7** / **8** |
 | Open the shop | **Shop** button or **S** |
 | Switch between Vippe and Affelito in the shop | click the tab, or **←** / **→** |
 
@@ -113,17 +113,17 @@ Debug and testing URL parameters:
 
 You win coins every time you finish a level:
 
-| | Level 1 (very easy) | Level 2 (easy) | Level 3 (medium) | Level 4 (hard) | Level 5 (very hard) | Level 6 (very hard) | Level 7 (nightmare) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Level cleared | 30 | 50 | 100 | 150 | 175 | 200 | 250 |
-| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 30 | up to 50 | up to 100 | up to 150 | up to 175 | up to 200 | up to 250 |
-| First time you beat the level | 30 | 50 | 100 | 150 | 175 | 200 | 250 |
+| | Level 1 (very easy) | Level 2 (easy) | Level 3 (medium) | Level 4 (hard) | Level 5 (very hard) | Level 6 (very hard) | Level 7 (very hard) | Level 8 (nightmare) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Level cleared | 30 | 50 | 100 | 150 | 175 | 200 | 225 | 250 |
+| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 30 | up to 50 | up to 100 | up to 150 | up to 175 | up to 200 | up to 225 | up to 250 |
+| First time you beat the level | 30 | 50 | 100 | 150 | 175 | 200 | 225 | 250 |
 
 So a harder level and fewer crashes give more coins. The coin total is shown at the top right of the menu.
 
 The shop has two tabs, one per character. The shop opens on the tab of the character you are wearing.
 
-**Vippe** (curly brown hair) has 14 skins. Red jersey, black hoodie and blue & black are free. The last one is unlocked by beating level 7 Mardrömmen. The others cost coins:
+**Vippe** (curly brown hair) has 14 skins. Red jersey, black hoodie and blue & black are free. The last one is unlocked by beating level 8 Mardrömmen. The others cost coins:
 
 | Skin | Coins | | Skin | Coins |
 | --- | --- | --- | --- | --- |
@@ -134,7 +134,7 @@ The shop has two tabs, one per character. The shop opens on the tab of the chara
 | Moose (antlers) | 400 | | King Vippe (gold crown) | 1500 |
 | | | | Scary Vippe (devil horns, bones and blood) | beat Mardrömmen |
 
-**Affelito** (straight light-brown hair swept to the side, hazel eyes, a lopsided grin and nearly always a trucker cap) has 14 skins. Black tee, grey hoodie and blue fleece are free. The last one is unlocked by beating level 7 Mardrömmen. The others cost coins:
+**Affelito** (straight light-brown hair swept to the side, hazel eyes, a lopsided grin and nearly always a trucker cap) has 14 skins. Black tee, grey hoodie and blue fleece are free. The last one is unlocked by beating level 8 Mardrömmen. The others cost coins:
 
 | Skin | Coins | | Skin | Coins |
 | --- | --- | --- | --- | --- |
@@ -246,7 +246,22 @@ A little longer and harder than the chess level: a deep-sea dive with half-jumps
 
 Level 6 has its own ambient soundtrack in A minor: flowing and ethereal in the reef and wreck, darker and sparser in the whale and deep sea, brightening toward major as you reach the surface.
 
-## Level 7: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
+## Level 7: Amazonas (≈ 1:59, 6 checkpoints)
+
+A rainforest adventure along the Amazon: harder than level 6 but easier than level 8, with fewer checkpoints and longer stretches between them. The new **raft mode** rides the rapids where the waves throw you up into the air. **Tripp Troppen**, a massive, terrifying hill in the middle of the jungle, turns dark as you enter it and changes to flying-bike mode at the bottom. Harmless poison-dart frogs hop in the background throughout, and poison frogs hang from the ceiling inside the hill. On the last stretch, with no checkpoint, a **jaguar chases you** all the way to the finish.
+
+| Section | Where | What happens |
+| --- | --- | --- |
+| **Regnskogen** | the rainforest floor, with toucans, macaws, monkeys and sloths | Jungle vines, roots, logs, thorny bushes and mud pools. A jaguar leaps out of the bush early on. |
+| **Floden** | the river, with floating water lilies and piranhas | Hop across lily pads and stones while piranhas leap up out of the water in rhythm. |
+| **Forsen** | the rapids | **Raft mode**: ride the rapids where the waves pitch you up and throw you into the air. Rocks and more piranhas on the water surface. |
+| **Tripp Troppen** | the entrance to a massive dark hill | A cave mouth with stone teeth and a crooked wooden sign. Inside it is pitch dark and only your lantern shines: poison frogs hang from the ceiling, glowing eyes watch you, stalagmites, bats, cobwebs and glowing fungi. Jump scare: a giant bird-eating spider. |
+| **Tripp Troppens djup** | deeper into the hill | **Flying-bike mode** through tight earth passages with poison frogs in the ceiling, stalagmites and stalactites. Jump scare: a jaguar lunging at the screen. |
+| **Jaguarjakten** | the jungle chase to the finish | Out of the hill at sunset: a jaguar runs right behind you, more jaguars leap out of the bushes, and the hardest jumps of the level come last. |
+
+The level has its own adventure soundtrack: driving jungle drums and brass, stately and forward-moving through the rainforest and river. The rapids surges with energy and splashing. Inside Tripp Troppen, the music darkens and becomes spooky, with sparse percussion and low tones. The jaguar chase is the climax, with pounding drums and a roaring finale.
+
+## Level 8: Mardrömmen (≈ 1:48, 10 checkpoints, 16+)
 
 A dark horror level with blood, jump scares, bloody nuns, creepy clowns and strobe lights, rated 16+ (the menu card shows a red 16+ badge and a ⚡ for flashing lights). It is hard in other ways than tight jumps too: darkness where only your lantern shines, strobe light where you only see the level in the flashes, moving hazards, running upside down on the ceiling, a mirrored screen, and jump scares that distract you. The last stretch, from the ghost train to the finish, has no checkpoint.
 
@@ -275,7 +290,7 @@ So you can make 8–10 crashes before your health runs out. Below 30 health the 
 
 ### Strobe and flashing lights
 
-The strobe flashes are locked to the music at most once per beat (2.6 per second, under the 3-per-second limit in the WCAG accessibility guidelines). Turn the strobe off with the **⚡ Strobe: On/Off** button in the pause menu, which only shows on level 6. With the strobe off there is a steady dim light instead. The setting is saved.
+The strobe flashes are locked to the music at most once per beat (2.6 per second, under the 3-per-second limit in the WCAG accessibility guidelines). Turn the strobe off with the **⚡ Strobe: On/Off** button in the pause menu, which only shows on level 8. With the strobe off there is a steady dim light instead. The setting is saved.
 
 Music: its own doom-metal soundtrack in C minor, in half-time so it feels like 78 BPM. It uses distorted guitar, organ, a choir, church bells, a detuned circus organ in the circus and a double-time climax in the ghost train. The melodies are original: the brief was "in the style of" the doom-metal song *Solitude* by Candlemass, and nothing is copied from it.
 
@@ -383,7 +398,18 @@ b.rail(233, 3, 'eel');       // rail()'s touch-and-die mechanic, reskinned as a 
 b.hole(364, 8, 16);          // the floor caves in — the rest of the level plays out one layer deeper
 ```
 
-Level 7 (Mardrömmen) adds:
+Level 7 (Amazonas) adds:
+
+```js
+b.portal(414, 'raft');       // raft mode: jumps like the cube, but the floor is the water surface
+b.rapids(496, 560, { amp: 1.8, len: 8 }); // waves: base + amp * sin(2π(x - x0) / len); a crest falling away throws the raft up
+b.piranha(x, { y, beats, phase, rise, air }); // a piranha leaping out of the water on the beat (hidden the rest of the time)
+b.jaguar(x, y, { from: [hx, hy], trigger, fall, arc }); // a jaguar leaping out of a bush at (hx, hy) and landing at x
+b.chase(946, 1240);          // a jaguar running right behind you (drawing and a roar only, no physics)
+b.frogDown(x, top, { bob, beats, phase }); // a poison frog hanging from the ceiling at `top`, bobbing
+```
+
+Level 8 (Mardrömmen) adds:
 
 ```js
 b.nun(x, y, { bob, beats, phase });      // a bloody nun bobbing up and down in time with the music

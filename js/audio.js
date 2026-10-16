@@ -87,6 +87,16 @@
     S3: parseMelody('. . C5 - E5 - F5 - | G5 - - - E5 - - - | C5 - - - E5 - - - | D5 - - - - - - - | . . E5 - E5 - D5 - | C5 - - - - - C5 - | E5 - - - G5 - - - | G5 - - - F5 - - - | . . E5 - F5 - G5 - | G5 - - - E5 - - - | C5 - - - D5 - - - | C5 - - - - - - -'),
     S4: parseMelody('. . C5 - D#5 - F5 - | G5 - - - D#5 - - - | C5 - - - - - - -'),
     S5: parseMelody('. . D6 - F#6 - G6 - | A6 - - - - - - - | . . D6 - F#6 - G6 - | A6 - - - - - - - | . . D6 - F#6 - G6 - | A6 - - - F#6 - - - | D6 - - - F#6 - - - | E6 - - - - - - - | . . F#6 - F#6 - E6 - | D6 - - - - - D6 - | F#6 - - - A6 - - - | A6 - - - G6 - - - | . . F#6 - G6 - A6 - | A6 - - - F#6 - - - | D6 - - - E6 - - - | D6 - - - - - - -'),
+    // the Amazon song (level 7 "Amazonas"), G major / E minor adventure: brass fanfare in the rainforest, a
+    // flowing river tune, a driving rapids run, a thin spooky ghost line in Tripp Troppen, and two
+    // relentless themes for the jaguar chase. All melodies are original.
+    Z1: parseMelody('G4 - B4 D5 - G5 - - | E5 - D5 C5 - E5 G5 - | D5 - B4 G4 - B4 D5 - | A4 - C5 D5 - F#5 A5 -'),
+    Z2: parseMelody('E5 - G5 C6 - B5 G5 - | D5 - G5 B5 - A5 G5 - | C5 - E5 A5 - G5 E5 - | F#5 - A5 D6 - C6 A5 -'),
+    Z3: parseMelody('B5 B5 G5 B5 E6 - D6 B5 | D6 D6 B5 D6 G6 - F#6 D6 | A5 A5 F#5 A5 D6 - C#6 A5 | B5 D6 F#6 D6 B5 F#5 D6 B5'),
+    Z4: parseMelody('E4 . . . G4 . . . | F4 . . . G#4 . . . | E4 . . . B4 . A#4 . | . . F4 . . . D#4 .'),
+    Z5: parseMelody('B4 . . . . . A#4 . | . . E4 . . . . . | F4 . . . . . E4 . | . . D#4 . . . . .'),
+    Z6: parseMelody('E5 G5 B5 E6 D6 B5 G5 B5 | E5 G5 C6 G5 E6 - D6 C6 | F#5 A5 D6 A5 F#6 - E6 D6 | D#5 F#5 B5 D#6 B5 F#5 B5 D#6'),
+    Z7: parseMelody('B5 - E6 - G6 F#6 E6 D6 | F#6 - A5 - D6 C#6 D6 F#6 | G6 - E6 - C6 B5 C6 E6 | D#6 - F#6 - B6 A6 F#6 D#6'),
   };
   // chords: [bass root midi, triad midis]
   const CH = {
@@ -96,6 +106,7 @@
     D: [38, [54, 57, 62]], B: [47, [54, 59, 63]],
     // level 6 (doom metal, C minor): wide "5th under root" doom-chord voicings, root note kept low for the guitar/bass
     Cm: [36, [55, 60, 63]], Ab: [32, [51, 56, 60]], Fm: [41, [60, 65, 68]], Db: [37, [56, 61, 65]],
+    Bm: [47, [54, 59, 62]],
     Eb: [39, [58, 63, 67]], Gb: [42, [61, 66, 70]], Bdim: [35, [53, 59, 62]],
   };
   const PROG = {
@@ -144,6 +155,16 @@
     parade3: ['C', 'Am', 'F', 'G'],
     parade4: ['D', 'G', 'A', 'D'],
     spooky: ['Cm', 'Fm', 'G', 'Cm'],
+    // the Amazon level ("Amazonas"): bright G major in the jungle and river, E minor for the rapids and
+    // the chase, and Em against Fm (a semitone clash) inside Tripp Troppen
+    jungle: ['G', 'C', 'G', 'D'],
+    riverA: ['C', 'G', 'Am', 'D'],
+    riverB: ['Em', 'D', 'C', 'D'],
+    rapids: ['Em', 'G', 'D', 'Bm'],
+    hill: ['Em', 'Fm', 'Em', 'Bdim'],
+    hilldeep: ['Em', 'Em', 'Bdim', 'Fm'],
+    chase: ['Em', 'C', 'D', 'B'],
+    chase2: ['Em', 'D', 'C', 'B'],
   };
   // each song: [fromBar, toBar, settings]. `phrase: 'section'` starts the 4-bar phrases at the section start.
   const SONGS = {
@@ -255,6 +276,27 @@
         // tower: the main riff returns
         [66, 70, { prog: 'doom2', guitar: 'doom', drums: 'doom', organ: true, lead: 'N2' }],
         [70, 72, { end: true, endBell: true }],
+      ],
+    },
+    // level 7 "Amazonas": areas start at bars 0, 4, 13, 25, 39, 48, 59; the finish is bar 78. Adventure
+    // music: brass fanfares and jungle toms, faster through the rapids, thin and ghostly inside Tripp
+    // Troppen (39-59), then the jaguar chase as the climax.
+    amazonas: {
+      endChord: 'G',
+      phrase: 'section',
+      sections: [
+        [0, 4, { prog: 'jungle', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true, birds: true }],
+        [4, 8, { prog: 'jungle', drums: 'tribal', bass: 'eighth', arp: 'up', lead: 'Z1', tone: 'flute', birds: true }],
+        [8, 13, { prog: 'jungle', drums: 'tribal', bass: 'eighth', arp: 'wave', lead: 'Z1', tone: 'brass', stabs: true, birds: true }],
+        [13, 19, { prog: 'riverA', drums: 'tribal', bass: 'octave', arp: 'wave', lead: 'Z2', tone: 'brass', stabs: true }],
+        [19, 25, { prog: 'riverB', drums: 'tribal', bass: 'octave', arp: 'up', lead: 'Z2', tone: 'brass', stabs: true, pad: true }],
+        [25, 39, { prog: 'rapids', drums: 'tribalfast', bass: 'octave', arp: 'fast', lead: 'Z3', tone: 'brass', stabs: true }],
+        [39, 48, { prog: 'hill', drums: 'ghost', bass: 'long', drone: true, pad: true, lead: 'Z4', tone: 'ghost', drips: true }],
+        [48, 58, { prog: 'hilldeep', drums: 'ghost', bass: 'long', drone: true, choir: true, lead: 'Z5', tone: 'ghost', drips: true }],
+        [58, 59, { prog: 'hilldeep', drums: 'roll', bass: null, arp: null, lead: null }],
+        [59, 67, { prog: 'chase', drums: 'chase', bass: 'octave', arp: 'fast', lead: 'Z6', tone: 'brass', stabs: true }],
+        [67, 78, { prog: 'chase2', drums: 'chase', bass: 'octave', arp: 'fast', lead: 'Z7', tone: 'brass', stabs: true, pad: true }],
+        [78, 80, { end: true }],
       ],
     },
     // level 7 "Stratusvägens alla helgon": a dusk Halloween street, the easiest level, ~78 bars (~2:00).
@@ -634,6 +676,24 @@
     lfo.start(t); lfo.stop(t + dur + 0.3);
   }
 
+  // ---- level 7: jungle toms and the jaguar's roar ----
+  function tom(t, f, v = 1) {
+    voice('sine', f, t, 0.22, 0.34 * v, { slide: f * 0.55, hold: 0.35, release: 0.08 });
+    noise(t, 0.03, 0.12 * v, 'bandpass', 1200, null, 1);
+  }
+  // a growl: a rapid chain of low saws (the throat rattle) over a breathy noise, sliding down. scale < 1 = smaller roar
+  function jaguarRoar(t, dest, scale = 1) {
+    const n = Math.round(14 * scale) + 4;
+    for (let i = 0; i < n; i++) {
+      const f = (150 - i * 4) * (0.85 + 0.15 * scale);
+      voice('sawtooth', f, t + i * 0.045, 0.09, 0.13 * scale, { dest, attack: 0.008, hold: 0.5, release: 0.05, lp: 700 + (i % 3) * 120, detune: (i % 2 ? 14 : -14) });
+    }
+    noise(t, 0.12, 0.3 * scale, 'highpass', 2600, dest, 1.1);
+    noise(t + 0.03, 0.04 * n, 0.3 * scale, 'bandpass', 650, dest, 2.2);
+    voice('sine', 70, t, 0.04 * n, 0.22 * scale, { dest, slide: 38, hold: 0.7 });
+    if (A.reverbIn) noise(t, 0.04 * n, 0.14 * scale, 'bandpass', 700, A.reverbIn, 2);
+  }
+
   function playStep(step, t) {
     const bar = Math.floor(step / 16);
     const s16 = step % 16;
@@ -688,6 +748,38 @@
       // a snare roll building up (the floor is caving in!)
       snare(t, 0.15 + s16 * 0.05);
       if (s16 % 4 === 0) kick(t, 0.6);
+    } else if (d === 'tribal') {
+      // jungle drums: kick on the downbeat and the "and" of 3, toms answering, a shaker on the 8ths
+      if (s16 === 0 || s16 === 8 || (s16 === 10 && pb % 2 === 1)) kick(t, s16 === 0 ? 1 : 0.85);
+      if (s16 === 3) tom(t, 230, 0.7);
+      if (s16 === 6) tom(t, 175, 0.8);
+      if (s16 === 12) clap(t, 0.8);
+      if (pb % 4 === 3 && s16 >= 12) tom(t, 150 - (s16 - 12) * 18, 0.9);
+      if (s16 % 2 === 0) hat(t, 0.5);
+    } else if (d === 'tribalfast') {
+      // the rapids: a kick on every beat, snare on 2 and 4, toms chasing on the off-beats
+      if (beat) kick(t, s16 === 0 ? 1 : 0.8);
+      if (s16 === 4 || s16 === 12) snare(t, 0.9);
+      if (s16 % 4 === 2) tom(t, s16 % 8 === 2 ? 210 : 170, 0.75);
+      if (s16 === 7 || s16 === 15) tom(t, 130, 0.8);
+      hat(t, s16 % 2 ? 0.35 : 0.65, s16 % 8 === 6);
+      if (barInSec % 4 === 0 && s16 === 0) crash(t);
+    } else if (d === 'chase') {
+      // the jaguar chase: pounding double-time feel, kicks on 16th pickups, toms rolling, a crash every 2 bars
+      if (beat || s16 === 14) kick(t, s16 === 0 ? 1 : 0.85);
+      if (s16 === 4 || s16 === 12) snare(t, 1);
+      if (s16 % 4 === 2) tom(t, s16 % 8 === 2 ? 200 : 160, 0.8);
+      if (s16 === 7 || s16 === 11 || s16 === 15) tom(t, 120, 0.9);
+      hat(t, s16 % 2 ? 0.4 : 0.75, s16 % 4 === 3);
+      if (bar % 2 === 0 && s16 === 0) crash(t);
+      if (pb % 4 === 3 && s16 >= 12) snare(t, 0.7);
+    } else if (d === 'ghost') {
+      // inside Tripp Troppen: a faint heartbeat and, now and then, a far-off dull tom in the dark
+      if (s16 === 0) {
+        bigKick(t, 0.4);
+        bigKick(t + STEP * 0.55, 0.6);
+      }
+      if (s16 === 12 && bar % 2 === 1) tom(t, 95, 0.5);
     } else if (d === 'doom') {
       // half-time doom: a big kick on the downbeat, a big snare on the "and" of 2, ride on quarters
       if (s16 === 0) bigKick(t, 1);
@@ -726,6 +818,16 @@
       const f = 1500 + ((step * 97) % 5) * 180;
       voice('sine', f, t, 0.09, 0.07, { slide: f * 0.45 });
       voice('sine', f, t + STEP * 3, 0.09, 0.025, { slide: f * 0.45 });
+    }
+    // birdsong in the rainforest: short rising chirps at pseudo-random 16ths
+    if (cfg.birds && ((step * 2246822519) >>> 0) % 11 === 0) {
+      const f = 2200 + ((step * 53) % 6) * 260;
+      voice('sine', f, t, 0.07, 0.04, { slide: f * 1.5, hold: 0.4 });
+      voice('sine', f * 1.2, t + 0.08, 0.07, 0.03, { slide: f * 1.8, hold: 0.4 });
+    }
+    // brass stabs: a punchy triad on the downbeat and the "and" of 2 (and 4 on odd bars)
+    if (cfg.stabs && (s16 === 0 || s16 === 6 || (s16 === 12 && pb % 2 === 1))) {
+      tri.forEach((m) => voice('sawtooth', mtof(m), t, STEP * 1.9, 0.03, { attack: 0.012, hold: 0.5, release: 0.06, lp: 1900, lpEnd: 900 }));
     }
     // thunder rumble in lightning zones, on the downbeat of odd bars (matching the visual flash at x%32==16)
     if (cfg.thunder && s16 === 0 && bar % 2 === 1) thunderRumble(t);
@@ -812,6 +914,15 @@
           // a bright, quickly-decaying pluck for the chess level's baroque feel
           voice('square', mtof(n.midi), t, Math.min(dur, STEP * 1.4), 0.09, { attack: 0.002, hold: 0.16, release: 0.12, lp: 3800 });
           voice('sawtooth', mtof(n.midi + 12), t, Math.min(dur, STEP * 1.1), 0.035, { attack: 0.001, hold: 0.1, release: 0.08, lp: 5200 });
+        } else if (cfg.tone === 'brass') {
+          // adventure brass: two detuned saws with a swelling filter and a square body underneath
+          voice('sawtooth', mtof(n.midi), t, dur, 0.07, { attack: 0.03, hold: 0.8, release: 0.08, lp: 1500, lpEnd: 2800, detune: -7 });
+          voice('sawtooth', mtof(n.midi), t, dur, 0.055, { attack: 0.035, hold: 0.8, release: 0.08, lp: 1500, lpEnd: 2800, detune: 8 });
+          voice('square', mtof(n.midi - 12), t, dur, 0.035, { attack: 0.03, hold: 0.8, lp: 1200 });
+        } else if (cfg.tone === 'ghost') {
+          // a thin wavering whistle drowned in reverb for Tripp Troppen
+          thereminNote(t, n.midi + 12, dur * 1.3, 0.07);
+          thereminNote(t, n.midi + 12, dur * 1.3, 0.05, A.reverbIn || A.bus);
         } else if (cfg.tone === 'reverse') {
           // the mirror hall: a slow swell attack and an abrupt stop, so it sounds backwards
           const swell = Math.min(dur * 0.85, 0.4);
@@ -915,6 +1026,29 @@
         noise(t, 0.5, 0.32, 'lowpass', 300, dest);
         noise(t + 0.05, 0.45, 0.16, 'bandpass', 3200, dest, 6);
         voice('sawtooth', 1900, t + 0.05, 0.35, 0.05, { dest, slide: 2600, lp: 4200 });
+        break;
+      // ---- level 7 "Amazonas": jungle scares ----
+      case 'scare_spider': {
+        // a giant spider dropping on a thread: a hissing slide down, rapid scratchy leg skitter, then a thump
+        noise(t, 0.5, 0.2, 'highpass', 5000, dest, 0.9);
+        voice('sawtooth', 2600, t, 0.5, 0.05, { dest, slide: 700, lp: 3500, hold: 0.7 });
+        for (let i = 0; i < 16; i++) {
+          noise(t + 0.3 + i * 0.035, 0.025, 0.2, 'bandpass', 3400 + (i % 4) * 700, dest, 3);
+        }
+        const land = t + 0.3;
+        voice('sine', 90, land, 0.3, 0.3, { dest, slide: 38, hold: 0.4 });
+        noise(land, 0.18, 0.28, 'lowpass', 500, dest);
+        if (A.reverbIn) noise(land, 0.7, 0.14, 'bandpass', 4200, A.reverbIn, 2);
+        break;
+      }
+      case 'scare_jaguar':
+        // a big jaguar roar right at the screen, with a low boom under it
+        jaguarRoar(t, dest, 1);
+        voice('sine', 55, t, 0.5, 0.3, { dest, slide: 28, hold: 0.5 });
+        break;
+      case 'roar':
+        // a smaller roar from far behind when the chase begins
+        jaguarRoar(t, dest, 0.6);
         break;
       case 'laugh':
         // a shorter, quieter clown laugh
