@@ -2582,7 +2582,6 @@
     fish(480, { phase: 0.5 });
     fish(491, { phase: 0.2 });
     // the roaring part
-    rock(511.1, 1);
     fish(520, { phase: 0.0 });
     rock(530, 1);
     fish(540, { phase: 0.5 });
