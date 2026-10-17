@@ -3348,7 +3348,6 @@
     },
     {
       id: 'park', num: 6, name: 'Nöjesparken', route: 'Entrén › Pariserhjulet › Lustiga huset › Stockrännan › Kanonen › Bergbanan',
-      localOnly: true, // not released yet
       difficulty: 4, diffName: 'Very Hard', reward: 190,
       winTitle: 'Parkens mästare!',
       winSub: 'Over the Ferris wheel, through the fun house, down the log flume, out of the cannon and round the roller coaster, all the way to the fireworks.',

@@ -233,7 +233,7 @@ Level 5 has its own D-minor baroque soundtrack with a harpsichord lead and a mar
 
 ## Level 6: Nöjesparken (≈ 2:00, 7 checkpoints)
 
-A summer day at the amusement park, from a sunny noon at the gate to a starry evening with fireworks. It sits between Schackmatt and Djupet in difficulty, but with only seven checkpoints you ride a whole attraction in one go. The new **cart mode** rides a rail: a hollowed-out log on the log flume and a car on the roller coaster, with the drops throwing you into the air and gaps in the rail to jump. The Ferris-wheel gondolas are the first **moving platforms** in the game. The level only shows when the game runs locally (`localOnly`) until it is released.
+A summer day at the amusement park, from a sunny noon at the gate to a starry evening with fireworks. It sits between Schackmatt and Djupet in difficulty, but with only seven checkpoints you ride a whole attraction in one go. The new **cart mode** rides a rail: a hollowed-out log on the log flume and a car on the roller coaster, with the drops throwing you into the air and gaps in the rail to jump. The Ferris-wheel gondolas are the first **moving platforms** in the game.
 
 | Section | Where | What happens |
 | --- | --- | --- |
