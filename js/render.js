@@ -27,6 +27,7 @@
     whale: 15, reeftower: 7, shipwreck: 10, kelpforest: 8,
     rookpiece: 4, knightpiece: 4, bishoppiece: 3.5, queenpiece: 4.5,
     tripptroppen: 10, waterfall: 8,
+    gate: 9, carousel: 6, funhouse: 10, flumehill: 14, droptower: 3,
   };
   // 0..1: how much of x lies inside one of the listed areas, eased over `fade` blocks at each border
   function areaWeight(lvl, ids, x, fade = 12) {
@@ -100,6 +101,23 @@
         // distant castle silhouettes on the horizon, level 4 "Schackmatt"
         far.push({ u, t: 'castlesil', w: 1.0 + rnd() * 1.6, h: 1.0 + rnd() * 1.8 });
         u += 0.5 + rnd() * 1.3;
+      } else if (kind === 'parkskyline') {
+        // Nöjesparken: a skyline of roller coaster humps, circus big tops, a far-off Ferris wheel and a drop tower
+        const r = rnd(), seed = Math.floor(rnd() * 1e6);
+        if (r < 0.36) {
+          const w = 2.4 + rnd() * 2.8;
+          far.push({ u, t: 'cstr', w, h: 0.8 + rnd() * 1.1, seed });
+          u += w + 0.3 + rnd() * 0.8;
+        } else if (r < 0.66) {
+          far.push({ u, t: 'bigtop', w: 1.2 + rnd() * 0.9, h: 0.9 + rnd() * 0.7, seed });
+          u += 1.3 + rnd() * 1.6;
+        } else if (r < 0.82) {
+          far.push({ u, t: 'farwheel', h: 1.7 + rnd() * 0.7, seed });
+          u += 2.2 + rnd() * 1.6;
+        } else {
+          far.push({ u, t: 'fartower', h: 1.8 + rnd() * 1.2, seed });
+          u += 1.0 + rnd() * 1.4;
+        }
       } else {
         if (kind && kind !== 'pine' && kind !== 'mixed') VD.lintMiss && VD.lintMiss('far', kind);
         const pine = kind === 'pine' || rnd() < 0.55;
@@ -116,7 +134,15 @@
     this.pM = pM;
     const mid = [];
     const hwHorror = (Art.horror && Art.horror.midHalf) || {};
-    for (const L of lvl.landmarks) mid.push({ u: (L.X - PX) * pM + HALF, d: L, t: L.type, hw: MID_HALFWIDTH[L.type] || hwHorror[L.type] || 6 });
+    // Nöjesparken: the Ferris wheel and the cannon are drawn in world space (they line up with the gondolas and the portal),
+    // the loop ring comes from lvl.loops and the fireworks are a sky effect, so none of those four go in the mid layer
+    this.worldLm = [];
+    this.fireworksX = null;
+    for (const L of lvl.landmarks) {
+      if (L.type === 'ferris' || L.type === 'cannon') this.worldLm.push(L);
+      else if (L.type === 'fireworks') this.fireworksX = L.X;
+      else if (L.type !== 'loop') mid.push({ u: (L.X - PX) * pM + HALF, d: L, t: L.type, hw: MID_HALFWIDTH[L.type] || hwHorror[L.type] || 6 });
+    }
     const uMaxM = (lvl.length + 80) * pM + 40;
     const [s0, s1] = th.midStep || [4, 6];
     for (let uu = -10; uu < uMaxM; uu += s0 + rnd() * s1) {
@@ -193,6 +219,7 @@
     for (let i = 0; i < 14; i++) this.clouds.push({ u: i * 9 + sr() * 5, y: 60 + sr() * 170, s: 0.6 + sr() * 0.8 });
   };
 
+  const CANDY_FLAG = ['#2a6fd6', '#ffb02e', '#b66cff']; // flags on the far-away park hedges
   const pm = (n, m) => ((n % m) + m) % m; // modulo that stays positive for negative n (grid indices left of x = 0)
   const sx = (wx, camX) => (wx - camX) * BS;
   const sy = (wy) => GY - wy * BS;
@@ -227,6 +254,10 @@
     ctx.bezierCurveTo(cx - s, cy - s * 0.6, cx - s * 0.5, cy - s * 1.3, cx, cy - s * 0.5);
     ctx.bezierCurveTo(cx + s * 0.5, cy - s * 1.3, cx + s, cy - s * 0.6, cx, cy + s * 0.3);
     ctx.closePath();
+  }
+  function circle(ctx, x, y, r) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
   }
   function makeBloodBlobs() {
     const r = U.rng(555);
@@ -284,6 +315,20 @@
       if (scaleX !== 1) ctx.scale(scaleX, 1);
       if (tiltA) ctx.rotate(tiltA);
       ctx.translate(-W / 2, -H / 2);
+    }
+    // Nöjesparken's loop-the-loop: the whole world (not the HUD) makes one full turn round the player's spot on the screen
+    const loopA = G.s && !menu ? this.loopAngle(G.s.x) : 0;
+    if (loopA) {
+      const pcx = sx(G.s.x + 0.5, camX), pcy = sy(G.s.y + VD.Physics.boxH(G.s) / 2);
+      ctx.translate(pcx, pcy);
+      ctx.rotate(loopA);
+      ctx.translate(-pcx, -pcy);
+      // the picture only covers the screen; fill a wide area round it so the corners are not empty while it turns
+      const sk = skyAt(this.sky, camX + HALF);
+      ctx.fillStyle = sk.top;
+      ctx.fillRect(-3 * W, -3 * H, 7 * W, 3 * H + GY);
+      ctx.fillStyle = Art.TL('#5a3028');
+      ctx.fillRect(-3 * W, GY, 7 * W, 3 * H);
     }
     const drops = lvl.drops;
     if (!drops.length) this.drawScene(ctx, camX, t, G, 0);
@@ -455,6 +500,9 @@
     const center = camX + HALF;
     const sky = skyAt(this.sky, center);
     Art.setDark(sky.dark);
+    // Nöjesparken: from theme.lights on, the string lights and lit rides glow, stronger the darker the sky
+    const lt = this.theme.lights;
+    Art.setLights(lt != null ? U.smooth(U.clamp((center - lt) / 24, 0, 1)) * (0.5 + 0.5 * U.clamp(sky.dark / 0.35, 0, 1)) : 0);
     const px = G.s ? G.s.x : center - HALF + PX;
     // indoor areas (floorball hall, bear cave, subway, sewer) fade in as you run through the door
     let inT = 0, inKind = null;
@@ -528,6 +576,12 @@
         } else if (inKind === 'cathedral') {
           this.drawCathedral(ctx, camX, t);
           this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'funhouse') {
+          this.drawFunhouse(ctx, camX, t, G);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'barrel') {
+          this.drawBarrelRoom(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
         } else {
           if (inKind !== 'hall') VD.lintMiss && VD.lintMiss('indoor', inKind);
           this.drawHall(ctx, camX, t);
@@ -536,6 +590,7 @@
         ctx.globalAlpha = flatAlpha;
       }
       this.drawGround(ctx, camX, t, inT, L);
+      if (inT < 1 && !L) this.drawParkWorld(ctx, camX, t, G);
       if (this.theme.lanes) {
         this.drawLaneRoad(ctx, camX, t);
         this.drawHouses(ctx, camX, t);
@@ -544,6 +599,7 @@
         this.drawPeople(ctx, camX, t, px);
         this.drawParkedBoards(ctx, camX, t);
       }
+      if (!L) this.drawTracks(ctx, camX, t, false);
       this.drawCorridors(ctx, camX, t, L);
       if (this.lvl.drops.length) this.drawHoles(ctx, camX, t, L);
       if (this.lvl.boss) this.drawKing(ctx, camX, t, G, L);
@@ -568,6 +624,7 @@
         if (here && G.state !== 'menu') this.drawChase(ctx, camX, t, G, L);
         this.drawTexts(ctx, camX, G, L);
         if (here && G.state !== 'menu') this.drawPlayer(ctx, camX, G, t);
+        if (!L) this.drawTracks(ctx, camX, t, true);
       }
     }
     ctx.restore();
@@ -659,6 +716,12 @@
       ctx.ellipse(x - 40 * s, c.y + 6 * s, 40 * s, 16 * s, 0, 0, Math.PI * 2);
       ctx.ellipse(x + 30 * s, c.y - 12 * s, 44 * s, 22 * s, 0, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    // Nöjesparken: fireworks over the park from the marker on, bigger and more of them towards the goal
+    if (this.fireworksX != null) {
+      const fa = U.smooth(U.clamp((center - this.fireworksX) / 18, 0, 1)) * U.clamp(0.2 + sky.dark * 2.3, 0, 1);
+      Art.fireworks(ctx, W, GY, t, fa, U.smooth(U.clamp((center - (this.lvl.finishX - 100)) / 100, 0, 1)));
     }
 
     // far layer
@@ -845,6 +908,94 @@
           ctx.lineTo(x + dx + 6, base - h - 36);
           ctx.lineTo(x + dx + 15, base - h - 18);
           ctx.fill();
+        }
+      } else if (f.t === 'cstr') {
+        // a distant roller coaster: a humped rail on thin posts, with a few lit bulbs at night
+        const w = f.w * BS, h = f.h * 44, r = U.rng(f.seed), ph = r() * 6, n = Math.max(6, Math.round(w / 7));
+        const ty = (k) => base - 8 - h * (0.3 + 0.7 * Math.abs(Math.sin((k / n) * Math.PI * 1.6 + ph)));
+        ctx.strokeStyle = farDark;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let k = 0; k <= n; k++) {
+          ctx.moveTo(x + (k / n) * w, ty(k));
+          ctx.lineTo(x + (k / n) * w, base + 2);
+        }
+        ctx.stroke();
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let k = 0; k <= n; k++) {
+          if (k) ctx.lineTo(x + (k / n) * w, ty(k));
+          else ctx.moveTo(x, ty(0));
+        }
+        ctx.stroke();
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let k = 0; k <= n; k++) {
+          if (k) ctx.lineTo(x + (k / n) * w, ty(k) + 5);
+          else ctx.moveTo(x, ty(0) + 5);
+        }
+        ctx.stroke();
+        if (Art.lights() > 0.2 || lit) {
+          ctx.fillStyle = 'rgba(255,200,120,0.85)';
+          for (let k = 0; k <= n; k += 2) ctx.fillRect(x + (k / n) * w - 1, ty(k) - 3, 2.5, 2.5);
+          ctx.fillStyle = farDark;
+        }
+      } else if (f.t === 'bigtop') {
+        // a circus big top: striped roof (one dark silhouette here) with a flag
+        const w = f.w * BS * 0.7, h = f.h * 38;
+        ctx.fillRect(x - w / 2, base - 18, w, 22);
+        ctx.beginPath();
+        ctx.moveTo(x - w / 2 - 5, base - 17);
+        ctx.quadraticCurveTo(x - w * 0.2, base - 20 - h * 0.5, x, base - 20 - h);
+        ctx.quadraticCurveTo(x + w * 0.2, base - 20 - h * 0.5, x + w / 2 + 5, base - 17);
+        ctx.fill();
+        ctx.fillRect(x - 1, base - 20 - h - 14, 2, 14);
+        ctx.fillRect(x + 1, base - 20 - h - 14, 9, 5);
+        if (Art.lights() > 0.2 || lit) {
+          ctx.fillStyle = 'rgba(255,214,130,0.85)';
+          for (let k = 0; k < 6; k++) ctx.fillRect(x - w / 2 + 3 + (k * (w - 8)) / 5, base - 12, 3, 3);
+          ctx.fillStyle = farDark;
+        }
+      } else if (f.t === 'farwheel') {
+        // a far-off Ferris wheel turning slowly
+        const R2 = f.h * 30, cy2 = base - R2 - 14, a0 = t * 0.22 + f.seed;
+        ctx.strokeStyle = farDark;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(x, cy2, R2, 0, TAU);
+        ctx.moveTo(x - 2, cy2);
+        ctx.lineTo(x - R2 * 0.55, base + 2);
+        ctx.moveTo(x + 2, cy2);
+        ctx.lineTo(x + R2 * 0.55, base + 2);
+        ctx.stroke();
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let k = 0; k < 8; k++) {
+          ctx.moveTo(x, cy2);
+          ctx.lineTo(x + Math.cos(a0 + (k * TAU) / 8) * R2, cy2 + Math.sin(a0 + (k * TAU) / 8) * R2);
+        }
+        ctx.stroke();
+        for (let k = 0; k < 8; k++) ctx.fillRect(x + Math.cos(a0 + (k * TAU) / 8) * R2 - 2.5, cy2 + Math.sin(a0 + (k * TAU) / 8) * R2, 5, 5);
+        if (Art.lights() > 0.2 || lit) {
+          ctx.fillStyle = 'rgba(255,170,220,0.9)';
+          for (let k = 0; k < 16; k++) ctx.fillRect(x + Math.cos(a0 * 0.5 + (k * TAU) / 16) * (R2 + 2) - 1, cy2 + Math.sin(a0 * 0.5 + (k * TAU) / 16) * (R2 + 2) - 1, 2.5, 2.5);
+          ctx.fillStyle = farDark;
+        }
+      } else if (f.t === 'fartower') {
+        // a drop tower: a thin mast with a seat ring that creeps up and falls
+        const h = f.h * 52, cyc = ((t / 7 + f.seed * 0.37) % 1);
+        const k = cyc < 0.6 ? U.smooth(cyc / 0.6) : cyc < 0.72 ? 1 : 1 - Math.pow((cyc - 0.72) / 0.28, 2);
+        ctx.fillRect(x - 3.5, base - h, 7, h + 4);
+        ctx.beginPath();
+        ctx.moveTo(x - 6, base - h);
+        ctx.lineTo(x, base - h - 14);
+        ctx.lineTo(x + 6, base - h);
+        ctx.fill();
+        ctx.fillRect(x - 11, base - 10 - k * (h - 24), 22, 5);
+        if (Art.lights() > 0.2 || lit) {
+          ctx.fillStyle = 'rgba(255,90,120,0.95)';
+          ctx.fillRect(x - 1.5, base - h - 18, 3, 3);
+          ctx.fillStyle = farDark;
         }
       } else VD.lintMiss && VD.lintMiss('far', f.t);
     }
@@ -1049,7 +1200,7 @@
       return;
     }
     const base = { jungle: '#1f5a28', meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93', graves: '#332b22', fairground: '#5f3f2e',
-      lagoon: '#0e5a68', wrecked: '#0a4048', openwater: '#083048', trench: '#04101c', shore: '#0e6a70', checker: '#241f38' }[style] || '#7dbb4e';
+      lagoon: '#0e5a68', wrecked: '#0a4048', openwater: '#083048', trench: '#04101c', shore: '#0e6a70', checker: '#241f38', amusement: '#6fc25a' }[style] || '#7dbb4e';
     ctx.fillStyle = T(base);
     ctx.fillRect(x0, mb - 6, w, GY - mb + 10);
     if (style === 'lagoon' || style === 'wrecked' || style === 'openwater' || style === 'trench' || style === 'shore') {
@@ -1173,6 +1324,112 @@
         ctx.lineTo(x + tw, mb);
         ctx.closePath();
         ctx.fill();
+      }
+    }
+    if (style === 'amusement') {
+      // Nöjesparken: mowed lawn, a path, and stalls, big tops, hedges and strings of lights far behind the action
+      ctx.fillStyle = 'rgba(255,255,255,0.09)';
+      for (let x = gridStart(x0, offM * BS, 240); x < x1; x += 240) {
+        const a0 = Math.max(x0, x), a1 = Math.min(x1, x + 120);
+        if (a1 > a0) ctx.fillRect(a0, mb - 6, a1 - a0, GY - mb + 10);
+      }
+      ctx.fillStyle = T('#e2cfa0');
+      ctx.fillRect(x0, mb + 6, w, GY - mb - 2);
+      ctx.fillStyle = 'rgba(120,80,40,0.2)';
+      ctx.fillRect(x0, mb + 6, w, 2);
+      const step = 150;
+      for (let x = gridStart(x0, offM * BS, step) - step; x < x1 + step; x += step) {
+        const i = Math.round((x + offM * BS) / step), hh = U.hash(i * 1.37 + 3), kind = Math.floor(hh * 6);
+        const cx = x + 40 + pm(i * 37, 60);
+        if (cx < x0 - 70 || cx > x1 + 70) continue;
+        // a pole with a string of lights to the next one, every other cell
+        if (i % 2 === 0) {
+          const nx = cx + step - pm(i * 37, 60) + pm((i + 1) * 37, 60);
+          ctx.strokeStyle = T('#5a4a5a');
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(cx - 34, mb + 6);
+          ctx.lineTo(cx - 34, mb - 66);
+          ctx.moveTo(nx - 34, mb + 6);
+          ctx.lineTo(nx - 34, mb - 66);
+          ctx.stroke();
+          Art.bulbString(ctx, cx - 34, mb - 66, nx - 34, mb - 66, 14, 22, t, i);
+        }
+        if (kind === 0 || kind === 5) {
+          // a circus big top
+          const bw = 74, bh = kind === 0 ? 62 : 46;
+          ctx.fillStyle = T('#fff4e0');
+          ctx.fillRect(cx - bw / 2, mb - 22, bw, 26);
+          for (let k = 0; k < 6; k += 2) {
+            ctx.fillStyle = T('#e8353a');
+            ctx.fillRect(cx - bw / 2 + k * (bw / 6), mb - 22, bw / 6, 26);
+          }
+          for (let k = 0; k < 6; k++) {
+            ctx.fillStyle = T(k % 2 ? '#fff4e0' : '#e8353a');
+            ctx.beginPath();
+            ctx.moveTo(cx - bw / 2 - 4 + k * ((bw + 8) / 6), mb - 20);
+            ctx.lineTo(cx, mb - 22 - bh);
+            ctx.lineTo(cx - bw / 2 - 4 + (k + 1) * ((bw + 8) / 6), mb - 20);
+            ctx.fill();
+          }
+          ctx.fillStyle = T('#ffd23a');
+          ctx.fillRect(cx - 1, mb - 22 - bh - 12, 2, 12);
+          ctx.fillRect(cx + 1, mb - 22 - bh - 12, 9, 5);
+        } else if (kind === 1 || kind === 4) {
+          // a sweets stall with a striped awning
+          const sw = 54, sh = 42, pal = ['#ffd6e2', '#d6efff', '#ffe9b8'][pm(i, 3)];
+          ctx.fillStyle = T(pal);
+          ctx.fillRect(cx - sw / 2, mb - sh + 8, sw, sh - 4);
+          ctx.fillStyle = T('#7a5a78');
+          ctx.fillRect(cx - sw / 2 + 6, mb - sh + 22, sw - 12, 14);
+          for (let k = 0; k < 6; k++) {
+            ctx.fillStyle = T(k % 2 ? '#fff4e0' : '#e8353a');
+            ctx.fillRect(cx - sw / 2 - 3 + k * ((sw + 6) / 6), mb - sh, (sw + 6) / 6, 16);
+          }
+          Art.bulb(ctx, cx - sw / 2 + 4, mb - sh + 18, 2.2, '#ffd23a', 0.8);
+          Art.bulb(ctx, cx + sw / 2 - 4, mb - sh + 18, 2.2, '#ffd23a', 0.8);
+        } else if (kind === 2) {
+          // a round tree dotted with blossom
+          ctx.fillStyle = T('#6a4a30');
+          ctx.fillRect(cx - 3, mb - 28, 6, 32);
+          ctx.fillStyle = T('#3f9a44');
+          circle(ctx, cx, mb - 46, 24);
+          ctx.fill();
+          ctx.fillStyle = T('#52b552');
+          circle(ctx, cx - 8, mb - 54, 12);
+          ctx.fill();
+          ctx.fillStyle = T('#ff8ac8');
+          for (let k = 0; k < 5; k++) {
+            circle(ctx, cx - 14 + pm(k * 13 + i * 7, 28), mb - 60 + pm(k * 17 + i * 3, 30), 2.4);
+            ctx.fill();
+          }
+        } else {
+          // a hedge with flowers and a flag
+          ctx.fillStyle = T('#3a8a40');
+          Art.rr(ctx, cx - 44, mb - 22, 88, 26, 12);
+          ctx.fill();
+          ctx.fillStyle = T('#4aa850');
+          Art.rr(ctx, cx - 40, mb - 22, 80, 10, 5);
+          ctx.fill();
+          for (let k = 0; k < 6; k++) {
+            ctx.fillStyle = T(['#ff4d6d', '#ffd23a', '#ffffff'][k % 3]);
+            circle(ctx, cx - 34 + k * 13, mb - 12 + (k % 2) * 4, 2.6);
+            ctx.fill();
+          }
+          ctx.strokeStyle = T('#7a6a5a');
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(cx + 30, mb - 20);
+          ctx.lineTo(cx + 30, mb - 70);
+          ctx.stroke();
+          ctx.fillStyle = T(CANDY_FLAG[Math.abs(i) % 3]);
+          const fw = Math.sin(t * 4 + i) * 2.5;
+          ctx.beginPath();
+          ctx.moveTo(cx + 30, mb - 70);
+          ctx.quadraticCurveTo(cx + 42, mb - 72 + fw, cx + 54, mb - 66);
+          ctx.quadraticCurveTo(cx + 42, mb - 60 - fw, cx + 30, mb - 58);
+          ctx.fill();
+        }
       }
     }
     if (style === 'meadow' || style === 'farm') {
@@ -1786,6 +2043,147 @@
       ctx.fillStyle = 'rgba(60,200,110,' + pulse + ')';
       ctx.fillRect(0, 0, W, GY);
     }
+  };
+
+  // ------------------------------------------------------------------ inside the fun house (level 6, Nöjesparken)
+  // wobbly candy-striped walls, bulging mirrors that warp Vippe's reflection, drifting confetti
+  R.drawFunhouse = function (ctx, camX, t, G) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#1e0a40');
+    g.addColorStop(1, '#6a2a8c');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    // two layers of wavy stripes, the far one slower and darker
+    const pal = [['#3a1a70', '#4a1f78', '#2a1560', '#5a2078'], ['#7a2a9a', '#2a7a8c', '#b03a8a', '#c8782a']];
+    for (let layer = 0; layer < 2; layer++) {
+      const off = camX * BS * (0.25 + layer * 0.2), step = 130 - layer * 20;
+      const start = gridStart(0, off, step) - step;
+      ctx.globalAlpha = layer ? 0.55 : 1;
+      for (let x = start; x < W + step; x += step) {
+        const i = Math.round((x + off) / step);
+        ctx.fillStyle = pal[layer][pm(i, 4)];
+        ctx.beginPath();
+        for (let y = 0; y <= GY + 24; y += 24) {
+          const wx = x + Math.sin(y * 0.018 + t * 0.9 + i * 1.3) * 16;
+          if (y) ctx.lineTo(wx, y);
+          else ctx.moveTo(wx, y);
+        }
+        for (let y = GY + 24; y >= 0; y -= 24) ctx.lineTo(x + step * 0.5 + Math.sin(y * 0.018 + t * 0.9 + i * 1.3 + 0.8) * 16, y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // the curvy mirrors: gold frames with a warped, stretched or squashed Vippe in some
+    const off = camX * BS * 0.55, step = 290;
+    const start = gridStart(0, off, step) - step;
+    const s = G && G.s, skin = G && G.skin, expr = G && G.vis && G.vis.oT > 0 ? 'o' : 'grin';
+    for (let x = start; x < W + step; x += step) {
+      const i = Math.round((x + off) / step), cx = x + step / 2, cy = 250, rx = 62 + pm(i * 7, 3) * 8, ry = 140;
+      ctx.fillStyle = '#e8c85a';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx + 12, ry + 12, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#9a7a1e';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx + 6, ry + 6, 0, 0, TAU);
+      ctx.fill();
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, TAU);
+      ctx.clip();
+      const mg = ctx.createLinearGradient(cx - rx, cy - ry, cx + rx, cy + ry);
+      mg.addColorStop(0, ['#9ad8ee', '#e0b8f0', '#b8f0d8'][pm(i, 3)]);
+      mg.addColorStop(0.5, '#f4f8ff');
+      mg.addColorStop(1, ['#5a8ab0', '#8a5ab0', '#5ab08a'][pm(i, 3)]);
+      ctx.fillStyle = mg;
+      ctx.fillRect(cx - rx, cy - ry, rx * 2, ry * 2);
+      if (s && pm(i, 2) === 0) {
+        ctx.translate(cx, cy + 40);
+        const mode = pm(i, 4);
+        const sway = Math.sin(t * 1.4 + i) * 0.12;
+        const sy2 = mode < 2 ? 1.5 + 0.35 * Math.sin(t * 0.8 + i) : 0.62 + 0.12 * Math.sin(t * 0.8 + i);
+        const sx2 = mode < 2 ? 0.8 : 1.5;
+        ctx.transform(sx2, sway * 0.4, 0, sy2, 0, 0);
+        Art.cube(ctx, BS * 1.2, expr, skin, 1);
+      } else {
+        // a swirl of colour where a reflection would be
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(cx - rx * 0.3, cy - ry * 0.2, rx * 0.25, ry * 0.5, 0.3, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+      // a streak of shine
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx - 8, ry - 8, 0, Math.PI * 1.1, Math.PI * 1.4);
+      ctx.stroke();
+      for (let k = 0; k < 14; k++) {
+        const a = (k * TAU) / 14;
+        Art.bulb(ctx, cx + Math.cos(a) * (rx + 9), cy + Math.sin(a) * (ry + 9), 3, Art.CANDY[k % 6], 0.8);
+      }
+    }
+    // confetti drifting down
+    for (let i = 0; i < 26; i++) {
+      const x = ((U.hash(i * 5.1) * W * 1.4 - camX * BS * 0.6 + Math.sin(t + i) * 14) % (W * 1.4) + W * 1.4) % (W * 1.4) - W * 0.2;
+      const y = (U.hash(i * 2.9) * GY + t * (14 + (i % 4) * 5)) % GY;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(t * 2 + i);
+      ctx.fillStyle = Art.CANDY[i % 6];
+      ctx.fillRect(-3, -1.5, 6, 3);
+      ctx.restore();
+    }
+  };
+
+  // inside the rolling barrel: a cylinder wall of red and white planks that turns round and round, iron hoops going by
+  R.drawBarrelRoom = function (ctx, camX, t) {
+    ctx.fillStyle = '#3a1a10';
+    ctx.fillRect(0, 0, W, GY + 4);
+    const cy = GY * 0.5, Rc = GY * 0.62, N = 16, rot = t * 1.1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, GY + 4);
+    ctx.clip();
+    for (let k = 0; k < N; k++) {
+      const a0 = rot + (k * TAU) / N, a1 = a0 + TAU / N, am = (a0 + a1) / 2;
+      // the far wall only: planks facing us (cos > 0); the ones edge-on above and below vanish
+      if (Math.cos(am) <= 0) continue;
+      const y0 = cy + Rc * Math.sin(a0), y1 = cy + Rc * Math.sin(a1);
+      const ya = Math.min(y0, y1), yb = Math.max(y0, y1);
+      ctx.fillStyle = k % 2 ? '#fff2dc' : '#e0353a';
+      ctx.fillRect(0, ya, W, yb - ya + 1);
+      ctx.fillStyle = 'rgba(40,10,0,' + 0.62 * (1 - Math.cos(am)) + ')';
+      ctx.fillRect(0, ya, W, yb - ya + 1);
+      ctx.fillStyle = 'rgba(70,30,10,0.45)';
+      ctx.fillRect(0, ya, W, 1.5);
+    }
+    ctx.restore();
+    // iron hoops round the barrel
+    const off = camX * BS * 0.5, step = 330;
+    for (let x = gridStart(0, off, step) - step; x < W + step; x += step) {
+      const g = ctx.createLinearGradient(x, 0, x + 34, 0);
+      g.addColorStop(0, '#22222c');
+      g.addColorStop(0.35, '#6a6a7a');
+      g.addColorStop(1, '#22222c');
+      ctx.fillStyle = g;
+      ctx.fillRect(x, 0, 34, GY + 4);
+      ctx.fillStyle = '#b8b8c8';
+      for (let y = ((t * 40) % 56) - 56; y < GY; y += 56) {
+        ctx.beginPath();
+        ctx.arc(x + 17, y + 28, 3, 0, TAU);
+        ctx.fill();
+      }
+    }
+    // a vignette towards the top and the floor
+    const vg = ctx.createLinearGradient(0, 0, 0, GY);
+    vg.addColorStop(0, 'rgba(20,0,0,0.5)');
+    vg.addColorStop(0.5, 'rgba(255,230,160,0.06)');
+    vg.addColorStop(1, 'rgba(20,0,0,0.5)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, GY + 4);
   };
 
   // ------------------------------------------------------------------ the subway (level 2)
@@ -3183,7 +3581,418 @@
           }
         }
         ctx.stroke();
+      } else if (st === 'parkpath' || st === 'funfloor') {
+        this.drawParkGround(ctx, camX, t, x0, x1, st);
       } else VD.lintMiss && VD.lintMiss('ground', st);
+    }
+  };
+
+  // ------------------------------------------------------------------ Nöjesparken: ground
+  // 'parkpath' = the red-brown paving of the park paths, 'funfloor' = the black and white chequered floor of the fun house
+  R.drawParkGround = function (ctx, camX, t, x0, x1, st) {
+    const T = Art.TL, w = x1 - x0;
+    if (w <= 0) return;
+    if (st === 'funfloor') {
+      ctx.fillStyle = T('#2a1a3a');
+      ctx.fillRect(x0, GY, w, H - GY);
+      const rows = 3, rowH = 30;
+      for (let i = Math.floor(camX + x0 / BS) - 1; i <= Math.ceil(camX + x1 / BS); i++) {
+        const x = (i - camX) * BS, a0 = Math.max(x0, x), a1 = Math.min(x1, x + BS);
+        if (a1 <= a0) continue;
+        for (let r = 0; r < rows; r++) {
+          ctx.fillStyle = T((i + r) & 1 ? '#fff8ee' : '#1c1226');
+          ctx.fillRect(a0, GY + 8 + r * rowH, a1 - a0, rowH);
+          ctx.fillStyle = (i + r) & 1 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)';
+          ctx.fillRect(a0, GY + 8 + r * rowH, a1 - a0, rowH * 0.3);
+        }
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      for (let r = 1; r < rows; r++) ctx.fillRect(x0, GY + 8 + r * rowH - 1, w, 2);
+      // a candy-striped kerb along the top
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x0, GY, w, 8);
+      ctx.clip();
+      for (let x = gridStart(x0, camX * BS, 28) - 28; x < x1 + 28; x += 28) {
+        ctx.fillStyle = T('#e8353a');
+        ctx.beginPath();
+        ctx.moveTo(x, GY + 8);
+        ctx.lineTo(x + 14, GY + 8);
+        ctx.lineTo(x + 22, GY);
+        ctx.lineTo(x + 8, GY);
+        ctx.fill();
+        ctx.fillStyle = T('#fff4e0');
+        ctx.beginPath();
+        ctx.moveTo(x + 14, GY + 8);
+        ctx.lineTo(x + 28, GY + 8);
+        ctx.lineTo(x + 36, GY);
+        ctx.lineTo(x + 22, GY);
+        ctx.fill();
+      }
+      ctx.restore();
+      const slab = GY + 8 + rows * rowH;
+      ctx.fillStyle = T('#3a2450');
+      ctx.fillRect(x0, slab, w, H - slab);
+      ctx.fillStyle = 'rgba(255,200,255,0.18)';
+      ctx.fillRect(x0, slab, w, 2);
+      return;
+    }
+    // park path: red-brown paving stones in staggered rows, with a pale kerb edge and a bit of grass at the lip
+    ctx.fillStyle = T('#7a4234');
+    ctx.fillRect(x0, GY, w, H - GY);
+    const bw = 40, bh = 17;
+    const cols = ['#b86a50', '#a85c46', '#c47c5a', '#b0634a'];
+    for (let r = 0; r < 9; r++) {
+      const yy = GY + 11 + r * (bh + 3), shift = (r % 2) * (bw / 2), off = camX * BS + shift;
+      const i0 = Math.floor((x0 + off) / (bw + 3)) - 1, i1 = Math.ceil((x1 + off) / (bw + 3));
+      for (let i = i0; i <= i1; i++) {
+        const x = i * (bw + 3) - off, a0 = Math.max(x0, x), a1 = Math.min(x1, x + bw);
+        if (a1 <= a0) continue;
+        ctx.fillStyle = T(cols[pm(i * 7 + r * 3, 4)]);
+        Art.rr(ctx, a0, yy, a1 - a0, bh, 4);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = 'rgba(255,230,200,0.14)';
+    ctx.fillRect(x0, GY + 8, w, 2);
+    ctx.fillStyle = T('#ecdcb8');
+    ctx.fillRect(x0, GY, w, 8);
+    ctx.fillStyle = T('#a8946c');
+    ctx.fillRect(x0, GY + 8, w, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillRect(x0, GY, w, 2);
+    // tufts of grass and a flower here and there along the kerb
+    for (let i = Math.floor((camX * BS + x0) / 70) - 1; i <= Math.ceil((camX * BS + x1) / 70); i++) {
+      const x = i * 70 - camX * BS + pm(i * 29, 40);
+      if (x < x0 || x > x1) continue;
+      ctx.fillStyle = T('#4a9a3a');
+      ctx.beginPath();
+      ctx.ellipse(x, GY + 1, 6, 3 + (i & 1), 0, Math.PI, 0);
+      ctx.fill();
+      if (pm(i, 3) === 0) {
+        ctx.fillStyle = T(['#ff4d6d', '#ffd23a', '#ff8ac8'][pm(i, 9) % 3]);
+        circle(ctx, x + 1, GY - 5, 2.6);
+        ctx.fill();
+      }
+    }
+  };
+
+  // ------------------------------------------------------------------ Nöjesparken: loop, world-space rides, rails
+  // how far the world has turned (radians) while the player is inside one of lvl.loops: one full turn, eased
+  R.loopAngle = function (x) {
+    const zs = this.lvl.loops;
+    if (zs) for (const z of zs) if (x >= z.x0 && x <= z.x1) return TAU * U.smooth((x - z.x0) / (z.x1 - z.x0));
+    return 0;
+  };
+
+  // the rides that stand in world space (they must line up with the gondolas and the cannon portal): the Ferris wheel's
+  // frame, the cannon and the loop ring, drawn behind the objects
+  R.drawParkWorld = function (ctx, camX, t, G) {
+    const lvl = this.lvl, PH = VD.Physics, mid = camX + HALF;
+    const px = G.s ? G.s.x : camX + PX;
+    for (const d of this.worldLm || []) {
+      if (d.type === 'ferris') {
+        if (Math.abs(d.X - mid) > HALF + d.R + 8) continue;
+        // the same beat clock the gondolas use (moveOf 'orbit'), so the spokes stay under their hooks
+        const ang = TAU * (PH.timeAt(lvl, px) / ((d.beats || 16) * (60 / 156)) + (d.phase || 0));
+        Art.ferrisWheel(ctx, sx(d.X, camX), sy(d.cy), d.R * BS, d.n || 8, ang, GY, t);
+      } else if (d.type === 'cannon') {
+        if (Math.abs(d.X - mid) > HALF + 18) continue;
+        // d.X is the muzzle; age = how far the player is past it (the shot goes off when the player flies through the portal there)
+        Art.cannonWorld(ctx, sx(d.X, camX), sy(d.y != null ? d.y : 2.6), GY, px - d.X, t, FONT);
+      }
+    }
+    for (const z of lvl.loops || []) {
+      const cx = (z.x0 + z.x1) / 2;
+      if (Math.abs(cx - mid) > HALF + 10) continue;
+      const h = PH.trackHeight ? PH.trackHeight(lvl, cx) : null, Rl = 3.3 * BS;
+      Art.loopRing(ctx, sx(cx, camX), sy(h == null ? 1 : h) - Rl, Rl, GY, t);
+    }
+  };
+
+  // the stretches of a track inside [a, b] (blocks) that really have rail: { a, b, sg, eg, pts } where pts = [X, h, X, h, ...]
+  // sampled every 4 px, sg/eg say that the stretch starts / ends at a gap (a broken rail end)
+  R.trackRuns = function (k, a, b) {
+    const th = VD.Physics.trackHeight, lvl = this.lvl, step = 4 / BS, segs = [];
+    const to = Math.min(k.x1 - 1e-3, b);
+    let cur = Math.max(k.x0, a), curGap = false;
+    for (const g of k.gaps.slice().sort((p, q) => p[0] - q[0])) {
+      if (g[1] <= cur) continue;
+      if (g[0] >= to) break;
+      if (g[0] > cur) segs.push({ a: cur, b: g[0] - 1e-3, sg: curGap, eg: true });
+      cur = Math.max(cur, g[1]);
+      curGap = true;
+    }
+    if (cur < to) segs.push({ a: cur, b: to, sg: curGap, eg: false });
+    for (const sg of segs) {
+      sg.pts = [];
+      for (let X = sg.a; X < sg.b; X += step) {
+        const h = th(lvl, X);
+        if (h != null) sg.pts.push(X, h);
+      }
+      const h = th(lvl, sg.b);
+      if (h != null) sg.pts.push(sg.b, h);
+    }
+    return segs;
+  };
+
+  // all the rails on screen. front = false: behind Vippe (rail, supports, the back of the flume); front = true: in front of him
+  // (the water and the wooden wall of the flume, which the log sits in)
+  R.drawTracks = function (ctx, camX, t, front) {
+    const tr = this.lvl.tracks;
+    if (!tr || !tr.length || !VD.Physics.trackHeight) return;
+    const xa = camX - 2, xb = camX + W / BS + 2;
+    for (const k of tr) {
+      if (k.x1 < xa || k.x0 > xb) continue;
+      if (front && k.style !== 'flume') continue;
+      for (const seg of this.trackRuns(k, xa, xb)) {
+        if (seg.pts.length < 4) continue;
+        if (k.style === 'flume') this.drawFlumeSeg(ctx, camX, t, seg, front);
+        else this.drawCoasterSeg(ctx, camX, t, seg);
+      }
+    }
+  };
+
+  // the log flume. back pass: trestle bents, the far rim and the inner water; front pass: the water over the log's lower half
+  // and the wooden wall in front of it
+  R.drawFlumeSeg = function (ctx, camX, t, seg, front) {
+    const T = Art.TL, p = seg.pts, n = p.length / 2, lvl = this.lvl, th = VD.Physics.trackHeight;
+    const X = (i) => sx(p[i * 2], camX), Y = (i) => sy(p[i * 2 + 1]);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    if (!front) {
+      // trestle bents every 3 blocks, braced to each other
+      const first = Math.ceil(p[0] / 3) * 3;
+      ctx.strokeStyle = T('#7a5232');
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      for (let xw = first; xw <= p[(n - 1) * 2]; xw += 3) {
+        const h0 = th(lvl, xw);
+        if (h0 == null) continue;
+        const xs = sx(xw, camX), ys = sy(h0) + 18;
+        if (GY - ys > 4) {
+          ctx.moveTo(xs - 11, ys);
+          ctx.lineTo(xs - 11, GY);
+          ctx.moveTo(xs + 11, ys);
+          ctx.lineTo(xs + 11, GY);
+        }
+      }
+      ctx.stroke();
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      for (let xw = first; xw + 3 <= p[(n - 1) * 2]; xw += 3) {
+        const h0 = th(lvl, xw), h1 = th(lvl, xw + 3);
+        if (h0 == null || h1 == null) continue;
+        const xs0 = sx(xw, camX), xs1 = sx(xw + 3, camX), y0 = sy(h0) + 28, y1 = sy(h1) + 28;
+        if (GY - y0 > 14 && GY - y1 > 14) {
+          ctx.moveTo(xs0 + 11, y0);
+          ctx.lineTo(xs1 - 11, Math.min(GY - 4, GY - (GY - y1) * 0.25));
+          ctx.moveTo(xs0 + 11, Math.min(GY - 4, GY - (GY - y0) * 0.25));
+          ctx.lineTo(xs1 - 11, y1);
+        }
+      }
+      ctx.stroke();
+      // the far rim of the trough and the dark water behind the log
+      ctx.beginPath();
+      ctx.moveTo(X(0), Y(0) - 4);
+      for (let i = 0; i < n; i++) ctx.lineTo(X(i), Y(i) - 4);
+      for (let i = n - 1; i >= 0; i--) ctx.lineTo(X(i), Y(i) + 14);
+      ctx.closePath();
+      const wg = ctx.createLinearGradient(0, GY - 330, 0, GY + 10);
+      wg.addColorStop(0, T('#5ac8f0'));
+      wg.addColorStop(1, T('#2a78b8'));
+      ctx.fillStyle = wg;
+      ctx.fill();
+      ctx.strokeStyle = T('#8a5a32');
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        if (i) ctx.lineTo(X(i), Y(i) - 8);
+        else ctx.moveTo(X(i), Y(i) - 8);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = T('#c8905a');
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      return;
+    }
+    // front: translucent water with foam on the surface, then the planked wall
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const y = Y(i) + 1 + Math.sin(p[i * 2] * 3 + t * 4) * 1.4;
+      if (i) ctx.lineTo(X(i), y);
+      else ctx.moveTo(X(i), y);
+    }
+    for (let i = n - 1; i >= 0; i--) ctx.lineTo(X(i), Y(i) + 14);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(80,190,240,0.62)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const y = Y(i) + 1 + Math.sin(p[i * 2] * 3 + t * 4) * 1.4;
+      if (i) ctx.lineTo(X(i), y);
+      else ctx.moveTo(X(i), y);
+    }
+    ctx.stroke();
+    // the wall
+    const hull = (d) => {
+      ctx.beginPath();
+      ctx.moveTo(X(0), Y(0) + d);
+      for (let i = 0; i < n; i++) ctx.lineTo(X(i), Y(i) + d);
+    };
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      if (i) ctx.lineTo(X(i), Y(i) + 13);
+      else ctx.moveTo(X(i), Y(i) + 13);
+    }
+    for (let i = n - 1; i >= 0; i--) ctx.lineTo(X(i), Y(i) + 36);
+    ctx.closePath();
+    const hg = ctx.createLinearGradient(0, GY - 330, 0, GY + 10);
+    hg.addColorStop(0, T('#c08a50'));
+    hg.addColorStop(1, T('#8a5a30'));
+    ctx.fillStyle = hg;
+    ctx.fill();
+    ctx.strokeStyle = T('#4a2a12');
+    ctx.lineWidth = 2;
+    for (const d of [24, 34]) {
+      hull(d);
+      ctx.stroke();
+    }
+    // a candy-striped band along the lip of the wall
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = T('#e8353a');
+    hull(16.5);
+    ctx.stroke();
+    ctx.strokeStyle = T('#fff4e0');
+    ctx.setLineDash([14, 14]);
+    ctx.lineDashOffset = -(camX * BS) % 28;
+    hull(16.5);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineCap = 'round';
+    // butt joints and nails
+    ctx.strokeStyle = T('#4a2a12');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let xw = Math.ceil(p[0] / 1.5) * 1.5; xw <= p[(n - 1) * 2]; xw += 1.5) {
+      const h0 = th(lvl, xw);
+      if (h0 == null) continue;
+      ctx.moveTo(sx(xw, camX), sy(h0) + 22);
+      ctx.lineTo(sx(xw, camX), sy(h0) + 35);
+    }
+    ctx.stroke();
+  };
+
+  // the roller coaster: a red steel rail on a white lattice, supported by lattice columns; broken ends where there are gaps
+  R.drawCoasterSeg = function (ctx, camX, t, seg) {
+    const T = Art.TL, p = seg.pts, n = p.length / 2, lvl = this.lvl, th = VD.Physics.trackHeight;
+    const X = (i) => sx(p[i * 2], camX), Y = (i) => sy(p[i * 2 + 1]);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // lattice support columns every 3 blocks
+    const last = p[(n - 1) * 2];
+    for (let xw = Math.ceil(p[0] / 3) * 3; xw <= last; xw += 3) {
+      const h0 = th(lvl, xw);
+      if (h0 == null) continue;
+      const xs = sx(xw, camX), ys = sy(h0) + 20, hg = GY - ys;
+      if (hg < 8) continue;
+      const sp = 8 + hg * 0.05;
+      ctx.strokeStyle = T('#6b7686');
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(xs - 5, ys);
+      ctx.lineTo(xs - sp, GY);
+      ctx.moveTo(xs + 5, ys);
+      ctx.lineTo(xs + sp, GY);
+      ctx.stroke();
+      ctx.strokeStyle = T('#f4f6fa');
+      ctx.lineWidth = 4.5;
+      ctx.stroke();
+      ctx.strokeStyle = T('#9aa5b6');
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let yy = ys, d = 0; yy < GY - 6; yy += 26, d ^= 1) {
+        const q0 = (yy - ys) / hg, q1 = Math.min(1, (yy + 26 - ys) / hg);
+        const w0 = 5 + (sp - 5) * q0, w1 = 5 + (sp - 5) * q1;
+        ctx.moveTo(xs + (d ? -w0 : w0), yy);
+        ctx.lineTo(xs + (d ? w1 : -w1), Math.min(GY, yy + 26));
+      }
+      ctx.stroke();
+      ctx.fillStyle = T('#6b7686');
+      ctx.fillRect(xs - sp - 8, GY - 4, 16, 4);
+      ctx.fillRect(xs + sp - 8, GY - 4, 16, 4);
+    }
+    // the lower chord and the zig-zag lattice between it and the rail
+    ctx.strokeStyle = T('#6b7686');
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      if (i) ctx.lineTo(X(i), Y(i) + 21);
+      else ctx.moveTo(X(i), Y(i) + 21);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = T('#f4f6fa');
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+    ctx.strokeStyle = T('#d8dde6');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0, d = 0; i + 4 < n; i += 4, d ^= 1) {
+      ctx.moveTo(X(i), d ? Y(i) + 21 : Y(i) + 6);
+      ctx.lineTo(X(i + 4), d ? Y(i + 4) + 6 : Y(i + 4) + 21);
+    }
+    ctx.stroke();
+    // the rail itself: its top edge is the surface the car rides on
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      if (i) ctx.lineTo(X(i), Y(i) + 4);
+      else ctx.moveTo(X(i), Y(i) + 4);
+    }
+    ctx.strokeStyle = T('#5a0e10');
+    ctx.lineWidth = 11;
+    ctx.stroke();
+    ctx.strokeStyle = T('#ec3a2e');
+    ctx.lineWidth = 7.5;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,205,190,0.75)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      if (i) ctx.lineTo(X(i), Y(i) + 2.4);
+      else ctx.moveTo(X(i), Y(i) + 2.4);
+    }
+    ctx.stroke();
+    // little lights under the rail once it is dark
+    if (Art.lights() > 0.05) {
+      for (let xw = Math.ceil(p[0] / 0.9) * 0.9; xw <= last; xw += 0.9) {
+        const h0 = th(lvl, xw);
+        if (h0 == null) continue;
+        const i = Math.round(xw / 0.9);
+        Art.bulb(ctx, sx(xw, camX), sy(h0) + 12, 2.6, Art.CANDY[((i % 6) + 6) % 6], (Math.floor(t * 7) + i) % 4 === 0 ? 1 : 0.6);
+      }
+    }
+    // the broken ends of a gap: a bent plate with bolts and a hazard stripe
+    for (const [at, dir] of [[seg.eg ? n - 1 : -1, 1], [seg.sg ? 0 : -1, -1]]) {
+      if (at < 0) continue;
+      const ex = X(at), ey = Y(at);
+      ctx.fillStyle = T('#6b7686');
+      Art.rr(ctx, ex - 4 + dir * 2, ey - 2, 8, 30, 2);
+      ctx.fill();
+      ctx.fillStyle = T('#ffd23a');
+      ctx.fillRect(ex - 4 + dir * 2, ey + 4, 8, 4);
+      ctx.fillRect(ex - 4 + dir * 2, ey + 14, 8, 4);
+      ctx.fillStyle = T('#23232a');
+      ctx.fillRect(ex - 4 + dir * 2, ey + 9, 8, 4);
+      ctx.fillStyle = T('#5a0e10');
+      ctx.beginPath();
+      ctx.moveTo(ex, ey + 2);
+      ctx.lineTo(ex + dir * 11, ey + 12 + Math.sin(t * 5) * 1.5);
+      ctx.lineTo(ex + dir * 4, ey + 26);
+      ctx.lineTo(ex, ey + 12);
+      ctx.fill();
     }
   };
 
@@ -3782,6 +4591,127 @@
         ctx.fillRect(x0, y - 4, x1 - x0, 4);
         ctx.fillStyle = 'rgba(120,255,160,0.32)';
         ctx.fillRect(x0, y - 2, x1 - x0, 2);
+      } else if (c.style === 'funhouse') {
+        // the fun house roof: crooked candy planks and strips of warped mirror, with bulbs along the lower edge
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#1a0834');
+        g.addColorStop(1, '#4a1a68');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x0, 0, x1 - x0, y + 18);
+        ctx.clip();
+        const planks = ['#7a2a9a', '#b03a8a', '#2a8a9a', '#c8782a'];
+        for (let x = gridStart(x0, camX * BS, 64) - 64; x < x1 + 64; x += 64) {
+          const i = Math.round((x + camX * BS) / 64);
+          ctx.fillStyle = planks[pm(i, 4)];
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x + 62, 0);
+          ctx.lineTo(x + 62 + 22, y + 6);
+          ctx.lineTo(x + 22, y + 6);
+          ctx.fill();
+          if (pm(i, 3) === 0) {
+            const mg = ctx.createLinearGradient(x, 0, x + 40, y);
+            mg.addColorStop(0, '#9ad8ee');
+            mg.addColorStop(0.5, '#f4f8ff');
+            mg.addColorStop(1, '#5a8ab0');
+            ctx.fillStyle = mg;
+            ctx.beginPath();
+            ctx.moveTo(x + 14, 0);
+            ctx.lineTo(x + 46, 0);
+            ctx.lineTo(x + 46 + 22, y + 6);
+            ctx.lineTo(x + 14 + 22, y + 6);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            const gl = ((t * 60 + i * 41) % 140) / 140;
+            ctx.fillRect(x + 22 + gl * 20 - 3, gl * (y + 6), 5, 10);
+          }
+        }
+        ctx.fillStyle = 'rgba(20,0,40,0.4)';
+        ctx.beginPath();
+        ctx.moveTo(x0, y - 8);
+        for (let x = gridStart(x0, camX * BS, 32) - 32; x < x1 + 32; x += 32) {
+          ctx.lineTo(U.clamp(x + 16, x0, x1), y + 5);
+          ctx.lineTo(U.clamp(x + 32, x0, x1), y - 8);
+        }
+        ctx.lineTo(x1, 0);
+        ctx.lineTo(x0, 0);
+        ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = '#e8c85a';
+        ctx.fillRect(x0, y - 4, x1 - x0, 4);
+        for (let x = gridStart(x0, camX * BS, 64) + 32; x < x1 + 32; x += 64) {
+          const i = Math.round((x + camX * BS) / 64);
+          Art.bulb(ctx, x, y + 2, 3, Art.CANDY[pm(i, 6)], 0.7 + 0.3 * Math.sin(t * 5 + i));
+        }
+      } else if (c.style === 'barrel') {
+        // the top of the turning barrel: broad red and white planks sliding by, with a thick wooden lip
+        const g = ctx.createLinearGradient(0, 0, 0, y);
+        g.addColorStop(0, '#2a0a06');
+        g.addColorStop(1, '#6a2a1a');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x0, 0, x1 - x0, y);
+        ctx.clip();
+        const ph = (t * 1.1 * 70) % 90;
+        for (let yy = -90 + ph; yy < y + 40; yy += 45) {
+          const k = Math.round((yy - ph) / 45);
+          ctx.fillStyle = pm(k, 2) ? 'rgba(255,242,220,0.5)' : 'rgba(224,53,58,0.5)';
+          ctx.fillRect(x0, yy, x1 - x0, 45);
+        }
+        ctx.restore();
+        ctx.fillStyle = '#4a2410';
+        ctx.fillRect(x0, y - 9, x1 - x0, 9);
+        ctx.fillStyle = '#7a4a24';
+        ctx.fillRect(x0, y - 9, x1 - x0, 3);
+        ctx.fillStyle = '#b8b8c8';
+        for (let x = gridStart(x0, camX * BS, 48) + 24; x < x1; x += 48) {
+          ctx.beginPath();
+          ctx.arc(x, y - 4, 2.5, 0, TAU);
+          ctx.fill();
+        }
+      } else if (c.style === 'bunting') {
+        // the cannon's "ceiling": a strip of striped tent canvas hung with flags and strings of lights
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x0, 0, x1 - x0, y + 40);
+        ctx.clip();
+        for (let x = gridStart(x0, camX * BS, 36) - 36; x < x1 + 36; x += 36) {
+          const i = Math.round((x + camX * BS) / 36);
+          ctx.fillStyle = Art.T(pm(i, 2) ? '#fff4e0' : '#e8353a');
+          ctx.fillRect(x, 0, 36, y);
+          ctx.beginPath();
+          ctx.arc(x + 18, y, 18, 0, Math.PI);
+          ctx.fill();
+          ctx.strokeStyle = Art.T('#5a1a30');
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        const sh = ctx.createLinearGradient(0, 0, 0, y);
+        sh.addColorStop(0, 'rgba(30,0,40,0.4)');
+        sh.addColorStop(1, 'rgba(255,255,255,0.08)');
+        ctx.fillStyle = sh;
+        ctx.fillRect(x0, 0, x1 - x0, y);
+        // pennants hanging from the hem
+        for (let x = gridStart(x0, camX * BS, 54) - 54; x < x1 + 54; x += 54) {
+          const i = Math.round((x + camX * BS) / 54), sw = Math.sin(t * 3 + i) * 2.5;
+          ctx.fillStyle = Art.T(Art.CANDY[pm(i, 6)]);
+          ctx.beginPath();
+          ctx.moveTo(x + 18, y + 14);
+          ctx.lineTo(x + 40, y + 14);
+          ctx.lineTo(x + 29 + sw, y + 38);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = Art.T('#5a1a30');
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        ctx.restore();
+        Art.bulbString(ctx, x0 - 6, y + 12, x1 + 6, y + 12, 5, 28, t, 2);
       } else {
         if (c.style !== 'fyris') VD.lintMiss && VD.lintMiss('corridor', c.style);
         // leafy canopy of the riverside trees
@@ -4886,6 +5816,13 @@
           break;
         }
         case 'solid': {
+          if (o.style === 'gondola' && o.mv && o.bx0 != null) {
+            // Nöjesparken: a Ferris wheel gondola hangs from a point that circles the wheel (moveOf 'orbit'); its box is bx0..bx1 x by0..by1
+            const mv = VD.Physics.moveOf(o, px, lvl);
+            const gx0 = sx(o.bx0 + mv.dx, camX), gy1 = sy(o.by1 + mv.dy);
+            Art.gondola(ctx, gx0, gy1, (o.bx1 - o.bx0) * BS, (o.by1 - o.by0) * BS, sx(o.mv.cx + mv.dx, camX), sy(o.mv.cy + mv.dy), o.idx != null ? o.idx : o.id, t);
+            break;
+          }
           const bf = AH && AH.block && AH.block[o.style];
           if (bf) bf(ctx, x, y, w, h, BS, o.id, t);
           else Art.block(ctx, o.style, x, y, w, h, BS, o.id, t);
@@ -4895,8 +5832,17 @@
           if (o.kind === 'spike' || o.kind === 'spikeDown') {
             const down = o.kind === 'spikeDown';
             const sf = AH && AH.spike && AH.spike[o.style];
+            // a cone standing on a sloping rail leans with it, its base on the rail
+            const slope = !down && o.style === 'cone' && o.y > 0.4 && VD.Physics.trackSlope && VD.Physics.trackHeight(lvl, o.x + 0.5) != null ? VD.Physics.trackSlope(lvl, o.x + 0.5) : 0;
+            if (slope) {
+              ctx.save();
+              ctx.translate(x + w / 2, y + h);
+              ctx.rotate(-Math.atan(slope));
+              ctx.translate(-(x + w / 2), -(y + h));
+            }
             if (sf) sf(ctx, x, y, w, h, down, glow(o.x), t, o.id);
             else Art.spike(ctx, x, y, w, h, down, o.style, glow(o.x), t, o.id);
+            if (slope) ctx.restore();
           } else if (o.kind === 'half') Art.half(ctx, x, y, w, h, o.style, glow(o.x));
           else if (o.kind === 'bird') {
             const cx2 = x + w / 2, cy2 = y + h / 2;
@@ -5001,10 +5947,15 @@
               ctx.arc(bx2, by2, BS * 0.4, 0, Math.PI * 2);
               ctx.fill();
             }
+          } else if (o.kind === 'barrel') {
+            // Nöjesparken: a striped barrel rolling at you (moveOf 'roll'); the hit box sits at mv.bx + dx, the art rolls by MV.a
+            const mv = VD.Physics.moveOf(o, px, lvl);
+            Art.barrel(ctx, sx(o.mv.bx + 0.5 + mv.dx, camX), sy(o.y + 0.425), BS * 0.88, mv.a);
           } else if (o.kind === 'balloon') {
             const mv = VD.Physics.moveOf(o, px, lvl);
             const bcx = sx(o.x + o.w / 2 + mv.dx, camX), bcy = sy(o.y + 1.1 + mv.dy);
-            if (AH && AH.hazard && AH.hazard.balloon) AH.hazard.balloon(ctx, bcx, bcy, BS, t, o.id, glow(o.x));
+            if (o.style === 'party') Art.partyBalloon(ctx, bcx, bcy, BS, t, o.id);
+            else if (AH && AH.hazard && AH.hazard.balloon) AH.hazard.balloon(ctx, bcx, bcy, BS, t, o.id, glow(o.x));
             else {
               ctx.fillStyle = '#c0081a';
               ctx.beginPath();
@@ -5116,6 +6067,19 @@
       else raftTilt = U.clamp(-s.vy * 0.025, -0.3, 0.3);
       Art.raft(ctx, cx, sy(s.y), BS * 1.55, s.grounded ? raftTilt : raftTilt * 0.4, t);
     }
+    // Nöjesparken's cart mode: Vippe rides a hollowed log in the flume or a car on the coaster rail, tilting with the slope
+    let cartTilt = 0, cartStyle = null;
+    if (s.mode === 'cart') {
+      const PH = VD.Physics, th = PH.trackHeight;
+      cartStyle = (PH.trackStyleAt && PH.trackStyleAt(this.lvl, s.x + 0.5)) || this._cartStyle || 'coaster';
+      this._cartStyle = cartStyle;
+      if (s.grounded && th) {
+        const h1 = th(this.lvl, s.x + 1.3), h0 = th(this.lvl, s.x - 0.3);
+        if (h1 != null && h0 != null) cartTilt = Math.atan2(-(h1 - h0) * BS, 1.6 * BS);
+      } else cartTilt = U.clamp(-s.vy * 0.025, -0.3, 0.3) * 0.4;
+      if (cartStyle === 'flume') Art.flumeLog(ctx, cx, sy(s.y), BS * 1.85, cartTilt, t, 0);
+      else Art.coasterCart(ctx, cx, sy(s.y), BS * 1.7, cartTilt, t, 0);
+    }
     ctx.save();
     ctx.translate(cx, cy);
     if (laneP) {
@@ -5123,17 +6087,24 @@
       ctx.scale(sc, sc);
     }
     const expr = G.state === 'won' || G.state === 'winning' ? 'happy' : v.oT > 0 ? 'o' : 'grin';
-    if (s.mode === 'cube' || s.mode === 'lane' || s.mode === 'raft') {
-      ctx.rotate(s.mode === 'raft' ? raftTilt * 0.8 : v.rot);
+    if (s.mode === 'cube' || s.mode === 'lane' || s.mode === 'raft' || s.mode === 'cart') {
+      ctx.rotate(s.mode === 'raft' ? raftTilt * 0.8 : s.mode === 'cart' ? cartTilt * 0.8 : v.rot);
       if (s.gdir > 0) ctx.scale(1, -1); // a gravity portal flipped him: run on the ceiling
       Art.cube(ctx, BS, expr, G.skin, 1);
     } else if (s.mode === 'ship') {
       ctx.rotate(v.rot);
-      Art.ship(ctx, BS * 1.15, expr, G.skin, v.wheel, t);
+      // in the park the ship is a human cannonball: helmet, scarf and speed streaks
+      if (this.lvl.id === 'park') Art.cannonball(ctx, BS * 1.15, expr, G.skin, t);
+      else Art.ship(ctx, BS * 1.15, expr, G.skin, v.wheel, t);
     } else {
       Art.ball(ctx, BS, expr, G.skin, v.rot, s.gdir > 0);
     }
     ctx.restore();
+    // the front wall of the log / the nose and lap bar of the car go over Vippe
+    if (s.mode === 'cart') {
+      if (cartStyle === 'flume') Art.flumeLog(ctx, cx, sy(s.y), BS * 1.85, cartTilt, t, 1);
+      else Art.coasterCart(ctx, cx, sy(s.y), BS * 1.7, cartTilt, t, 1);
+    }
   };
 
   // Amazonas: the jaguar that hunts you down the last stretch, ~5 blocks behind the player (graphics only, no physics).

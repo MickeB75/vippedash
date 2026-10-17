@@ -97,6 +97,19 @@
     Z5: parseMelody('B4 . . . . . A#4 . | . . E4 . . . . . | F4 . . . . . E4 . | . . D#4 . . . . .'),
     Z6: parseMelody('E5 G5 B5 E6 D6 B5 G5 B5 | E5 G5 C6 G5 E6 - D6 C6 | F#5 A5 D6 A5 F#6 - E6 D6 | D#5 F#5 B5 D#6 B5 F#5 B5 D#6'),
     Z7: parseMelody('B5 - E6 - G6 F#6 E6 D6 | F#6 - A5 - D6 C#6 D6 F#6 | G6 - E6 - C6 B5 C6 E6 | D#6 - F#6 - B6 A6 F#6 D#6'),
+    // the amusement park song (level 6 "Nöjesparken"), C major fairground music that ends in D major: a music-box
+    // intro, a waltzing barrel-organ tune at the gate, a glittering glockenspiel for the Ferris wheel, a lurching
+    // chromatic fun-house tune, a spinning barrel, a climb and a splash on the log flume, a circus fanfare for the
+    // cannon, a driving roller coaster and a big finale. All melodies are original.
+    P0: parseMelody('G5 . E5 . C6 . G5 - | A5 . F5 . C6 - A5 G5'),
+    P1: parseMelody('C5 - E5 G5 - E5 C5 - | A4 - C5 F5 - E5 D5 - | E5 - G5 C6 - B5 G5 - | D5 - F5 B5 - A5 G5 - | E5 E5 G5 E5 C5 - D5 E5 | F5 - A5 F5 C6 - A5 F5 | G5 - E5 C5 E5 - G5 - | D5 - B4 - G5 - - -'),
+    P2: parseMelody('G5 - E5 G5 C6 - G5 E5 | A5 - E5 A5 C6 - A5 E5 | A5 - F5 A5 C6 - A5 F5 | B5 - G5 B5 D6 - B5 G5 | E6 - D6 C6 - G5 E5 G5 | C6 - B5 A5 - E5 A5 C6 | A5 - C6 F6 - E6 C6 A5 | D6 - B5 G5 - D5 G5 B5 | C6 - - E6 - D6 C6 - | A5 - C6 E6 - C6 A5 - | F6 - E6 C6 - A5 C6 F6 | D6 - B5 - G5 - - -'),
+    P3: parseMelody('C5 C#5 D5 . E5 . G5 F#5 | G#5 . E5 D#5 E5 . B4 . | C6 B5 C6 . G#5 . E5 . | D5 . B5 . G5 F#5 G5 . | E5 - G5 - C6 B5 A#5 A5 | G#5 . B5 . E6 . D#6 . | C6 - D#6 - C6 - G#5 -'),
+    P4: parseMelody('A5 C6 E6 C6 A5 C6 E6 C6 | D6 F6 A5 F6 D6 F6 A5 F6 | B5 D6 G6 D6 B5 D6 G6 D6 | C6 E6 G6 E6 C6 E6 G6 E6 | E6 - C6 - A5 - - -'),
+    P5: parseMelody('B4 - D5 - G5 - D5 - | E5 - G5 - B5 - G5 - | G5 - C6 - E6 - C6 - | A5 - D6 - F#6 - D6 - | B5 - D6 - G6 - D6 - | B5 - E6 - G6 - E6 - | C6 - E6 - G6 - E6 - | F#5 A5 D6 F#6 A6 - - - | G6 F#6 E6 D6 B5 G5 B5 D6 | E6 - B5 G5 E6 - G5 B5 | C6 - E6 G6 - E6 C6 - | D6 - F#6 A6 - F#6 D6 - | G6 - - - - - - -'),
+    P6: parseMelody('. . . . G5 - C6 - | D6 - A#5 D6 F6 - D6 A#5 | C6 - A5 C6 F6 - E6 F6 | G5 - B5 D6 G6 - F6 D6 | E6 E6 . E6 G6 - E6 C6 | D6 D6 . D6 F6 - D6 A#5 | C6 C6 . A5 C6 - F6 - | G6 - F6 E6 D6 - B5 G5 | G5 - C6 E6 - G6 E6 C6 | A#5 - D6 F6 - A#5 D6 F6 | A5 - C6 F6 - - - -'),
+    P7: parseMelody('A5 A5 C6 E6 E6 C6 A5 C6 | A5 A5 C6 F6 F6 C6 A5 C6 | G5 G5 C6 E6 E6 G6 E6 C6 | B5 B5 D6 G6 G6 D6 B5 D6 | C6 E6 A6 E6 C6 E6 A6 - | C6 F6 A6 F6 C6 F6 A6 - | E6 G6 C6 E6 G6 E6 C6 G5 | D6 G6 B5 D6 G6 F6 E6 D6 | A5 - C6 - E6 - A5 - | A5 - C6 - F6 - - -'),
+    P8: parseMelody('D6 - F#6 A6 - F#6 D6 - | C#6 - E6 A6 - E6 C#6 - | B5 - D6 G6 - B6 G6 - | E6 - C#6 E6 A6 - G6 E6 | F#6 F#6 A6 F#6 D6 - E6 F#6 | E6 - A6 E6 C#6 - E6 A6 | G6 - B6 G6 D6 - G6 B6 | A6 - E6 C#6 E6 - A6 - | A6 - F#6 D6 A6 - F#6 A6 | E6 - C#6 E6 A6 - - -'),
   };
   // chords: [bass root midi, triad midis]
   const CH = {
@@ -165,6 +178,16 @@
     hilldeep: ['Em', 'Em', 'Bdim', 'Fm'],
     chase: ['Em', 'C', 'D', 'B'],
     chase2: ['Em', 'D', 'C', 'B'],
+    // the amusement park level ("Nöjesparken"): C major fairground, a lurching C-E-Ab-G in the fun house,
+    // mixolydian Bb in the cannon fanfare, and D major (a step up) for the finale
+    parkA: ['C', 'F', 'C', 'G'],
+    parkWheel: ['C', 'Am', 'F', 'G'],
+    parkFun: ['C', 'E', 'Ab', 'G'],
+    parkBarrel: ['Am', 'Dm', 'G', 'C'],
+    parkFlume: ['G', 'Em', 'C', 'D'],
+    parkCannon: ['C', 'Bb', 'F', 'G'],
+    parkCoaster: ['Am', 'F', 'C', 'G'],
+    parkFinale: ['D', 'A', 'G', 'A'],
   };
   // each song: [fromBar, toBar, settings]. `phrase: 'section'` starts the 4-bar phrases at the section start.
   const SONGS = {
@@ -318,6 +341,27 @@
         [41, 60, { prog: 'parade3', drums: 'train', bass: 'octave', arp: 'fast', lead: 'S1' }],
         [60, 80, { prog: 'parade4', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'S5', pad: true }],
         [80, 82, { end: true }],
+      ],
+    },
+    // level 6 "Nöjesparken": areas start at bars 0, 10, 22, 29, 34, 47, 58 and 68; the finish is bar 78. Fairground
+    // music: a music box, then a barrel-organ oompah at the gate, a glockenspiel over the Ferris wheel, a
+    // wobbly fun house, a spinning barrel, the log flume (chain-lift clicks for 5 bars up the lift hill (x 566-622), then the big drop at x 624),
+    // a snare roll and a cannon boom half way into bar 47 (x=760) with a circus fanfare, the roller coaster
+    // and a D major finale with fireworks.
+    park: {
+      endChord: 'D',
+      phrase: 'section',
+      sections: [
+        [0, 2, { prog: 'parkA', lead: 'P0', tone: 'glock' }],
+        [2, 10, { prog: 'parkA', drums: 'polka', bass: 'oompah', pah: true, lead: 'P1', tone: 'park' }],
+        [10, 22, { prog: 'parkWheel', drums: 'float', bass: 'long', arp: 'wave', lead: 'P2', tone: 'glock', pad: true }],
+        [22, 29, { prog: 'parkFun', drums: 'half', bass: 'oompah', pah: true, lead: 'P3', tone: 'wobbly' }],
+        [29, 34, { prog: 'parkBarrel', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'P4', tone: 'park' }],
+        [34, 47, { prog: 'parkFlume', drums: 'flume', bass: 'octave', arp: 'wave', lead: 'P5', tone: 'park', chain: 5, drips: true }],
+        [47, 58, { prog: 'parkCannon', drums: 'cannon', bass: 'oompah', pah: true, stabs: true, lead: 'P6', tone: 'brass', shine: true }],
+        [58, 68, { prog: 'parkCoaster', drums: 'coaster', bass: 'octave', arp: 'fast', stabs: true, lead: 'P7', tone: 'brass', shine: true }],
+        [68, 78, { prog: 'parkFinale', drums: 'coaster', bass: 'octave', arp: 'fast', stabs: true, pad: true, lead: 'P8', tone: 'brass', shine: true, fireworks: true }],
+        [78, 80, { end: true }],
       ],
     },
   };
@@ -694,6 +738,21 @@
     if (A.reverbIn) noise(t, 0.04 * n, 0.14 * scale, 'bandpass', 700, A.reverbIn, 2);
   }
 
+  // ---- level 6: glockenspiel and the log flume's chain lift ----
+  // a glockenspiel bell: a sine with a bright inharmonic overtone, a short ring
+  function glockNote(t, m, vol = 1) {
+    const f = mtof(m);
+    voice('sine', f, t, 0.5, 0.11 * vol, { attack: 0.001, hold: 0.06, release: 0.16 });
+    voice('sine', f * 2.76, t, 0.3, 0.04 * vol, { attack: 0.001, hold: 0.04, release: 0.07 });
+    voice('sine', f * 5.4, t, 0.15, 0.015 * vol, { attack: 0.001, hold: 0.03, release: 0.04 });
+    voice('triangle', f * 0.5, t, 0.2, 0.03 * vol, { attack: 0.002, hold: 0.1, release: 0.05 });
+  }
+  // one clack of the log flume's chain lift
+  function chainClick(t, v = 1, accent) {
+    noise(t, 0.03, 0.16 * v, 'bandpass', accent ? 2400 : 3400, null, 4);
+    voice('square', accent ? 330 : 520, t, 0.025, 0.05 * v, { attack: 0.001, hold: 0.2, release: 0.01, lp: 1800 });
+  }
+
   function playStep(step, t) {
     const bar = Math.floor(step / 16);
     const s16 = step % 16;
@@ -773,6 +832,61 @@
       hat(t, s16 % 2 ? 0.4 : 0.75, s16 % 4 === 3);
       if (bar % 2 === 0 && s16 === 0) crash(t);
       if (pb % 4 === 3 && s16 >= 12) snare(t, 0.7);
+    } else if (d === 'polka') {
+      // the gate: oompah drums, a kick on beats 1 and 3, a soft snare on 2 and 4, light hats
+      if (s16 === 0 || s16 === 8) kick(t, 0.8);
+      if (s16 === 4 || s16 === 12) snare(t, 0.5);
+      if (s16 % 4 === 2) hat(t, 0.5);
+      if (pb % 4 === 3 && s16 >= 12) snare(t, 0.4 + (s16 - 12) * 0.15);
+    } else if (d === 'float') {
+      // the Ferris wheel: a floating pulse, a kick on the downbeat and a gentle shaker
+      if (s16 === 0) kick(t, 0.55);
+      if (s16 % 2 === 0) hat(t, 0.35);
+      if (s16 === 12) clap(t, 0.35);
+    } else if (d === 'flume') {
+      // the log flume: a slow climb (soft kick, ticking chain), a snare roll to the top and a big drop
+      const climb = cfg.chain || 8;
+      if (barInSec < climb) {
+        if (s16 === 0 || s16 === 8) kick(t, 0.6 + barInSec * 0.05);
+        if (barInSec === climb - 1 && s16 >= 8) snare(t, 0.2 + (s16 - 8) * 0.1);
+      } else {
+        if (beat) kick(t, s16 === 0 ? 1 : 0.85);
+        if (s16 === 4 || s16 === 12) {
+          snare(t, 0.9);
+          clap(t, 0.7);
+        }
+        hat(t, s16 % 2 ? 0.4 : 0.7, s16 % 4 === 2);
+        if (barInSec === climb && s16 === 0) {
+          // the big splash
+          crash(t);
+          noise(t, 0.9, 0.35, 'bandpass', 900, null, 0.5);
+          voice('sine', 1500, t, 0.7, 0.07, { slide: 200, hold: 0.8 });
+        }
+        if (barInSec === 12 && s16 === 0) noise(t, 0.7, 0.25, 'bandpass', 800, null, 0.5);
+      }
+    } else if (d === 'cannon') {
+      // a snare roll up to the boom half way into the first bar, then a circus march
+      if (barInSec === 0 && s16 < 8) {
+        snare(t, 0.15 + s16 * 0.07);
+        if (s16 % 4 === 0) kick(t, 0.6);
+      } else if (barInSec === 0 && s16 === 8) {
+        bigKick(t, 1.3);
+        crash(t);
+        noise(t, 0.7, 0.35, 'lowpass', 500);
+      } else {
+        if (s16 === 0 || s16 === 8) kick(t, 0.95);
+        if (s16 === 4 || s16 === 12) snare(t, 0.9);
+        if (s16 % 2 === 0) hat(t, s16 % 4 ? 0.4 : 0.6);
+        if (bar % 2 === 0 && s16 === 0) crash(t);
+        if (pb % 4 === 3 && s16 >= 12) snare(t, 0.7);
+      }
+    } else if (d === 'coaster') {
+      // the roller coaster and the finale: pounding beats with a 16th pickup, a hat on every 8th
+      if (beat || s16 === 14) kick(t, s16 === 0 ? 1 : 0.85);
+      if (s16 === 4 || s16 === 12) snare(t, 0.95);
+      hat(t, s16 % 2 ? 0.35 : 0.7, s16 % 4 === 2);
+      if (bar % 2 === 0 && s16 === 0) crash(t);
+      if (pb % 4 === 3 && s16 >= 12) snare(t, 0.7);
     } else if (d === 'ghost') {
       // inside Tripp Troppen: a faint heartbeat and, now and then, a far-off dull tom in the dark
       if (s16 === 0) {
@@ -833,6 +947,22 @@
     if (cfg.thunder && s16 === 0 && bar % 2 === 1) thunderRumble(t);
     // church bell tolls, at the given step offsets within this section (barInSec * 16 + s16)
     if (cfg.bell && cfg.bell.includes(barInSec * 16 + s16)) churchBell(t, 48, 0.4);
+
+    // the log flume's chain lift: clacks on every 8th for the climb, getting louder, then a silent beat at the top
+    if (cfg.chain && barInSec < cfg.chain && s16 % 2 === 0 && !(barInSec === cfg.chain - 1 && s16 >= 8)) {
+      chainClick(t, 0.6 + 0.5 * (barInSec / cfg.chain), s16 % 4 === 0);
+    }
+    // fireworks: a rising whistle, then a burst with a few glittering notes
+    if (cfg.fireworks && s16 % 2 === 1 && ((step * 2654435761) >>> 0) % 13 === 0) {
+      const f = 500 + ((step * 71) % 5) * 90;
+      voice('sine', f, t, 0.35, 0.04, { slide: f * 2.2, hold: 0.8 });
+      noise(t + 0.38, 0.35, 0.1, 'highpass', 3500);
+      [0, 1, 2].forEach((i) => glockNote(t + 0.38 + i * 0.05, 84 + ((step + i * 3) % 4) * 3, 0.5));
+    }
+    // fairground "pah": a short staccato chord on beats 2 and 4 against the oompah bass
+    if (cfg.pah && (s16 === 4 || s16 === 12)) {
+      tri.forEach((m) => voice('square', mtof(m), t, STEP * 1.4, 0.03, { attack: 0.004, hold: 0.3, release: 0.05, lp: 2200 }));
+    }
 
     // ---- bass ----
     if (cfg.bass === 'eighth' && s16 % 2 === 0) {
@@ -936,10 +1066,30 @@
           // a wavering, spooky theremin-like lead with slow vibrato (level 7)
           thereminNote(t, n.midi, dur, 0.09);
           thereminNote(t, n.midi + 12, dur, 0.03);
+        } else if (cfg.tone === 'park') {
+          // a fairground calliope / barrel organ: a steady nasal square with an airy octave and a soft organ body
+          const sway = Math.sin(t * 5.1 + n.midi) * 5; // a few cents of drift, deterministic so offline renders match
+          voice('square', mtof(n.midi), t, dur, 0.075, { attack: 0.012, hold: 0.85, release: 0.05, lp: 3200, detune: sway });
+          voice('sine', mtof(n.midi + 12), t, dur, 0.035, { attack: 0.015, hold: 0.8, release: 0.05 });
+          voice('triangle', mtof(n.midi - 12), t, dur, 0.03, { attack: 0.012, hold: 0.85, release: 0.05 });
+          noise(t, 0.04, 0.025, 'bandpass', 2800, null, 2);
+        } else if (cfg.tone === 'glock') {
+          // a glockenspiel / music box, an octave up
+          glockNote(t, n.midi + 12);
+        } else if (cfg.tone === 'wobbly') {
+          // the fun house: a slide-whistle scoop into each note, played slightly out of tune and wobbling
+          const f = mtof(n.midi);
+          const off = ((n.midi * 37) % 5 - 2) * 18; // up to +-36 cents flat or sharp, depending on the note
+          const wob = Math.sin(t * 9.7) * 25;
+          voice('square', f, t, dur, 0.07, { attack: 0.01, hold: 0.7, release: 0.05, lp: 2600, detune: off + wob, slide: f * 1.02 });
+          voice('sine', f * 0.9, t, Math.min(dur, STEP * 1.4), 0.07, { attack: 0.005, hold: 0.5, slide: f * 2 });
+          voice('triangle', f * 2, t, dur, 0.03, { attack: 0.01, hold: 0.6, detune: -off - wob });
         } else {
           voice('sawtooth', mtof(n.midi), t, dur, 0.075, { lp: 3200, hold: 0.7, detune: -5 });
           voice('square', mtof(n.midi), t, dur, 0.045, { lp: 2400, hold: 0.7, detune: 5 });
         }
+        // a glockenspiel sparkle doubling the lead an octave up
+        if (cfg.shine) glockNote(t, n.midi + 12, 0.6);
       }
     }
   }

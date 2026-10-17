@@ -986,6 +986,17 @@
       const target = U.clamp(-s.vy * 0.12, -0.35, 0.35);
       v.rot += (target - v.rot) * 0.2;
       if (s.grounded && G.tickN % 4 === 0) particle({ x: s.x - 0.1, y: s.y + 0.05, vx: -3 - Math.random() * 2, vy: 1 + Math.random() * 2, life: 0.4, size: 5, color: 'rgba(235,250,255,0.85)', grav: 10 });
+    } else if (s.mode === 'cart') {
+      // Nöjesparken: the log / roller-coaster car follows the rail's slope (render.js drawPlayer tilts it
+      // by G.vis.rot) — no cube spin; water spray off the log, sparks off the coaster car
+      const target = U.clamp(-Math.atan2(s.vy, P.SPEED), -0.9, 0.9);
+      v.rot += (target - v.rot) * 0.3;
+      if (s.grounded && G.tickN % 4 === 0) {
+        const flume = Ph.trackStyleAt(G.lvl, s.x + 0.5) === 'flume';
+        particle(flume
+          ? { x: s.x - 0.1, y: s.y + 0.05, vx: -3 - Math.random() * 2, vy: 1 + Math.random() * 2, life: 0.4, size: 5, color: 'rgba(235,250,255,0.85)', grav: 10 }
+          : { x: s.x + 0.2, y: s.y + 0.05, vx: -2 - Math.random() * 2, vy: 0.5 + Math.random() * 1.5, life: 0.3, size: 3, color: Math.random() < 0.5 ? '#ffd24a' : '#fff4c4', grav: 12 });
+      }
     } else if (s.mode === 'ship') {
       const a = -Math.atan2(s.vy, P.SPEED) * 0.85;
       v.rot += (a - v.rot) * 0.15;

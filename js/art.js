@@ -54,6 +54,8 @@
 
   // Amazonas (level 7 "Amazonas") block/spike/water styles live in the section at the bottom of this file
   const JUNGLE = { block: {}, spike: {}, water: {} };
+  // level 6 "Nöjesparken" (the amusement park) block/spike/water styles live in the section at the bottom of this file
+  const PARK = { block: {}, spike: {}, water: {} };
 
   // =====================================================================
   // CHARACTER — Vippe: curly brown hair, blue-grey eyes, big goofy faces
@@ -1708,9 +1710,15 @@
     if (style === 'pawnspike') return pawnSpike(ctx, x, y, w, h, glow, t, seed);
     if (style === 'diagonal') return diagonalSpike(ctx, x, y, w, h, down, glow);
     if (JUNGLE.spike[style]) return JUNGLE.spike[style](ctx, x, y, w, h, down, glow, t, seed);
+    if (PARK.spike[style]) return PARK.spike[style](ctx, x, y, w, h, down, glow, t, seed);
     if (style === 'cone') {
       const bx = x + w * 0.1, bw = w * 0.8;
-      if (down) return;
+      // hanging from the roof (spikeDown): the same cone turned upside down around the middle of its tile
+      if (down) {
+        ctx.save();
+        ctx.translate(0, y * 2 + h);
+        ctx.scale(1, -1);
+      }
       ctx.fillStyle = TL('#ff6d12');
       tri(ctx, bx + bw * 0.12, y + h * 0.88, x + w / 2, y + h * 0.04, bx + bw * 0.88, y + h * 0.88);
       ctx.fill();
@@ -1728,6 +1736,7 @@
       ctx.fillStyle = TL('#2b2b2b');
       rr(ctx, bx, y + h * 0.84, bw, h * 0.16, 3);
       ctx.fill();
+      if (down) ctx.restore();
       return;
     }
     if (style) VD.lintMiss && VD.lintMiss('spike', style);
@@ -2168,6 +2177,7 @@
     if (style === 'sludge') return sludge(ctx, x0, x1, ySurf, yBot, t);
     if (style === 'current') return current(ctx, x0, x1, ySurf, yBot, t);
     if (JUNGLE.water[style]) return JUNGLE.water[style](ctx, x0, x1, ySurf, yBot, t);
+    if (PARK.water[style]) return PARK.water[style](ctx, x0, x1, ySurf, yBot, t);
     if (style) VD.lintMiss && VD.lintMiss('water', style);
     const g = ctx.createLinearGradient(0, ySurf, 0, yBot);
     g.addColorStop(0, TL('#3f93d6'));
@@ -3616,6 +3626,7 @@
       default: {
         if (METRO_BLOCKS[st]) return METRO_BLOCKS[st](ctx, x, y, w, h, bs, seed, t);
         if (JUNGLE.block[st]) return JUNGLE.block[st](ctx, x, y, w, h, bs, seed, t);
+        if (PARK.block[st]) return PARK.block[st](ctx, x, y, w, h, bs, seed, t);
         VD.lintMiss && VD.lintMiss('block', st);
         bevel(ctx, x, y, w, h, '#30303a', '#16161c', '#ffffff', 4);
       }
@@ -10401,6 +10412,2265 @@
     }
     ctx.stroke();
   };
+  // =====================================================================
+  // NÖJESPARKEN (level 6, the amusement park) — blocks, hazards, gondolas, props
+  // =====================================================================
+  // the ground line of the screen (render.js GY), for blocks that need to know whether they stand on the ground or hang from the roof
+  const PARK_GY = 552;
+  // 0..1: how brightly the string lights and the lit rides shine (render.js sets it from theme.lights and the sky every frame)
+  let lightK = 0;
+  Art.setLights = (k) => {
+    lightK = U.clamp(k, 0, 1);
+  };
+  Art.lights = () => lightK;
+  const CANDY = ['#ff4d6d', '#ffb02e', '#35c9a5', '#4aa3ff', '#b66cff', '#ff7ac8'];
+  Art.CANDY = CANDY;
+  const cand = (i) => CANDY[((Math.floor(i) % CANDY.length) + CANDY.length) % CANDY.length]; // any integer, also negative ones
+
+  // a soft round glow as a cached sprite per colour: bulbs and lanterns draw it with drawImage instead of a gradient each
+  const glowCache = new Map();
+  function glowSprite(col) {
+    let cv = glowCache.get(col);
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.width = cv.height = 64;
+      const c = cv.getContext('2d');
+      const g = c.createRadialGradient(32, 32, 1, 32, 32, 32);
+      g.addColorStop(0, U.rgba(col, 0.95));
+      g.addColorStop(0.35, U.rgba(col, 0.38));
+      g.addColorStop(1, U.rgba(col, 0));
+      c.fillStyle = g;
+      c.fillRect(0, 0, 64, 64);
+      glowCache.set(col, cv);
+    }
+    return cv;
+  }
+  function glowAt(ctx, x, y, r, col, a) {
+    if (a <= 0.01) return;
+    ctx.globalAlpha = Math.min(1, a);
+    ctx.drawImage(glowSprite(col), x - r, y - r, r * 2, r * 2);
+    ctx.globalAlpha = 1;
+  }
+  Art.glowAt = glowAt;
+  // a light bulb: a pale glass bead by day, a bright one with a halo once the lights are on (k = a flicker/size factor)
+  function bulb(ctx, x, y, r, col, k = 1) {
+    const on = lightK * k;
+    ctx.fillStyle = U.mixHex(col, '#ffffff', 0.25 + 0.55 * on);
+    circle(ctx, x, y, r);
+    ctx.fill();
+    if (on > 0.05) glowAt(ctx, x, y, r * 4.2, col, 0.7 * on);
+  }
+  // a sagging wire with bulbs on it, from (x0, y0) to (x1, y1); bulbs twinkle in candy colours
+  function bulbString(ctx, x0, y0, x1, y1, sag, gap, t, seed) {
+    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2 + sag * 2;
+    ctx.strokeStyle = TL('#2a2230');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(mx, my, x1, y1);
+    ctx.stroke();
+    const n = Math.max(2, Math.round(Math.hypot(x1 - x0, y1 - y0) / gap));
+    for (let i = 1; i < n; i++) {
+      const u = i / n, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
+      const bx = a * x0 + b * mx + c * x1, by = a * y0 + b * my + c * y1 + 4;
+      bulb(ctx, bx, by, 3.4, cand(i + seed), 0.65 + 0.35 * Math.sin(t * 4 + i * 1.7 + seed));
+    }
+  }
+  Art.bulbString = bulbString;
+  Art.bulb = bulb;
+  // vertical stripes of two colours across [x, x + w], sw wide each (the caller clips); phase shifts them sideways
+  function stripes(ctx, x, y, w, h, sw, c1, c2, phase = 0) {
+    ctx.fillStyle = c2;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = c1;
+    for (let xx = x - ((phase % (sw * 2)) + sw * 2) % (sw * 2); xx < x + w; xx += sw * 2) ctx.fillRect(xx, y, sw, h);
+  }
+
+  // ---------- blocks (ctx, x, y, w, h, bs, seed, t) ----------
+  // stand: a sweets / hot dog stall; you stand on its red-and-white striped awning
+  PARK.block.stand = (ctx, x, y, w, h, bs, seed, t) => {
+    const rnd = U.rng(seed * 3181 + 7);
+    const aw = Math.min(h * 0.46, bs * 0.7);
+    // the stall body
+    const bg = ctx.createLinearGradient(0, y, 0, y + h);
+    const base = ['#ffe9b8', '#ffd6e2', '#d6efff'][seed % 3];
+    bg.addColorStop(0, TL(base));
+    bg.addColorStop(1, TL(U.mixHex(base, '#8a5a30', 0.35)));
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 7);
+    ctx.fillStyle = bg;
+    ctx.fill();
+    ctx.save();
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 7);
+    ctx.clip();
+    // the serving hatch, with the goods on the counter
+    const hx = x + 7, hw = w - 14, hy = y + aw + 3, hh = Math.max(9, h - aw - Math.max(10, h * 0.2) - 4);
+    ctx.fillStyle = TL('#3a2230');
+    rr(ctx, hx, hy, hw, hh, 4);
+    ctx.fill();
+    ctx.fillStyle = lightK > 0.1 ? U.mixHex('#3a2230', '#ffcf7a', 0.55 * lightK) : TL('#4e3040');
+    rr(ctx, hx + 2, hy + 2, hw - 4, hh - 4, 3);
+    ctx.fill();
+    const kind = seed % 3;
+    for (let cx = x + bs * 0.5; cx < x + w - bs * 0.3; cx += bs) {
+      const gy = hy + hh;
+      if (kind === 0) {
+        // candy floss on cones
+        ctx.fillStyle = TL('#f5e1b4');
+        tri(ctx, cx - 3, gy - 8, cx + 3, gy - 8, cx, gy);
+        ctx.fill();
+        ctx.fillStyle = TL(rnd() < 0.5 ? '#ff9ac9' : '#9ad7ff');
+        circle(ctx, cx, gy - 13, Math.min(8, hh * 0.38));
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        circle(ctx, cx - 2.5, gy - 15, 2.6);
+        ctx.fill();
+      } else if (kind === 1) {
+        // jars of sweets
+        for (let k = 0; k < 2; k++) {
+          const jx = cx - 9 + k * 12, jh = Math.min(hh - 3, 14 + k * 3);
+          ctx.fillStyle = 'rgba(220,240,255,0.7)';
+          rr(ctx, jx, gy - jh, 10, jh, 3);
+          ctx.fill();
+          ctx.fillStyle = TL(cand(seed + k * 2 + Math.floor(cx / bs)));
+          rr(ctx, jx + 1.5, gy - jh * 0.7, 7, jh * 0.7 - 1, 2);
+          ctx.fill();
+        }
+      } else {
+        // a hot dog and a mustard bottle
+        ctx.fillStyle = TL('#f2d28a');
+        rr(ctx, cx - 11, gy - 8, 22, 7, 3.5);
+        ctx.fill();
+        ctx.fillStyle = TL('#c8442a');
+        rr(ctx, cx - 10, gy - 9.5, 20, 4.5, 2.2);
+        ctx.fill();
+        ctx.fillStyle = TL('#f2c230');
+        ctx.fillRect(cx + 12, gy - 14, 4, 13);
+      }
+    }
+    // counter and a candy-striped front panel
+    const cy = y + h - Math.max(10, h * 0.2);
+    ctx.fillStyle = TL('#a8683a');
+    ctx.fillRect(x, cy, w, 4);
+    stripes(ctx, x, cy + 4, w, h, bs * 0.17, TL('#ff4d6d'), TL('#fff4e0'), 0);
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = TL('#5a3418');
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 7);
+    ctx.stroke();
+    // the awning: red and white stripes with a scalloped edge
+    const sw = bs * 0.25;
+    ctx.save();
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 7);
+    ctx.clip();
+    stripes(ctx, x, y, w, aw, sw, TL('#e8353a'), TL('#fffaf0'), 0);
+    for (let i = 0, xx = x; xx < x + w; xx += sw, i++) {
+      ctx.fillStyle = i % 2 ? TL('#fffaf0') : TL('#e8353a');
+      ctx.beginPath();
+      ctx.arc(xx + sw / 2, y + aw, sw / 2, 0, Math.PI);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(x, y, w, 4);
+    ctx.restore();
+    ctx.strokeStyle = TL('#7a1f26');
+    ctx.lineWidth = 2.5;
+    rr(ctx, x + 1.5, y + 1.5, w - 3, aw, 6);
+    ctx.stroke();
+    // bulbs under the scallops
+    for (let xx = x + sw; xx < x + w - 4; xx += sw * 2) bulb(ctx, xx, y + aw + sw / 2 + 2, 2.6, CANDY[1], 0.7 + 0.3 * Math.sin(t * 3 + xx));
+  };
+
+  // funblock: a crooked fun-house block in candy colours, dotted, striped or zig-zagged
+  PARK.block.funblock = (ctx, x, y, w, h, bs, seed, t) => {
+    const rnd = U.rng(seed * 4409 + 11);
+    const a = CANDY[seed % 6], b = CANDY[(seed + 2) % 6], c = CANDY[(seed + 4) % 6];
+    const j = () => (rnd() - 0.5) * bs * 0.12;
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(x + 3 + j(), y + 3 + j());
+      ctx.lineTo(x + w - 3 + j(), y + 2 + j());
+      ctx.lineTo(x + w - 2 + j(), y + h - 3 + j());
+      ctx.lineTo(x + 2 + j(), y + h - 2 + j());
+      ctx.closePath();
+    };
+    ctx.lineJoin = 'round';
+    path();
+    ctx.fillStyle = TL(a);
+    ctx.fill();
+    ctx.save();
+    path();
+    ctx.clip();
+    const kind = seed % 3;
+    if (kind === 0) {
+      // slanted stripes
+      ctx.fillStyle = TL(b);
+      ctx.beginPath();
+      for (let k = -h; k < w + h; k += bs * 0.5) {
+        ctx.moveTo(x + k, y + h);
+        ctx.lineTo(x + k + h, y);
+        ctx.lineTo(x + k + h + bs * 0.25, y);
+        ctx.lineTo(x + k + bs * 0.25, y + h);
+      }
+      ctx.fill();
+    } else if (kind === 1) {
+      // polka dots
+      ctx.fillStyle = TL('#fff4e0');
+      ctx.beginPath();
+      for (let yy = y + bs * 0.25, r = 0; yy < y + h; yy += bs * 0.5, r++)
+        for (let xx = x + bs * 0.25 + (r % 2) * bs * 0.25; xx < x + w; xx += bs * 0.5) {
+          ctx.moveTo(xx + bs * 0.1, yy);
+          ctx.arc(xx, yy, bs * 0.1, 0, TAU);
+        }
+      ctx.fill();
+      ctx.fillStyle = TL(c);
+      ctx.beginPath();
+      for (let yy = y + bs * 0.5, r = 0; yy < y + h; yy += bs * 0.5, r++)
+        for (let xx = x + bs * 0.5 + (r % 2) * bs * 0.25; xx < x + w; xx += bs * 0.5) {
+          ctx.moveTo(xx + bs * 0.05, yy);
+          ctx.arc(xx, yy, bs * 0.05, 0, TAU);
+        }
+      ctx.fill();
+    } else {
+      // zig-zag bands
+      ctx.strokeStyle = TL(b);
+      ctx.lineWidth = bs * 0.16;
+      ctx.beginPath();
+      for (let yy = y + bs * 0.28; yy < y + h; yy += bs * 0.5) {
+        ctx.moveTo(x - 4, yy);
+        for (let xx = x - 4, d = 1; xx < x + w + bs * 0.25; xx += bs * 0.25, d = -d) ctx.lineTo(xx + bs * 0.25, yy + d * bs * 0.12);
+      }
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.32)';
+    ctx.fillRect(x, y, w, 6);
+    ctx.fillStyle = 'rgba(40,0,60,0.18)';
+    ctx.fillRect(x, y + h - 7, w, 7);
+    ctx.restore();
+    path();
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = TL('#3a1a4a');
+    ctx.stroke();
+  };
+
+  // tent: striped circus canvas, a pillar on the ground or a flap hanging from the roof (decided by how high it is)
+  PARK.block.tent = (ctx, x, y, w, h, bs, seed, t) => {
+    const hang = (PARK_GY - (y + h)) / bs > 1.2;
+    const pal = [['#e8353a', '#fffaf0'], ['#2a6fd6', '#ffd23a'], ['#8a3fc8', '#ffb3e0']][seed % 3];
+    const sw = bs * 0.3;
+    ctx.save();
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 5);
+    ctx.clip();
+    stripes(ctx, x, y, w, h, sw, TL(pal[0]), TL(pal[1]), 0);
+    // cylinder shading: the canvas curves away at both edges
+    const sh = ctx.createLinearGradient(x, 0, x + w, 0);
+    sh.addColorStop(0, 'rgba(30,0,40,0.38)');
+    sh.addColorStop(0.3, 'rgba(255,255,255,0.12)');
+    sh.addColorStop(0.7, 'rgba(0,0,0,0)');
+    sh.addColorStop(1, 'rgba(30,0,40,0.38)');
+    ctx.fillStyle = sh;
+    ctx.fillRect(x, y, w, h);
+    // a golden rope band
+    ctx.fillStyle = TL('#f2c230');
+    const by = hang ? y + h - bs * 0.42 : y + bs * 0.3;
+    ctx.fillRect(x, by, w, 5);
+    ctx.fillStyle = TL('#a07a10');
+    ctx.fillRect(x, by + 5, w, 2);
+    ctx.restore();
+    ctx.strokeStyle = TL('#3a1a30');
+    ctx.lineWidth = 3;
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 5);
+    ctx.stroke();
+    // scalloped hem along the free edge, with a tassel on each scallop
+    const hy = hang ? y + h : y;
+    for (let i = 0, xx = x; xx < x + w - 2; xx += sw, i++) {
+      const ww = Math.min(sw, x + w - xx);
+      ctx.fillStyle = i % 2 ? TL(pal[1]) : TL(pal[0]);
+      ctx.beginPath();
+      if (hang) ctx.arc(xx + ww / 2, hy, ww / 2, 0, Math.PI);
+      else ctx.arc(xx + ww / 2, hy, ww / 2, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = TL('#3a1a30');
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    if (!hang) {
+      // a little pennant on top of the pillar
+      const px = x + w / 2, sway = Math.sin(t * 3 + seed) * 3;
+      ctx.strokeStyle = TL('#3a1a30');
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(px, y - 2);
+      ctx.lineTo(px, y - bs * 0.55);
+      ctx.stroke();
+      ctx.fillStyle = TL(pal[0]);
+      tri(ctx, px, y - bs * 0.55, px + bs * 0.4 + sway, y - bs * 0.45, px, y - bs * 0.32);
+      ctx.fill();
+    } else {
+      for (let xx = x + sw; xx < x + w - 4; xx += sw * 2) bulb(ctx, xx, y + h + sw / 2 + 4, 2.6, cand(Math.floor(xx / sw) + seed), 0.7);
+    }
+  };
+
+  // girder: a white steel lattice beam of the roller coaster (horizontal when it is wider than tall)
+  PARK.block.girder = (ctx, x, y, w, h, bs, seed, t) => {
+    const horiz = w >= h;
+    // a beam up in the air stands on two lattice posts, one at each end, down to the ground
+    if (horiz && w >= bs * 2 && PARK_GY - (y + h) > bs * 0.9) {
+      for (const px of [x + 7, x + w - 7]) {
+        ctx.fillStyle = TL('#f4f6fa');
+        ctx.fillRect(px - 5, y + h - 2, 10, PARK_GY - (y + h) + 2);
+        ctx.strokeStyle = TL('#6b7686');
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(px - 5, y + h - 2, 10, PARK_GY - (y + h) + 2);
+        ctx.strokeStyle = TL('#9aa5b6');
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let yy = y + h, d = 0; yy < PARK_GY - 4; yy += 16, d ^= 1) {
+          ctx.moveTo(px + (d ? -5 : 5), yy);
+          ctx.lineTo(px + (d ? 5 : -5), Math.min(PARK_GY, yy + 16));
+        }
+        ctx.stroke();
+        ctx.fillStyle = TL('#6b7686');
+        ctx.fillRect(px - 10, PARK_GY - 4, 20, 4);
+      }
+    }
+    const g = ctx.createLinearGradient(x, y, horiz ? x : x + w, horiz ? y + h : y);
+    g.addColorStop(0, TL('#fbfcff'));
+    g.addColorStop(1, TL('#b9c2d0'));
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 3);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = TL('#6b7686');
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // lattice: two chords and the zig-zag between them
+    ctx.save();
+    rr(ctx, x + 1, y + 1, w - 2, h - 2, 3);
+    ctx.clip();
+    ctx.strokeStyle = TL('#8f9aab');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const step = bs * 0.5;
+    if (horiz) {
+      const y0 = y + 7, y1 = y + h - 7;
+      for (let xx = x, d = 0; xx < x + w; xx += step, d ^= 1) {
+        ctx.moveTo(xx, d ? y0 : y1);
+        ctx.lineTo(xx + step, d ? y1 : y0);
+      }
+      ctx.stroke();
+      ctx.fillStyle = TL('#dfe5ee');
+      ctx.fillRect(x, y + 2, w, 6);
+      ctx.fillRect(x, y + h - 8, w, 6);
+    } else {
+      const x0 = x + 7, x1 = x + w - 7;
+      for (let yy = y, d = 0; yy < y + h; yy += step, d ^= 1) {
+        ctx.moveTo(d ? x0 : x1, yy);
+        ctx.lineTo(d ? x1 : x0, yy + step);
+      }
+      ctx.stroke();
+      ctx.fillStyle = TL('#dfe5ee');
+      ctx.fillRect(x + 2, y, 6, h);
+      ctx.fillRect(x + w - 8, y, 6, h);
+    }
+    ctx.restore();
+    // a red safety rail along the top and bolts at the joints
+    ctx.fillStyle = TL('#e0342b');
+    ctx.fillRect(x + 3, y + 1, w - 6, 3.5);
+    ctx.fillStyle = TL('#5a6474');
+    for (let k = 0; k < (horiz ? w : h) / bs; k++) {
+      const bx = horiz ? x + k * bs + bs / 2 : x + w / 2, by = horiz ? y + h / 2 : y + k * bs + bs / 2;
+      circle(ctx, bx, by, 2.4);
+      ctx.fill();
+    }
+  };
+
+  // ---------- the Ferris wheel gondola: (x, y, w, h) is its box on screen, the roof is the top edge you stand on ----------
+  Art.gondola = function (ctx, x, y, w, h, pvx, pvy, idx, t) {
+    const col = cand(idx);
+    const dark = U.mixHex(col, '#2a0a30', 0.45);
+    ctx.lineJoin = 'round';
+    // the hanger from the wheel rim down to the roof
+    ctx.strokeStyle = TL('#5a6474');
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(pvx, pvy);
+    ctx.lineTo(x + w / 2, y);
+    ctx.stroke();
+    // the cabin under the roof
+    const roofH = 11;
+    rr(ctx, x + 4, y + roofH - 3, w - 8, h - roofH + 3, 8);
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, TL(col));
+    g.addColorStop(1, TL(dark));
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = TL('#2a0a30');
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // windows
+    const lit = lightK > 0.1;
+    for (let k = 0; k < 3; k++) {
+      const wx = x + 11 + k * ((w - 22) / 3);
+      ctx.fillStyle = lit ? U.mixHex('#bfe6ff', '#ffe09a', lightK) : TL('#bfe6ff');
+      rr(ctx, wx, y + roofH + 4, (w - 22) / 3 - 4, h - roofH - 15, 4);
+      ctx.fill();
+      if (lit) glowAt(ctx, wx + (w - 22) / 6, y + roofH + 12, 20, '#ffd27a', 0.4 * lightK);
+    }
+    // the roof you stand on: a flat deck with a light-coloured top edge
+    rr(ctx, x, y, w, roofH, 5);
+    ctx.fillStyle = TL(dark);
+    ctx.fill();
+    ctx.strokeStyle = TL('#2a0a30');
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = TL('#fff4e0');
+    rr(ctx, x + 3, y + 1.5, w - 6, 4, 2);
+    ctx.fill();
+    for (let k = 0; k < 3; k++) bulb(ctx, x + 9 + k * ((w - 18) / 2), y + roofH - 2.5, 2.2, col, 0.8);
+    // the pivot on the rim
+    ctx.fillStyle = TL('#f2c230');
+    circle(ctx, pvx, pvy, 5.5);
+    ctx.fill();
+    ctx.strokeStyle = TL('#7a5a10');
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  };
+
+  // ---------- hazards ----------
+  // lamp (spikeDown): a glowing paper lantern hanging from a string of lights
+  PARK.spike.lamp = (ctx, x, y, w, h, down, glow, t, seed) => {
+    const cx = x + w / 2, sw = Math.sin(t * 1.7 + seed * 1.3) * 2.5;
+    const ly = down ? y + h * 0.6 : y + h * 0.55, rx = w * 0.36, ry = h * 0.3;
+    const col = ['#ff8a2e', '#ff5a6e', '#ffc83a'][seed % 3];
+    glowAt(ctx, cx + sw, ly, w * 1.05, '#ffcf6a', 0.3 + 0.45 * lightK);
+    ctx.strokeStyle = '#2a2230';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, down ? Math.min(y, 0) - 4 : ly);
+    ctx.lineTo(cx + sw, ly - ry);
+    ctx.stroke();
+    // cap, ribbed body, bottom tassel
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = '#2a2230';
+    rr(ctx, cx + sw - rx * 0.4, ly - ry - 4, rx * 0.8, 6, 2);
+    ctx.fill();
+    const g = ctx.createRadialGradient(cx + sw - rx * 0.3, ly - ry * 0.3, 2, cx + sw, ly, rx * 1.2);
+    g.addColorStop(0, '#fff3b0');
+    g.addColorStop(0.45, col);
+    g.addColorStop(1, U.mixHex(col, '#7a1c10', 0.6));
+    ctx.beginPath();
+    ctx.ellipse(cx + sw, ly, rx, ry, 0, 0, TAU);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = '#5a1608';
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(90,22,8,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (const k of [-0.55, 0, 0.55]) {
+      ctx.moveTo(cx + sw, ly - ry);
+      ctx.quadraticCurveTo(cx + sw + k * rx * 1.5, ly, cx + sw, ly + ry);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#2a2230';
+    rr(ctx, cx + sw - rx * 0.32, ly + ry - 2, rx * 0.64, 5, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffd23a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + sw, ly + ry + 3);
+    ctx.lineTo(cx + sw + Math.sin(t * 3 + seed) * 2, ly + ry + 10);
+    ctx.stroke();
+    if (glow) {
+      ctx.strokeStyle = glow;
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx + sw, ly, rx + 3.5, ry + 3.5, 0, 0, TAU);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  };
+
+  // pond: the park pond under the Ferris wheel, with lily pads, pink lotus flowers and rubber ducks
+  PARK.water.pond = (ctx, x0, x1, ySurf, yBot, t) => {
+    const g = ctx.createLinearGradient(0, ySurf, 0, yBot);
+    g.addColorStop(0, TL('#5ad0f0'));
+    g.addColorStop(0.35, TL('#2a8fd0'));
+    g.addColorStop(1, TL('#14407a'));
+    const wave = (x) => ySurf + Math.sin((x - x0) * 0.05 + t * 2.4) * 2.2;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x0, yBot);
+    for (let x = x0; x <= x1 + 8; x += 8) ctx.lineTo(Math.min(x, x1), wave(x));
+    ctx.lineTo(x1, yBot);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(235,250,255,0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = x0; x <= x1; x += 8) {
+      if (x === x0) ctx.moveTo(x, wave(x));
+      else ctx.lineTo(x, wave(x));
+    }
+    ctx.stroke();
+    // glints
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 2;
+    for (let x = x0 + 24, k = 0; x < x1 - 24; x += 64, k++) {
+      const yy = ySurf + 18 + Math.sin(k * 17) * 9, dx = Math.sin(t * 1.4 + k) * 6;
+      ctx.beginPath();
+      ctx.moveTo(x + dx, yy);
+      ctx.lineTo(x + dx + 20, yy);
+      ctx.stroke();
+    }
+    // lily pads, lotus flowers and ducks, placed relative to x0 so they scroll with the world
+    const step = 96;
+    const k0 = Math.max(0, Math.floor((-60 - x0) / step)), k1 = Math.min(Math.floor((x1 - x0) / step), Math.ceil((1340 - x0) / step));
+    for (let k = k0; k <= k1; k++) {
+      const px = x0 + 40 + k * step + ((k * 37) % 30), py = ySurf + 4 + ((k * 13) % 3) * 3;
+      if (px < x0 + 22 || px > x1 - 22) continue;
+      if (k % 4 === 1) {
+        // a rubber duck bobbing along
+        const bob = Math.sin(t * 2.2 + k) * 1.8, dir = k % 8 < 4 ? 1 : -1, dx = Math.sin(t * 0.7 + k) * 8;
+        const dxp = px + dx, dy = ySurf - 2 + bob;
+        ctx.strokeStyle = 'rgba(235,250,255,0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(dxp, ySurf + 3, 17 + Math.sin(t * 2 + k) * 2, 3.2, 0, 0, TAU);
+        ctx.stroke();
+        ctx.fillStyle = TL('#ffd23a');
+        ctx.beginPath();
+        ctx.ellipse(dxp, dy - 5, 11, 7, 0, 0, TAU);
+        ctx.fill();
+        circle(ctx, dxp + dir * 8, dy - 13, 6);
+        ctx.fill();
+        ctx.fillStyle = TL('#ff8a1f');
+        tri(ctx, dxp + dir * 13, dy - 13, dxp + dir * 19, dy - 11, dxp + dir * 13, dy - 9);
+        ctx.fill();
+        ctx.fillStyle = '#222';
+        circle(ctx, dxp + dir * 9, dy - 14.5, 1.3);
+        ctx.fill();
+        ctx.strokeStyle = TL('#e0a000');
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(dxp - dir * 3, dy - 5, 5, dir > 0 ? 0.3 : Math.PI - 2.3, dir > 0 ? 2.3 : Math.PI - 0.3);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = TL('#4fb04a');
+        ctx.beginPath();
+        ctx.ellipse(px, py, 20, 6, 0, 0.3, TAU - 0.05);
+        ctx.lineTo(px, py);
+        ctx.fill();
+        if (k % 3 === 0) {
+          ctx.fillStyle = TL('#ff8ac8');
+          for (const a of [-0.7, 0, 0.7]) {
+            ctx.beginPath();
+            ctx.ellipse(px + 4 + a * 5, py - 5, 3, 6, a, 0, TAU);
+            ctx.fill();
+          }
+          ctx.fillStyle = '#ffe070';
+          circle(ctx, px + 4, py - 3, 2.2);
+          ctx.fill();
+        }
+      }
+    }
+    // stone coping at both ends
+    ctx.fillStyle = TL('#cfc7b4');
+    ctx.strokeStyle = TL('#7a7060');
+    ctx.lineWidth = 2;
+    for (const [ex, dir] of [[x0, -1], [x1, 1]]) {
+      rr(ctx, ex - (dir < 0 ? 12 : 0), ySurf - 8, 12, yBot - ySurf + 8, 3);
+      ctx.fill();
+      ctx.stroke();
+    }
+  };
+
+  // barrel: a striped wooden barrel rolling at you, seen end-on (cx, cy = centre, size = diameter, ang = how far it has rolled)
+  Art.barrel = function (ctx, cx, cy, size, ang) {
+    const r = size * 0.5;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath();
+    ctx.ellipse(0, r + 2, r * 0.95, 4, 0, 0, TAU);
+    ctx.fill();
+    circle(ctx, 0, 0, r);
+    ctx.fillStyle = TL('#8a5228');
+    ctx.fill();
+    ctx.save();
+    circle(ctx, 0, 0, r * 0.88);
+    ctx.clip();
+    ctx.rotate(ang);
+    // the head: planks painted red and white
+    const sw = r * 0.34;
+    ctx.fillStyle = TL('#fff4e0');
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.fillStyle = TL('#e8353a');
+    for (let xx = -r - sw * 0.5; xx < r; xx += sw * 2) ctx.fillRect(xx, -r, sw, r * 2);
+    ctx.strokeStyle = 'rgba(60,20,10,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let xx = -r - sw * 0.5; xx < r + sw; xx += sw) {
+      ctx.moveTo(xx, -r);
+      ctx.lineTo(xx, r);
+    }
+    ctx.stroke();
+    ctx.fillStyle = TL('#3a2418');
+    circle(ctx, 0, 0, r * 0.13);
+    ctx.fill();
+    ctx.restore();
+    // the iron hoop
+    ctx.strokeStyle = TL('#3a3a46');
+    ctx.lineWidth = r * 0.16;
+    circle(ctx, 0, 0, r * 0.9);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.96, Math.PI * 1.05, Math.PI * 1.45);
+    ctx.stroke();
+    ctx.strokeStyle = TL('#2a1608');
+    ctx.lineWidth = 2.5;
+    circle(ctx, 0, 0, r);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  // a glad party balloon (the hazard, bobbing): cx, cy = middle of the balloon, s = block size
+  Art.partyBalloon = function (ctx, cx, cy, s, t, seed) {
+    const col = CANDY[seed % 6], dark = U.mixHex(col, '#1a0a30', 0.5);
+    const sway = Math.sin(t * 1.8 + seed) * 0.05;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(sway);
+    ctx.lineJoin = 'round';
+    // the string
+    ctx.strokeStyle = 'rgba(40,30,50,0.75)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(0, s * 0.52);
+    ctx.bezierCurveTo(s * 0.12, s * 0.7, -s * 0.14, s * 0.85, s * 0.04, s * 1.05);
+    ctx.stroke();
+    // the knot
+    ctx.fillStyle = TL(dark);
+    tri(ctx, 0, s * 0.46, -s * 0.06, s * 0.58, s * 0.06, s * 0.58);
+    ctx.fill();
+    // the balloon
+    const g = ctx.createRadialGradient(-s * 0.14, -s * 0.2, s * 0.03, 0, 0, s * 0.55);
+    g.addColorStop(0, TL(U.mixHex(col, '#ffffff', 0.45)));
+    g.addColorStop(0.5, TL(col));
+    g.addColorStop(1, TL(dark));
+    ctx.beginPath();
+    ctx.moveTo(0, s * 0.5);
+    ctx.bezierCurveTo(-s * 0.58, s * 0.2, -s * 0.5, -s * 0.52, 0, -s * 0.52);
+    ctx.bezierCurveTo(s * 0.5, -s * 0.52, s * 0.58, s * 0.2, 0, s * 0.5);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = TL(dark);
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+    // shine and a white star
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.2, -s * 0.28, s * 0.07, s * 0.14, 0.5, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? s * 0.05 : s * 0.12;
+      const px = s * 0.1 + Math.cos(a) * r, py = s * 0.02 + Math.sin(a) * r;
+      if (i) ctx.lineTo(px, py);
+      else ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
+  // ---------- near scenery (ctx, x, base, d, t, bs, font): visitors, signs and lamp posts ----------
+  // one park visitor standing on `base`, waving; o = { skin, hair, shirt, pants, hat, item, sc, ph }
+  function visitor(ctx, x, base, t, o) {
+    const sc = o.sc || 1, ph = o.ph || 0;
+    ctx.save();
+    ctx.translate(x, base);
+    ctx.scale(sc, sc);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const bounce = Math.abs(Math.sin(t * 3.4 + ph)) * 2.5;
+    ctx.translate(0, -bounce);
+    // legs and shoes
+    ctx.strokeStyle = T(o.pants);
+    ctx.lineWidth = 12;
+    ctx.beginPath();
+    ctx.moveTo(-7, -44);
+    ctx.lineTo(-8, -7);
+    ctx.moveTo(7, -44);
+    ctx.lineTo(8, -7);
+    ctx.stroke();
+    ctx.fillStyle = T('#2a2630');
+    rr(ctx, -15, -9, 14, 9, 4);
+    ctx.fill();
+    rr(ctx, 1, -9, 14, 9, 4);
+    ctx.fill();
+    // the arm holding the thing, in front of the body
+    const armHold = () => {
+      ctx.strokeStyle = T(o.shirt);
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      ctx.moveTo(-15, -80);
+      ctx.lineTo(-23, -62);
+      ctx.stroke();
+      ctx.fillStyle = T(o.skin);
+      circle(ctx, -23, -60, 5);
+      ctx.fill();
+    };
+    // torso
+    ctx.fillStyle = T(o.shirt);
+    rr(ctx, -17, -90, 34, 50, 11);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    if (o.stripe) {
+      ctx.fillStyle = T(o.stripe);
+      ctx.fillRect(-16, -72, 32, 6);
+      ctx.fillRect(-16, -58, 32, 6);
+    }
+    // item in the hand, then the waving arm
+    const it = o.item;
+    if (it === 'icecream') {
+      armHold();
+      ctx.fillStyle = T('#e0a85a');
+      tri(ctx, -28, -64, -18, -64, -23, -42);
+      ctx.fill();
+      ctx.fillStyle = T('#ff9ac9');
+      circle(ctx, -23, -69, 7);
+      ctx.fill();
+      ctx.fillStyle = T('#fff4e0');
+      circle(ctx, -23, -77, 6);
+      ctx.fill();
+      ctx.fillStyle = T('#e8353a');
+      circle(ctx, -22, -83, 2.4);
+      ctx.fill();
+    } else if (it === 'floss') {
+      armHold();
+      ctx.strokeStyle = T('#e8d4a8');
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-23, -62);
+      ctx.lineTo(-23, -84);
+      ctx.stroke();
+      ctx.fillStyle = T('#ff9ac9');
+      circle(ctx, -23, -92, 12);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      circle(ctx, -27, -96, 4);
+      ctx.fill();
+    } else if (it === 'balloons') {
+      armHold();
+      const cols = ['#ff4d6d', '#ffb02e', '#4aa3ff'];
+      for (let k = 0; k < 3; k++) {
+        const bx = -23 + (k - 1) * 17 + Math.sin(t * 1.5 + k + ph) * 3, by = -146 - (k === 1 ? 14 : 0);
+        ctx.strokeStyle = 'rgba(40,30,50,0.7)';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(-23, -62);
+        ctx.quadraticCurveTo((bx - 23) / 2, (by - 62) / 2, bx, by + 14);
+        ctx.stroke();
+        ctx.fillStyle = T(cols[k]);
+        ctx.beginPath();
+        ctx.ellipse(bx, by, 11, 14, 0, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.beginPath();
+        ctx.ellipse(bx - 4, by - 5, 2.5, 4.5, 0.5, 0, TAU);
+        ctx.fill();
+      }
+    } else if (it === 'flag') {
+      armHold();
+      ctx.strokeStyle = T('#7a5a30');
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-23, -58);
+      ctx.lineTo(-23, -128);
+      ctx.stroke();
+      ctx.fillStyle = T('#e8353a');
+      ctx.beginPath();
+      const fw = Math.sin(t * 5 + ph) * 3;
+      ctx.moveTo(-23, -128);
+      ctx.quadraticCurveTo(-8, -131 + fw, 8, -124);
+      ctx.quadraticCurveTo(-6, -118 - fw, -23, -112);
+      ctx.fill();
+    } else {
+      // plain: the free arm hangs
+      ctx.strokeStyle = T(o.shirt);
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      ctx.moveTo(-15, -80);
+      ctx.lineTo(-20, -52);
+      ctx.stroke();
+      ctx.fillStyle = T(o.skin);
+      circle(ctx, -20, -50, 5);
+      ctx.fill();
+    }
+    // the waving arm
+    const wave = -2.35 + Math.sin(t * 6 + ph) * 0.45;
+    ctx.save();
+    ctx.translate(15, -82);
+    ctx.rotate(wave);
+    ctx.strokeStyle = T(o.shirt);
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 24);
+    ctx.stroke();
+    ctx.fillStyle = T(o.skin);
+    circle(ctx, 0, 27, 5.5);
+    ctx.fill();
+    ctx.restore();
+    // head
+    ctx.fillStyle = T(o.skin);
+    circle(ctx, 0, -106, 15);
+    ctx.fill();
+    ctx.fillStyle = T(o.hair);
+    ctx.beginPath();
+    if (o.long) {
+      ctx.moveTo(-16, -96);
+      ctx.quadraticCurveTo(-18, -125, 0, -123);
+      ctx.quadraticCurveTo(18, -125, 16, -96);
+      ctx.lineTo(11, -100);
+      ctx.quadraticCurveTo(0, -112, -11, -100);
+    } else {
+      ctx.arc(0, -108, 15.5, Math.PI * 1.02, Math.PI * 1.98);
+      ctx.quadraticCurveTo(8, -112, 0, -110);
+      ctx.quadraticCurveTo(-8, -112, -15.8, -108);
+    }
+    ctx.fill();
+    if (o.hat === 'cap') {
+      ctx.fillStyle = T(o.hatCol || '#2a6fd6');
+      ctx.beginPath();
+      ctx.arc(0, -111, 15.5, Math.PI, 0);
+      ctx.fill();
+      rr(ctx, 4, -113, 20, 5, 2.5);
+      ctx.fill();
+    } else if (o.hat === 'sun') {
+      ctx.fillStyle = T('#f2d278');
+      ctx.beginPath();
+      ctx.ellipse(0, -114, 26, 6, 0, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -114, 13, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = T('#e8353a');
+      ctx.fillRect(-13, -118, 26, 4);
+    }
+    ctx.fillStyle = '#2a1a1a';
+    circle(ctx, -5, -106, 1.8);
+    ctx.fill();
+    circle(ctx, 5, -106, 1.8);
+    ctx.fill();
+    ctx.strokeStyle = '#7a2a2a';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, -102, 5.5, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,130,120,0.35)';
+    circle(ctx, -9, -102, 3);
+    ctx.fill();
+    circle(ctx, 9, -102, 3);
+    ctx.fill();
+    ctx.restore();
+  }
+  const VISITORS = [
+    { skin: '#f2c6a0', hair: '#6b3a1a', shirt: '#e8353a', pants: '#2a4a8a', item: 'icecream', long: true },
+    { skin: '#d9a070', hair: '#1a1410', shirt: '#2a9d8f', pants: '#4a4a52', item: 'balloons', hat: 'cap', hatCol: '#e8353a', stripe: '#fff4e0' },
+    { skin: '#f6d0b0', hair: '#c8861a', shirt: '#b66cff', pants: '#3a3a6a', item: 'floss', sc: 0.72, ph: 1.3 },
+    { skin: '#8a5a38', hair: '#120c08', shirt: '#ffb02e', pants: '#3a5a2a', item: 'flag', hat: 'cap', hatCol: '#2a6fd6' },
+    { skin: '#f2c6a0', hair: '#d8d0b8', shirt: '#ff7ac8', pants: '#fff4e0', hat: 'sun', long: true, ph: 2.1 },
+    { skin: '#e8b890', hair: '#4a2a14', shirt: '#4aa3ff', pants: '#2a2630', stripe: '#fff4e0', ph: 0.7 },
+  ];
+  near.visitor = function (ctx, x, base, d, t) {
+    const v = VISITORS[(d.v || 0) % VISITORS.length];
+    visitor(ctx, x, base, t, v);
+    if ((d.v || 0) === 5) {
+      // a kid on the shoulders waving a balloon
+      visitor(ctx, x + 2, base - 112, t, { skin: '#f6d0b0', hair: '#c8861a', shirt: '#ff4d6d', pants: '#fff4e0', item: 'balloons', sc: 0.5, ph: 2.4 });
+    }
+  };
+  // parksign: a yellow signboard with chaser bulbs round the edge, on two posts
+  near.parksign = function (ctx, x, base, d, t, bs, font) {
+    const text = d.text || 'NÖJESPARKEN';
+    ctx.font = '26px ' + font;
+    const tw = Math.max(110, ctx.measureText(text).width + 40), th = 56, top = base - 128;
+    ctx.fillStyle = T('#6b4a2e');
+    ctx.fillRect(x - tw / 2 + 14, top + th - 2, 9, base - top - th + 2);
+    ctx.fillRect(x + tw / 2 - 23, top + th - 2, 9, base - top - th + 2);
+    ctx.lineJoin = 'round';
+    rr(ctx, x - tw / 2, top, tw, th, 10);
+    ctx.fillStyle = T('#ffd23a');
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = T('#c8442a');
+    ctx.stroke();
+    ctx.strokeStyle = T('#a07a10');
+    ctx.lineWidth = 1.5;
+    rr(ctx, x - tw / 2 + 7, top + 7, tw - 14, th - 14, 6);
+    ctx.stroke();
+    // bulbs on the frame
+    const n = Math.round(tw / 20);
+    for (let i = 0; i <= n; i++) {
+      const bx = x - tw / 2 + 4 + (i * (tw - 8)) / n, on = (Math.floor(t * 4) + i) % 2;
+      bulb(ctx, bx, top + 3, 2.6, on ? '#ff4d6d' : '#fff4c4', 0.85);
+      bulb(ctx, bx, top + th - 3, 2.6, on ? '#fff4c4' : '#ff4d6d', 0.85);
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(120,20,30,0.8)';
+    ctx.strokeText(text, x, top + th / 2 + 1);
+    ctx.fillStyle = T('#e8353a');
+    ctx.fillText(text, x, top + th / 2 + 1);
+  };
+  // lamppost: an old-fashioned cast-iron street lamp that comes on at dusk
+  near.lamppost = function (ctx, x, base, d, t) {
+    const dk = Math.max(Art.dark() * 1.6 - 0.15, lightK * 0.9), a = U.clamp(dk, 0, 1);
+    const iron = T('#26362e');
+    ctx.fillStyle = iron;
+    rr(ctx, x - 11, base - 14, 22, 14, 3);
+    ctx.fill();
+    rr(ctx, x - 7, base - 28, 14, 16, 3);
+    ctx.fill();
+    ctx.fillRect(x - 3, base - 150, 6, 126);
+    ctx.fillStyle = T('#3a4e44');
+    circle(ctx, x, base - 70, 5);
+    ctx.fill();
+    // curly arms
+    ctx.strokeStyle = iron;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, base - 118);
+    ctx.quadraticCurveTo(x - 22, base - 124, x - 22, base - 106);
+    ctx.moveTo(x, base - 118);
+    ctx.quadraticCurveTo(x + 22, base - 124, x + 22, base - 106);
+    ctx.stroke();
+    // the lantern
+    const ly = base - 166;
+    if (a > 0.02) glowAt(ctx, x, ly - 6, 78, '#ffe0a0', 0.75 * a);
+    ctx.fillStyle = iron;
+    tri(ctx, x - 15, ly - 18, x, ly - 34, x + 15, ly - 18);
+    ctx.fill();
+    circle(ctx, x, ly - 36, 3.2);
+    ctx.fill();
+    ctx.fillStyle = a > 0.05 ? U.mixHex('#c8dcea', '#fff0b8', a) : T('#c8dcea');
+    ctx.beginPath();
+    ctx.moveTo(x - 13, ly - 18);
+    ctx.lineTo(x + 13, ly - 18);
+    ctx.lineTo(x + 9, ly + 12);
+    ctx.lineTo(x - 9, ly + 12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = iron;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, ly - 18);
+    ctx.lineTo(x, ly + 12);
+    ctx.stroke();
+    rr(ctx, x - 10, ly + 11, 20, 6, 2);
+    ctx.fillStyle = iron;
+    ctx.fill();
+  };
+
+  // ---------- mid-layer landmarks (ctx, x, base, d, t, font) ----------
+  // a flag on a pole at (x, y): length h up, in the given colour
+  function parkFlag(ctx, x, y, h, col, t, seed) {
+    ctx.strokeStyle = T('#7a6a5a');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y - h);
+    ctx.stroke();
+    const w = Math.sin(t * 4 + seed) * 3;
+    ctx.fillStyle = T(col);
+    ctx.beginPath();
+    ctx.moveTo(x, y - h);
+    ctx.quadraticCurveTo(x + 14, y - h - 3 + w, x + 30, y - h + 3);
+    ctx.quadraticCurveTo(x + 14, y - h + 10 - w, x, y - h + 14);
+    ctx.fill();
+  }
+  // a pointed tower roof with scalloped stripes: base centre (x, y), half width hw, height h
+  function stripedRoof(ctx, x, y, hw, h, c1, c2, sn) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x - hw, y);
+    ctx.quadraticCurveTo(x - hw * 0.5, y - h * 0.35, x, y - h);
+    ctx.quadraticCurveTo(x + hw * 0.5, y - h * 0.35, x + hw, y);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = c2;
+    ctx.fillRect(x - hw, y - h, hw * 2, h);
+    ctx.fillStyle = c1;
+    for (let i = 0; i < sn; i += 2) {
+      const a0 = -1 + (i * 2) / sn, a1 = -1 + ((i + 1) * 2) / sn;
+      ctx.beginPath();
+      ctx.moveTo(x, y - h);
+      ctx.lineTo(x + a0 * hw * 1.1, y + 2);
+      ctx.lineTo(x + a1 * hw * 1.1, y + 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = T('#5a1a30');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x - hw, y);
+    ctx.quadraticCurveTo(x - hw * 0.5, y - h * 0.35, x, y - h);
+    ctx.quadraticCurveTo(x + hw * 0.5, y - h * 0.35, x + hw, y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // the park gate: two candy-striped towers and an arch with NÖJESPARKEN in light bulbs
+  mid.gate = function (ctx, x, base, d, t, font) {
+    ctx.lineJoin = 'round';
+    const tw = 104, th = 250, gap = 168;
+    // the arch between the towers
+    const ay = base - 232;
+    ctx.fillStyle = T('#ffe9f0');
+    ctx.fillRect(x - gap, ay, gap * 2, 66);
+    ctx.fillStyle = T('#ff6ab0');
+    ctx.fillRect(x - gap, ay + 56, gap * 2, 10);
+    ctx.strokeStyle = T('#5a1a30');
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x - gap, ay, gap * 2, 66);
+    // dim interior of the passage
+    ctx.fillStyle = T('#7a5a78');
+    ctx.beginPath();
+    ctx.moveTo(x - gap + 10, base);
+    ctx.lineTo(x - gap + 10, ay + 80);
+    ctx.quadraticCurveTo(x, ay + 20, x + gap - 10, ay + 80);
+    ctx.lineTo(x + gap - 10, base);
+    ctx.closePath();
+    ctx.fill();
+    // the sign, framed in chasing bulbs
+    ctx.font = '38px ' + font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = T('#e8353a');
+    rr(ctx, x - 150, ay + 4, 300, 56, 10);
+    ctx.fill();
+    ctx.strokeStyle = T('#ffd23a');
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    const nb = 28;
+    for (let i = 0; i < nb; i++) {
+      const u = i / nb, per = 2 * (300 + 56), s = u * per;
+      let bx, by;
+      if (s < 300) (bx = x - 150 + s), (by = ay + 4);
+      else if (s < 356) (bx = x + 150), (by = ay + 4 + (s - 300));
+      else if (s < 656) (bx = x + 150 - (s - 356)), (by = ay + 60);
+      else (bx = x - 150), (by = ay + 60 - (s - 656));
+      bulb(ctx, bx, by, 3, (Math.floor(t * 5) + i) % 3 === 0 ? '#fff4c4' : '#ffd23a', 0.8);
+    }
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(90,10,20,0.85)';
+    ctx.strokeText('NÖJESPARKEN', x, ay + 33);
+    ctx.fillStyle = '#fff1a8';
+    ctx.fillText('NÖJESPARKEN', x, ay + 33);
+    // the towers
+    for (const sd of [-1, 1]) {
+      const cx = x + sd * (gap + tw / 2 - 8), bt = base - th;
+      ctx.fillStyle = T('#fff4e0');
+      ctx.fillRect(cx - tw / 2, bt, tw, th);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(cx - tw / 2, bt, tw, th);
+      ctx.clip();
+      ctx.fillStyle = T('#ff7ac8');
+      for (let yy = bt + 20; yy < base; yy += 56) ctx.fillRect(cx - tw / 2, yy, tw, 24);
+      ctx.restore();
+      ctx.strokeStyle = T('#5a1a30');
+      ctx.lineWidth = 3;
+      ctx.strokeRect(cx - tw / 2, bt, tw, th);
+      // arched windows with warm light
+      for (const wy of [bt + 40, bt + 120]) {
+        ctx.fillStyle = lightK > 0.1 ? '#ffdc8a' : T('#8fc8ee');
+        ctx.beginPath();
+        ctx.moveTo(cx - 14, wy + 42);
+        ctx.lineTo(cx - 14, wy + 14);
+        ctx.arc(cx, wy + 14, 14, Math.PI, 0);
+        ctx.lineTo(cx + 14, wy + 42);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        if (lightK > 0.1) glowAt(ctx, cx, wy + 26, 44, '#ffd27a', 0.5 * lightK);
+      }
+      // overhanging top and the striped roof
+      ctx.fillStyle = T('#e8353a');
+      rr(ctx, cx - tw / 2 - 8, bt - 12, tw + 16, 16, 4);
+      ctx.fill();
+      ctx.stroke();
+      stripedRoof(ctx, cx, bt - 10, tw / 2 + 10, 96, T('#e8353a'), T('#fffaf0'), 10);
+      parkFlag(ctx, cx, bt - 104, 34, sd < 0 ? '#2a6fd6' : '#ffb02e', t, sd);
+      for (let i = 0; i < 6; i++) bulb(ctx, cx - tw / 2 + 8 + i * ((tw - 16) / 5), bt - 4, 2.6, CANDY[i % 6], 0.8);
+    }
+    // ticket booths in front
+    for (const sd of [-1, 1]) {
+      const bx = x + sd * (gap + tw + 54), bw = 84, bh = 78;
+      ctx.fillStyle = T('#ffd9e4');
+      ctx.fillRect(bx - bw / 2, base - bh, bw, bh);
+      ctx.strokeStyle = T('#5a1a30');
+      ctx.lineWidth = 3;
+      ctx.strokeRect(bx - bw / 2, base - bh, bw, bh);
+      ctx.fillStyle = T('#7a5a78');
+      ctx.fillRect(bx - 22, base - bh + 24, 44, 28);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(bx - bw / 2 - 6, base - bh - 18, bw + 12, 26);
+      ctx.clip();
+      stripes(ctx, bx - bw / 2 - 6, base - bh - 18, bw + 12, 26, 11, T('#e8353a'), T('#fffaf0'), 0);
+      ctx.restore();
+      ctx.strokeRect(bx - bw / 2 - 6, base - bh - 18, bw + 12, 26);
+    }
+    // bunting along the front of the arch
+    for (let i = 0; i < 2; i++) bulbString(ctx, x - gap - tw + 20 + i * 4, ay + 70, x + gap + tw - 20, ay + 70, 12, 22, t, 3);
+  };
+
+  // the carousel: a striped canopy, a ring of galloping horses and lamps
+  mid.carousel = function (ctx, x, base, d, t, font) {
+    ctx.save();
+    ctx.translate(x, base);
+    ctx.scale(1.4, 1.4);
+    ctx.translate(-x, -base);
+    ctx.lineJoin = 'round';
+    const R = 100, topY = base - 188;
+    // platform
+    ctx.fillStyle = T('#8a5a3a');
+    ctx.beginPath();
+    ctx.ellipse(x, base - 8, R + 22, 16, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = T('#d8b070');
+    ctx.fillRect(x - R - 22, base - 22, (R + 22) * 2, 14);
+    ctx.fillStyle = T('#e8353a');
+    ctx.fillRect(x - R - 22, base - 22, (R + 22) * 2, 4);
+    // central column and the horses, back half first
+    const spin = t * 0.7;
+    const horses = [];
+    for (let i = 0; i < 6; i++) {
+      const a = spin + (i * TAU) / 6, hx = x + Math.sin(a) * R * 0.86, depth = Math.cos(a);
+      horses.push({ i, hx, depth, hy: base - 62 - Math.sin(t * 2.6 + i * 1.7) * 14 });
+    }
+    horses.sort((p, q) => p.depth - q.depth);
+    const drawHorse = (hs) => {
+      const dir = Math.cos(spin + (hs.i * TAU) / 6) > 0 ? -1 : 1; // facing the way it is moving
+      const col = ['#fff4e0', '#ffb3d0', '#b8d8ff', '#ffe08a', '#c8f0c8', '#e0c8ff'][hs.i];
+      ctx.strokeStyle = T('#d8b070');
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(hs.hx, topY + 12);
+      ctx.lineTo(hs.hx, hs.hy + 22);
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(hs.hx, hs.hy);
+      ctx.scale(dir, 1);
+      ctx.fillStyle = T(col);
+      ctx.strokeStyle = T('#5a3a4a');
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 22, 11, 0, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(14, -4);
+      ctx.quadraticCurveTo(24, -26, 32, -22);
+      ctx.lineTo(36, -12);
+      ctx.lineTo(26, -8);
+      ctx.quadraticCurveTo(22, 0, 14, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = T('#e8353a');
+      ctx.beginPath();
+      ctx.moveTo(14, -6);
+      ctx.quadraticCurveTo(10, -22, 20, -24);
+      ctx.quadraticCurveTo(12, -16, 18, -6);
+      ctx.fill();
+      ctx.strokeStyle = T(col);
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(-20, -2);
+      ctx.quadraticCurveTo(-30, 4, -26, 16);
+      ctx.moveTo(-12, 8);
+      ctx.lineTo(-14, 22);
+      ctx.moveTo(10, 8);
+      ctx.lineTo(14, 22);
+      ctx.stroke();
+      ctx.fillStyle = '#2a1a2a';
+      circle(ctx, 28, -16, 1.6);
+      ctx.fill();
+      ctx.restore();
+    };
+    for (const hs of horses) if (hs.depth < 0) drawHorse(hs);
+    ctx.fillStyle = T('#ffd23a');
+    ctx.fillRect(x - 12, topY + 10, 24, base - topY - 20);
+    ctx.fillStyle = T('#e8353a');
+    for (let yy = topY + 20; yy < base - 30; yy += 36) ctx.fillRect(x - 12, yy, 24, 10);
+    for (const hs of horses) if (hs.depth >= 0) drawHorse(hs);
+    // canopy
+    const cw = R + 30;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x - cw, topY + 6);
+    ctx.quadraticCurveTo(x - cw * 0.45, topY - 24, x, topY - 58);
+    ctx.quadraticCurveTo(x + cw * 0.45, topY - 24, x + cw, topY + 6);
+    ctx.closePath();
+    ctx.clip();
+    stripes(ctx, x - cw, topY - 62, cw * 2, 76, 22, T('#e8353a'), T('#fffaf0'), spin * 40);
+    ctx.restore();
+    ctx.strokeStyle = T('#5a1a30');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x - cw, topY + 6);
+    ctx.quadraticCurveTo(x - cw * 0.45, topY - 24, x, topY - 58);
+    ctx.quadraticCurveTo(x + cw * 0.45, topY - 24, x + cw, topY + 6);
+    ctx.stroke();
+    for (let i = 0, xx = x - cw; xx < x + cw - 4; xx += 22, i++) {
+      ctx.fillStyle = i % 2 ? T('#fffaf0') : T('#e8353a');
+      ctx.beginPath();
+      ctx.arc(xx + 11, topY + 6, 11, 0, Math.PI);
+      ctx.fill();
+      ctx.stroke();
+      bulb(ctx, xx + 11, topY + 21, 2.8, CANDY[i % 6], 0.7 + 0.3 * Math.sin(t * 4 + i));
+    }
+    parkFlag(ctx, x, topY - 58, 30, '#ffd23a', t, 5);
+    ctx.beginPath();
+    ctx.arc(x, topY - 90, 5, 0, TAU);
+    ctx.fillStyle = T('#ffd23a');
+    ctx.fill();
+    ctx.restore();
+  };
+
+  // the fun house: a lopsided candy-coloured building with a huge clown face, the open mouth is the way in (or out)
+  mid.funhouse = function (ctx, x, base, d, t, font) {
+    const exit = d.side === 'exit';
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const W0 = 600, top = base - 360;
+    // the crooked building: wavy candy stripes
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x - W0 / 2, base);
+    ctx.lineTo(x - W0 / 2 + 8, top + 40);
+    ctx.quadraticCurveTo(x - W0 * 0.25, top - 14, x, top + 24);
+    ctx.quadraticCurveTo(x + W0 * 0.25, top + 60, x + W0 / 2 - 8, top + 30);
+    ctx.lineTo(x + W0 / 2, base);
+    ctx.closePath();
+    ctx.clip();
+    const cols = exit ? ['#ffb02e', '#ff7ac8', '#35c9a5', '#4aa3ff'] : ['#b66cff', '#ff4d6d', '#ffb02e', '#35c9a5'];
+    for (let i = 0; i * 52 < W0 + 60; i++) {
+      ctx.fillStyle = T(cols[i % 4]);
+      ctx.beginPath();
+      ctx.moveTo(x - W0 / 2 - 30 + i * 52, top - 30);
+      ctx.lineTo(x - W0 / 2 + 10 + i * 52, top - 30);
+      ctx.bezierCurveTo(x - W0 / 2 + 40 + i * 52, top + 100, x - W0 / 2 - 20 + i * 52, top + 200, x - W0 / 2 + 10 + i * 52, base + 10);
+      ctx.lineTo(x - W0 / 2 - 30 + i * 52, base + 10);
+      ctx.bezierCurveTo(x - W0 / 2 - 60 + i * 52, top + 200, x - W0 / 2 - 10 + i * 52, top + 100, x - W0 / 2 - 30 + i * 52, top - 30);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = T('#3a1a4a');
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x - W0 / 2, base);
+    ctx.lineTo(x - W0 / 2 + 8, top + 40);
+    ctx.quadraticCurveTo(x - W0 * 0.25, top - 14, x, top + 24);
+    ctx.quadraticCurveTo(x + W0 * 0.25, top + 60, x + W0 / 2 - 8, top + 30);
+    ctx.lineTo(x + W0 / 2, base);
+    ctx.stroke();
+    // little crooked towers with pointy hats and flags
+    for (const [tx, ty, tl] of [[-W0 / 2 + 40, top + 24, -0.12], [W0 / 2 - 44, top + 8, 0.1]]) {
+      ctx.save();
+      ctx.translate(x + tx, ty);
+      ctx.rotate(tl);
+      ctx.fillStyle = T('#fff4e0');
+      ctx.fillRect(-22, -60, 44, 80);
+      ctx.strokeRect(-22, -60, 44, 80);
+      stripedRoof(ctx, 0, -58, 30, 66, T('#ff4d6d'), T('#ffd23a'), 8);
+      parkFlag(ctx, 0, -122, 26, '#35c9a5', t, tx);
+      ctx.restore();
+    }
+    // the clown face: hair puffs, eyes, a red nose, a hat
+    ctx.fillStyle = T('#ff8a1f');
+    for (const sd of [-1, 1])
+      for (let k = 0; k < 3; k++) {
+        circle(ctx, x + sd * (160 + k * 10), top + 120 + k * 40, 38 - k * 4);
+        ctx.fill();
+        ctx.stroke();
+      }
+    ctx.fillStyle = T('#fff4e0');
+    ctx.beginPath();
+    ctx.ellipse(x, top + 180, 184, 160, 0, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    // top hat tilted
+    ctx.save();
+    ctx.translate(x - 40, top + 36);
+    ctx.rotate(-0.24);
+    ctx.fillStyle = T('#2a2a4a');
+    ctx.fillRect(-44, -66, 88, 70);
+    ctx.fillStyle = T('#e8353a');
+    ctx.fillRect(-44, -22, 88, 14);
+    ctx.fillStyle = T('#2a2a4a');
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 74, 12, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeRect(-44, -66, 88, 70);
+    ctx.fillStyle = T('#ffd23a');
+    circle(ctx, 20, -40, 6);
+    ctx.fill();
+    ctx.restore();
+    // eyes follow a slow wander
+    for (const sd of [-1, 1]) {
+      const ex = x + sd * 66, ey = top + 112;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, 34, 40, sd * 0.12, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      const px = ex + Math.sin(t * 0.8) * 12, py = ey + Math.cos(t * 1.1) * 10;
+      ctx.fillStyle = T(sd < 0 ? '#2a6fd6' : '#35c9a5');
+      circle(ctx, px, py, 16);
+      ctx.fill();
+      ctx.fillStyle = '#111';
+      circle(ctx, px, py, 8);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      circle(ctx, px - 4, py - 5, 3);
+      ctx.fill();
+      // a star painted round the eye
+      ctx.strokeStyle = T('#b66cff');
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      for (let k = 0; k < 5; k++) {
+        const a = -Math.PI / 2 + (k * TAU) / 5 + sd * 0.1;
+        ctx.moveTo(ex + Math.cos(a) * 46, ey - 8 + Math.sin(a) * 52);
+        ctx.lineTo(ex + Math.cos(a) * 62, ey - 8 + Math.sin(a) * 68);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = T('#3a1a4a');
+      ctx.lineWidth = 4;
+    }
+    ctx.fillStyle = T('#e8353a');
+    circle(ctx, x, top + 176, 20);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    circle(ctx, x - 6, top + 169, 5);
+    ctx.fill();
+    // the mouth: a wide red grin around the doorway
+    const my = base, mw = 100, mh = 128;
+    ctx.fillStyle = T('#e8353a');
+    ctx.beginPath();
+    ctx.moveTo(x - mw - 36, base - 70);
+    ctx.quadraticCurveTo(x - mw - 36, base - mh - 36, x, base - mh - 36);
+    ctx.quadraticCurveTo(x + mw + 36, base - mh - 36, x + mw + 36, base - 70);
+    ctx.lineTo(x + mw + 36, base);
+    ctx.lineTo(x - mw - 36, base);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // the dark (or, for the exit, glowing) doorway inside the mouth
+    const gr = ctx.createLinearGradient(0, base - mh, 0, base);
+    if (exit) {
+      gr.addColorStop(0, '#ffe2a0');
+      gr.addColorStop(1, '#ff9a5a');
+    } else {
+      gr.addColorStop(0, '#1a0a30');
+      gr.addColorStop(1, '#4a1a60');
+    }
+    ctx.fillStyle = gr;
+    ctx.beginPath();
+    ctx.moveTo(x - mw, my);
+    ctx.lineTo(x - mw, base - mh * 0.55);
+    ctx.quadraticCurveTo(x - mw, base - mh, x, base - mh);
+    ctx.quadraticCurveTo(x + mw, base - mh, x + mw, base - mh * 0.55);
+    ctx.lineTo(x + mw, my);
+    ctx.closePath();
+    ctx.fill();
+    if (!exit) {
+      // swirling spiral deep inside
+      ctx.strokeStyle = 'rgba(255,200,255,0.55)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let k = 0; k < 90; k++) {
+        const a = k * 0.28 + t * 2.4, r = 3 + k * 0.85;
+        const px = x + Math.cos(a) * r, py = base - 70 + Math.sin(a) * r * 0.8;
+        if (k) ctx.lineTo(px, py);
+        else ctx.moveTo(px, py);
+      }
+      ctx.stroke();
+    } else {
+      glowAt(ctx, x, base - 60, 150, '#fff0b0', 0.5);
+    }
+    ctx.strokeStyle = T('#3a1a4a');
+    ctx.lineWidth = 4;
+    // teeth along the top of the doorway
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 7; i++) {
+      const tx = x - mw + 14 + i * ((mw * 2 - 28) / 6), arc = Math.sin(((tx - (x - mw)) / (mw * 2)) * Math.PI);
+      const ty = base - mh * (0.55 + 0.45 * arc);
+      ctx.beginPath();
+      ctx.moveTo(tx - 15, ty);
+      ctx.lineTo(tx + 15, ty);
+      ctx.lineTo(tx, ty + 30);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    // a signboard on posts beside the mouth
+    const sgx = x + (exit ? 1 : -1) * 232;
+    ctx.fillStyle = T('#6b4a2e');
+    ctx.fillRect(sgx - 48, base - 70, 8, 70);
+    ctx.fillRect(sgx + 40, base - 70, 8, 70);
+    ctx.save();
+    ctx.translate(sgx, base - 92);
+    ctx.rotate(exit ? 0.05 : -0.05);
+    ctx.fillStyle = T('#ffd23a');
+    rr(ctx, -64, -22, 128, 44, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.font = '19px ' + font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(90,10,20,0.85)';
+    const lab = exit ? 'UTGÅNG' : 'LUSTIGA HUSET';
+    ctx.strokeText(lab, 0, 2);
+    ctx.fillStyle = T('#e8353a');
+    ctx.fillText(lab, 0, 2);
+    ctx.restore();
+    for (let i = 0; i < 12; i++) bulb(ctx, x - mw - 24 + i * ((mw * 2 + 48) / 11), base - mh - 24 + Math.abs(i - 5.5) * 3.6, 3, CANDY[i % 6], 0.7 + 0.3 * Math.sin(t * 5 + i));
+  };
+
+  // the log flume hill: a huge wooden ramp with the trough on top and a splash pool at the bottom
+  mid.flumehill = function (ctx, x, base, d, t, font) {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const topX = x - 120, topY = base - 310, poolX = x + 190;
+    // the lift ramp: from the lower left up to the crest, then a steep drop to the pool
+    const rampY = (px) => {
+      if (px < topX) return base - 22 - ((px - (x - 380)) / (topX - (x - 380))) * (310 - 22);
+      const q = Math.min(1, (px - topX) / (poolX - topX));
+      return topY + (310 - 28) * Math.pow(q, 1.7);
+    };
+    // trestle posts and braces
+    ctx.strokeStyle = T('#7a5232');
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (let px = x - 360; px <= poolX - 24; px += 34) {
+      const ry = rampY(px);
+      ctx.moveTo(px, ry + 8);
+      ctx.lineTo(px, base);
+      ctx.moveTo(px, ry + 14);
+      ctx.lineTo(px + 34, Math.min(base, rampY(px + 34) + 70));
+    }
+    ctx.stroke();
+    // the trough: wood side with a blue water line
+    const path = (dy) => {
+      ctx.beginPath();
+      for (let px = x - 380; px <= poolX; px += 10) {
+        const ry = rampY(px) + dy;
+        if (px === x - 380) ctx.moveTo(px, ry);
+        else ctx.lineTo(px, ry);
+      }
+    };
+    ctx.strokeStyle = T('#9a6a3c');
+    ctx.lineWidth = 22;
+    path(10);
+    ctx.stroke();
+    ctx.strokeStyle = T('#5a3a1e');
+    ctx.lineWidth = 3;
+    path(20);
+    ctx.stroke();
+    ctx.strokeStyle = T('#4aa8e0');
+    ctx.lineWidth = 9;
+    path(0);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 2;
+    path(-3);
+    ctx.stroke();
+    // logs riding up the lift and down the drop
+    for (let k = 0; k < 3; k++) {
+      const u = (t * 0.07 + k / 3) % 1;
+      const px = u < 0.72 ? x - 360 + (u / 0.72) * (topX - (x - 360)) : topX + ((u - 0.72) / 0.28) * (poolX - topX - 40);
+      const py = rampY(px) - 12, ang = Math.atan2(rampY(px + 6) - rampY(px - 6), 12);
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(ang);
+      ctx.fillStyle = T('#a8703a');
+      rr(ctx, -16, -8, 32, 16, 7);
+      ctx.fill();
+      ctx.strokeStyle = T('#4a2a10');
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = T(CANDY[(k * 2) % 6]);
+      circle(ctx, 0, -9, 6);
+      ctx.fill();
+      ctx.restore();
+    }
+    // the splash pool and a plume of spray
+    ctx.fillStyle = T('#3aa0e0');
+    ctx.beginPath();
+    ctx.ellipse(poolX + 60, base - 4, 120, 16, 0, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    const pl = (Math.sin(t * 2.4) + 1) / 2;
+    ctx.fillStyle = 'rgba(240,252,255,0.85)';
+    for (let i = 0; i < 9; i++) {
+      const a = -0.5 + (i / 8) * 1.0 - 0.4, rr2 = 26 + pl * 22 + (i % 3) * 8;
+      circle(ctx, poolX - 10 + Math.sin(a * 3) * rr2 * 1.4, base - 16 - Math.abs(Math.cos(a * 3)) * rr2 * (0.9 + pl * 0.6) - (i % 2) * 6, 5 + (i % 3) * 2);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.ellipse(poolX - 8, base - 12, 54, 14, 0, 0, TAU);
+    ctx.fill();
+    // the sign on the crest
+    ctx.save();
+    ctx.translate(topX + 30, topY - 64);
+    ctx.rotate(-0.06);
+    ctx.fillStyle = T('#ffd23a');
+    rr(ctx, -76, -22, 152, 44, 9);
+    ctx.fill();
+    ctx.strokeStyle = T('#c8442a');
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.font = '26px ' + font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(0,50,120,0.85)';
+    ctx.strokeText('SPLASH!', 0, 2);
+    ctx.fillStyle = T('#ffffff');
+    ctx.fillText('SPLASH!', 0, 2);
+    ctx.restore();
+    ctx.strokeStyle = T('#7a5232');
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(topX + 30, topY - 42);
+    ctx.lineTo(topX + 30, topY - 4);
+    ctx.stroke();
+  };
+
+  // the drop tower: a tall lattice mast with a seat ring that creeps up and then falls
+  mid.droptower = function (ctx, x, base, d, t, font) {
+    const h = 380, w = 44;
+    ctx.lineJoin = 'round';
+    // lattice mast
+    ctx.fillStyle = T('#f4f6fa');
+    ctx.fillRect(x - w / 2, base - h, w, h);
+    ctx.strokeStyle = T('#6b7686');
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x - w / 2, base - h, w, h);
+    ctx.strokeStyle = T('#e0342b');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let yy = base - h, dd = 0; yy < base; yy += 30, dd ^= 1) {
+      ctx.moveTo(dd ? x - w / 2 : x + w / 2, yy);
+      ctx.lineTo(dd ? x + w / 2 : x - w / 2, yy + 30);
+    }
+    ctx.stroke();
+    // the seat ring: rises slowly, hangs, drops fast
+    const cyc = (t / 7) % 1;
+    let k;
+    if (cyc < 0.6) k = U.smooth(cyc / 0.6);
+    else if (cyc < 0.72) k = 1;
+    else k = 1 - Math.pow((cyc - 0.72) / 0.28, 2);
+    const ry = base - 40 - k * (h - 90);
+    ctx.fillStyle = T('#e8353a');
+    rr(ctx, x - 40, ry - 6, 80, 12, 5);
+    ctx.fill();
+    ctx.strokeStyle = T('#5a1a30');
+    ctx.stroke();
+    for (let i = -2; i <= 2; i++) {
+      ctx.strokeStyle = T('#4a4a58');
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + i * 16, ry + 5);
+      ctx.lineTo(x + i * 16 + i * 2, ry + 22);
+      ctx.stroke();
+      ctx.fillStyle = T(CANDY[(i + 2) % 6]);
+      rr(ctx, x + i * 16 + i * 2 - 6, ry + 20, 12, 16, 4);
+      ctx.fill();
+    }
+    // the cap, a flag and a blinking beacon
+    ctx.fillStyle = T('#e8353a');
+    tri(ctx, x - 30, base - h, x, base - h - 46, x + 30, base - h);
+    ctx.fill();
+    ctx.strokeStyle = T('#5a1a30');
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    parkFlag(ctx, x, base - h - 46, 24, '#ffd23a', t, 9);
+    bulb(ctx, x, base - h - 10, 4, Math.floor(t * 3) % 2 ? '#ff4d6d' : '#fff4c4', 1);
+    ctx.fillStyle = T('#e0342b');
+    rr(ctx, x - 40, base - 18, 80, 18, 4);
+    ctx.fill();
+  };
+
+  // ---------- world-space rides: the Ferris wheel's frame, the cannon, the loop (drawn by render.js behind the objects) ----------
+  // The wheel's frame at screen (cx, cy) with outer radius R px: A-legs down to gy, the rim, spokes and bulbs. The gondolas are
+  // solid blocks drawn on their own, hanging from the rim points; ang is how far the wheel has turned (radians, counter-clockwise).
+  Art.ferrisWheel = function (ctx, cx, cy, R, n, ang, gy, t) {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const steel = T('#f4eef6'), edge = T('#7a4a78'), accent = T('#ff6ab0');
+    // the two A-legs and their cross braces
+    const spread = Math.max(R * 0.62, (gy - cy) * 0.42);
+    for (const sd of [-1, 1]) {
+      ctx.strokeStyle = edge;
+      ctx.lineWidth = 15;
+      ctx.beginPath();
+      ctx.moveTo(cx + sd * 5, cy);
+      ctx.lineTo(cx + sd * spread, gy);
+      ctx.stroke();
+      ctx.strokeStyle = steel;
+      ctx.lineWidth = 10;
+      ctx.stroke();
+      ctx.fillStyle = edge;
+      rr(ctx, cx + sd * spread - 20, gy - 10, 40, 10, 3);
+      ctx.fill();
+    }
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (const f of [0.35, 0.65]) {
+      const yy = cy + (gy - cy) * f, xx = spread * f;
+      ctx.moveTo(cx - xx, yy);
+      ctx.lineTo(cx + xx, yy);
+    }
+    ctx.moveTo(cx - spread * 0.35, cy + (gy - cy) * 0.35);
+    ctx.lineTo(cx + spread * 0.65, cy + (gy - cy) * 0.65);
+    ctx.moveTo(cx + spread * 0.35, cy + (gy - cy) * 0.35);
+    ctx.lineTo(cx - spread * 0.65, cy + (gy - cy) * 0.65);
+    ctx.stroke();
+    // the inner ring and the lattice between the rings
+    const ri = R * 0.58;
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i < n * 2; i++) {
+      const a0 = ang + (i * Math.PI) / n, a1 = ang + ((i + 1) * Math.PI) / n;
+      const p0r = i % 2 ? R : ri, p1r = i % 2 ? ri : R;
+      ctx.moveTo(cx + Math.cos(a0) * p0r, cy - Math.sin(a0) * p0r);
+      ctx.lineTo(cx + Math.cos(a1) * p1r, cy - Math.sin(a1) * p1r);
+    }
+    ctx.stroke();
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ri, 0, TAU);
+    ctx.stroke();
+    // the spokes to every gondola hook
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = ang + (i * TAU) / n;
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * R, cy - Math.sin(a) * R);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = steel;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // the outer rim
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 9;
+    circle(ctx, cx, cy, R);
+    ctx.stroke();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    // bulbs round the rim, chasing
+    const nb = n * 3;
+    for (let i = 0; i < nb; i++) {
+      const a = ang * 0.5 + (i * TAU) / nb;
+      bulb(ctx, cx + Math.cos(a) * (R + 7), cy - Math.sin(a) * (R + 7), 3, CANDY[i % 6], (Math.floor(t * 6) + i) % 3 === 0 ? 1 : 0.55);
+    }
+    // the hub
+    ctx.fillStyle = edge;
+    circle(ctx, cx, cy, 19);
+    ctx.fill();
+    ctx.fillStyle = T('#ffd23a');
+    circle(ctx, cx, cy, 14);
+    ctx.fill();
+    ctx.fillStyle = T('#e8353a');
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = ang + (i * Math.PI) / 5, r = i % 2 ? 5 : 12;
+      const px = cx + Math.cos(a) * r, py = cy - Math.sin(a) * r;
+      if (i) ctx.lineTo(px, py);
+      else ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  // The circus cannon with its muzzle at screen (mx, my) pointing up-right. age = blocks since the player flew past the
+  // portal (negative before): after that the muzzle flashes, "BOM!" pops up and a plume of smoke drifts off.
+  Art.cannonWorld = function (ctx, mx, my, gy, age, t, font) {
+    const th = -0.46, L = 210, dx = Math.cos(th), dy = Math.sin(th);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // wheels and carriage
+    const bx = mx - dx * L * 0.62, by = my - dy * L * 0.62 + 6;
+    ctx.strokeStyle = T('#5a3a1e');
+    ctx.lineWidth = 12;
+    ctx.beginPath();
+    ctx.moveTo(bx - 52, gy - 4);
+    ctx.lineTo(bx + 34, gy - 4);
+    ctx.stroke();
+    ctx.fillStyle = T('#8a5a30');
+    ctx.beginPath();
+    ctx.moveTo(bx - 40, by + 12);
+    ctx.lineTo(bx + 40, by + 12);
+    ctx.lineTo(bx + 52, gy - 30);
+    ctx.lineTo(bx - 52, gy - 30);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = T('#3a2210');
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    const wr = 46, wx = bx + 6, wy = gy - wr - 2;
+    ctx.fillStyle = T('#d8a050');
+    circle(ctx, wx, wy, wr);
+    ctx.fill();
+    ctx.strokeStyle = T('#3a2210');
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.fillStyle = T('#9a6a30');
+    circle(ctx, wx, wy, wr * 0.78);
+    ctx.fill();
+    ctx.strokeStyle = T('#5a3a1e');
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i * TAU) / 8 + 0.2;
+      ctx.moveTo(wx, wy);
+      ctx.lineTo(wx + Math.cos(a) * wr * 0.78, wy + Math.sin(a) * wr * 0.78);
+    }
+    ctx.stroke();
+    ctx.fillStyle = T('#ffd23a');
+    circle(ctx, wx, wy, 8);
+    ctx.fill();
+    ctx.strokeStyle = T('#e8353a');
+    ctx.lineWidth = 5;
+    circle(ctx, wx, wy, wr - 3);
+    ctx.stroke();
+    // the barrel: tapered, striped, with a flared gold mouth
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.rotate(th);
+    const r0 = 34, r1 = 27, segs = 7, sl = L / segs;
+    for (let i = 0; i < segs; i++) {
+      const x0 = -L + i * sl, x1 = x0 + sl;
+      const ra = r0 + (r1 - r0) * (i / segs), rb = r0 + (r1 - r0) * ((i + 1) / segs);
+      ctx.fillStyle = T(i % 2 ? '#fffaf0' : '#e8353a');
+      ctx.beginPath();
+      ctx.moveTo(x0, -ra);
+      ctx.lineTo(x1, -rb);
+      ctx.lineTo(x1, rb);
+      ctx.lineTo(x0, ra);
+      ctx.closePath();
+      ctx.fill();
+    }
+    const sh = ctx.createLinearGradient(0, -r0, 0, r0);
+    sh.addColorStop(0, 'rgba(255,255,255,0.4)');
+    sh.addColorStop(0.35, 'rgba(255,255,255,0)');
+    sh.addColorStop(1, 'rgba(30,0,40,0.4)');
+    ctx.fillStyle = sh;
+    ctx.beginPath();
+    ctx.moveTo(-L, -r0);
+    ctx.lineTo(0, -r1);
+    ctx.lineTo(0, r1);
+    ctx.lineTo(-L, r0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = T('#4a0c18');
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+    // gold rings and the mouth
+    ctx.fillStyle = T('#ffc83a');
+    for (const f of [0.12, 0.5]) {
+      const r = r0 + (r1 - r0) * f;
+      rr(ctx, -L + L * f - 6, -r - 3, 12, r * 2 + 6, 3);
+      ctx.fill();
+      ctx.stroke();
+    }
+    rr(ctx, -12, -r1 - 7, 22, r1 * 2 + 14, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#2a1030';
+    ctx.beginPath();
+    ctx.ellipse(10, 0, 8, r1 - 3, 0, 0, TAU);
+    ctx.fill();
+    // a star on the barrel and bulbs along the top
+    ctx.fillStyle = T('#ffd23a');
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? 6 : 14;
+      const px = -L * 0.3 + Math.cos(a) * r, py = Math.sin(a) * r;
+      if (i) ctx.lineTo(px, py);
+      else ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    for (let i = 0; i < 7; i++) bulb(ctx, -L * 0.12 - i * 20, -(r0 + (r1 - r0) * (i / 7)) - 6, 2.8, CANDY[i % 6], 0.8);
+    ctx.restore();
+    // before the shot: a lazy wisp of smoke and a spark at the mouth
+    if (age < 0) {
+      for (let i = 0; i < 3; i++) {
+        const u = (t * 0.45 + i / 3) % 1;
+        ctx.fillStyle = 'rgba(235,235,245,' + 0.4 * (1 - u) + ')';
+        circle(ctx, mx + 12 + u * 20, my - 6 - u * 46, 5 + u * 11);
+        ctx.fill();
+      }
+      return;
+    }
+    // the shot: flash, BOM and smoke
+    if (age < 1.7) {
+      const f = age / 1.7, e = 1 - f;
+      glowAt(ctx, mx + 20, my - 8, 120 * (0.5 + e), '#ffd27a', 0.9 * e);
+      ctx.fillStyle = 'rgba(255,240,170,' + e + ')';
+      ctx.beginPath();
+      for (let i = 0; i < 16; i++) {
+        const a = th + (i * TAU) / 16, r = (i % 2 ? 26 : 64) * (0.6 + f * 1.0) * e + 6;
+        const px = mx + 16 + Math.cos(a) * r, py = my + Math.sin(a) * r;
+        if (i) ctx.lineTo(px, py);
+        else ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,140,40,' + 0.9 * e + ')';
+      circle(ctx, mx + 16, my, 16 * (0.6 + e));
+      ctx.fill();
+    }
+    if (age < 5) {
+      const pop = Math.min(1, age / 0.25), fade = 1 - Math.max(0, (age - 3) / 2);
+      ctx.save();
+      ctx.translate(mx + 54, my - 88 - age * 4);
+      ctx.rotate(-0.12);
+      ctx.scale(0.4 + 0.75 * pop, 0.4 + 0.75 * pop);
+      ctx.globalAlpha = Math.max(0, fade);
+      ctx.font = '72px ' + font;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = '#5a0c10';
+      ctx.strokeText('BOM!', 0, 0);
+      ctx.fillStyle = '#ffd23a';
+      ctx.fillText('BOM!', 0, 0);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ff7a1a';
+      ctx.strokeText('BOM!', 0, 0);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+    const puffs = 11;
+    for (let i = 0; i < puffs; i++) {
+      const lag = i * 0.35, a = age - lag;
+      if (a <= 0 || a > 17) continue;
+      const k = a / 17, ease = 1 - Math.pow(1 - Math.min(1, a / 5), 2);
+      const px = mx + 20 + dx * (30 + i * 7) * ease * 2.2 + a * 6, py = my + dy * (30 + i * 7) * ease * 2.2 - a * 5 - i * 2;
+      const r = 16 + a * 4.5 + (i % 3) * 5;
+      ctx.fillStyle = 'rgba(' + (i % 2 ? '238,236,246' : '214,212,226') + ',' + 0.8 * (1 - k) * (1 - k) + ')';
+      circle(ctx, px, py, r);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,' + 0.35 * (1 - k) + ')';
+      circle(ctx, px - r * 0.25, py - r * 0.3, r * 0.55);
+      ctx.fill();
+    }
+  };
+
+  // The loop-the-loop ring of roller-coaster rail at screen (cx, cy), radius R px, supports down to gy. The rail itself
+  // runs flat through the bottom; the whole view spins round while the cart goes through (render.js).
+  Art.loopRing = function (ctx, cx, cy, R, gy, t) {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const off = 22;
+    // white lattice legs
+    for (const sd of [-1, 1]) {
+      const sx0 = cx + sd * R * 0.92, sy0 = cy + R * 0.38, ex = cx + sd * (R * 1.12 + 6);
+      ctx.fillStyle = T('#e8ecf4');
+      ctx.beginPath();
+      ctx.moveTo(sx0 - 7, sy0);
+      ctx.lineTo(sx0 + 7, sy0);
+      ctx.lineTo(ex + 11, gy);
+      ctx.lineTo(ex - 11, gy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = T('#7a8698');
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.beginPath();
+      for (let yy = sy0, d = 0; yy < gy - 20; yy += 28, d ^= 1) {
+        const q0 = (yy - sy0) / (gy - sy0), q1 = Math.min(1, (yy + 28 - sy0) / (gy - sy0));
+        const xa = sx0 + (ex - sx0) * q0, xb = sx0 + (ex - sx0) * q1, w0 = 7 + 4 * q0, w1 = 7 + 4 * q1;
+        ctx.moveTo(d ? xa - w0 : xa + w0, yy);
+        ctx.lineTo(d ? xb + w1 : xb - w1, Math.min(gy, yy + 28));
+      }
+      ctx.stroke();
+    }
+    // the back ring (further away), the ties, then the front ring
+    ctx.strokeStyle = T('#a82a24');
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(cx + off, cy - 10, R, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = T('#f4f6fa');
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i < 24; i++) {
+      const a = (i * TAU) / 24;
+      ctx.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
+      ctx.lineTo(cx + off + Math.cos(a) * R, cy - 10 + Math.sin(a) * R);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = T('#7a1a18');
+    ctx.lineWidth = 13;
+    circle(ctx, cx, cy, R);
+    ctx.stroke();
+    ctx.strokeStyle = T('#ff4a3a');
+    ctx.lineWidth = 9;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R - 2, Math.PI * 1.1, Math.PI * 1.7);
+    ctx.stroke();
+    // little lights round the ring
+    for (let i = 0; i < 18; i++) {
+      const a = (i * TAU) / 18 + t * 0.4;
+      bulb(ctx, cx + Math.cos(a) * (R + 11), cy + Math.sin(a) * (R + 11), 3, CANDY[i % 6], (Math.floor(t * 6) + i) % 3 === 0 ? 1 : 0.55);
+    }
+    // the top mast with a flag
+    ctx.strokeStyle = T('#e8ecf4');
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - R - 6);
+    ctx.lineTo(cx, cy - R - 38);
+    ctx.stroke();
+    parkFlag(ctx, cx, cy - R - 36, 20, '#ffd23a', t, 3);
+  };
+
+  // ---------- fireworks in the night sky (render.js passes the screen width W and the ground line) ----------
+  // amount 0..1 fades them in, big 0..1 makes the bursts larger and more frequent (the finale at the goal)
+  Art.fireworks = function (ctx, W, gy, t, amount, big) {
+    if (amount <= 0.01) return;
+    const slots = 6 + Math.round(big * 5);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    for (let i = 0; i < slots; i++) {
+      const per = 2.5 + (i % 4) * 0.55 - big * 0.5, ph = (t + i * 0.83) / per, cyc = Math.floor(ph), f = ph - cyc;
+      const h1 = U.hash(i * 7.1 + cyc * 3.3), h2 = U.hash(i * 3.9 + cyc * 5.7), h3 = U.hash(i * 11.3 + cyc * 1.9);
+      const bx = W * (0.06 + 0.88 * h1), by = 60 + 210 * h2;
+      const col = CANDY[Math.floor(h3 * 6)], col2 = CANDY[(Math.floor(h3 * 6) + 2) % 6];
+      const Rmax = (62 + 56 * h3) * (1 + 0.9 * big);
+      if (f < 0.2) {
+        // the rocket climbing
+        const p = 1 - Math.pow(1 - f / 0.2, 2), hy = gy - 30 + (by - (gy - 30)) * p;
+        ctx.strokeStyle = U.rgba('#ffe9a8', 0.8 * amount);
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(bx, hy + 34 * (1 - p * 0.4));
+        ctx.lineTo(bx, hy);
+        ctx.stroke();
+        ctx.fillStyle = U.rgba('#ffffff', amount);
+        circle(ctx, bx, hy, 2.6);
+        ctx.fill();
+        continue;
+      }
+      const q = (f - 0.2) / 0.8, e = 1 - Math.pow(1 - q, 2.2), r = Rmax * e, fade = Math.pow(1 - q, 1.15) * amount;
+      if (q < 0.25) glowAt(ctx, bx, by, Rmax * 1.2 * (0.4 + q * 2), col, 0.7 * (1 - q * 4) * amount);
+      const n = 28;
+      for (let k = 0; k < n; k++) {
+        const a = (k * TAU) / n + h1 * 3, ring = k % 2 ? 1 : 0.72, rk = r * ring;
+        const droop = q * q * Rmax * 0.55;
+        const x1 = bx + Math.cos(a) * rk, y1 = by + Math.sin(a) * rk + droop;
+        const rp = Rmax * (1 - Math.pow(1 - Math.max(0, q - 0.07), 2.2)) * ring;
+        const x0 = bx + Math.cos(a) * rp, y0 = by + Math.sin(a) * rp + q * q * Rmax * 0.55 * 0.85;
+        ctx.strokeStyle = U.rgba(k % 2 ? col : col2, fade * 0.8);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+        ctx.fillStyle = U.rgba(k % 2 ? '#ffffff' : col2, fade);
+        circle(ctx, x1, y1, 1.8 + (1 - q) * 1.2);
+        ctx.fill();
+      }
+      if (q > 0.55) {
+        // late glitter
+        for (let k = 0; k < 10; k++) {
+          const a = k * 2.4 + h2 * 5, rk = Rmax * (0.4 + 0.7 * U.hash(k * 3.1 + i)), tw = (Math.sin(t * 24 + k * 5) + 1) / 2;
+          ctx.fillStyle = U.rgba('#fff4c4', fade * tw);
+          ctx.fillRect(bx + Math.cos(a) * rk, by + Math.sin(a) * rk + q * q * Rmax * 0.6, 2.4, 2.4);
+        }
+      }
+    }
+    ctx.restore();
+  };
+
+  // ---------- Vippe's rides ----------
+  // The hollowed log of the flume. (cx, y) = middle of the top edge of the water in px, w the log's length, ang the tilt.
+  // part 0 is the back of the log (drawn before Vippe), part 1 the front wall and the splashes (drawn after him).
+  Art.flumeLog = function (ctx, cx, y, w, ang, t, part) {
+    ctx.save();
+    ctx.translate(cx, y);
+    ctx.rotate(ang);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const hw = w / 2;
+    const wood = () => {
+      const g = ctx.createLinearGradient(0, -9, 0, 17);
+      g.addColorStop(0, '#d8a064');
+      g.addColorStop(0.45, '#a8703a');
+      g.addColorStop(1, '#6a4020');
+      return g;
+    };
+    if (part === 0) {
+      rr(ctx, -hw, -10, w, 27, 11);
+      ctx.fillStyle = wood();
+      ctx.fill();
+      ctx.strokeStyle = '#3a2010';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      // the hollow: dark inside, lit along the far rim
+      ctx.fillStyle = '#4a2a14';
+      rr(ctx, -hw + 7, -9, w - 14, 11, 4);
+      ctx.fill();
+      ctx.fillStyle = '#7a4a24';
+      ctx.fillRect(-hw + 10, -9, w - 20, 3);
+    } else {
+      // the front wall of the log, over Vippe's legs
+      ctx.beginPath();
+      ctx.moveTo(-hw + 2, -3);
+      ctx.lineTo(hw - 2, -3);
+      ctx.lineTo(hw, 8);
+      ctx.quadraticCurveTo(hw - 2, 17, hw - 10, 17);
+      ctx.lineTo(-hw + 10, 17);
+      ctx.quadraticCurveTo(-hw + 2, 17, -hw, 8);
+      ctx.closePath();
+      ctx.fillStyle = wood();
+      ctx.fill();
+      ctx.strokeStyle = '#3a2010';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      // a candy-striped band along the lip
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-hw + 4, -3, w - 8, 6);
+      ctx.clip();
+      stripes(ctx, -hw + 4, -3, w - 8, 6, 7, '#e8353a', '#fff4e0', 0);
+      ctx.restore();
+      // bark
+      ctx.strokeStyle = 'rgba(50,28,10,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const lx = -hw + 14 + i * (w - 28) / 4;
+        ctx.moveTo(lx, 7 + (i % 2) * 3);
+        ctx.lineTo(lx + 12, 7 + (i % 2) * 3);
+      }
+      ctx.stroke();
+      // spray off the bow and a foamy wake behind
+      for (let i = 0; i < 6; i++) {
+        const u = (t * 2.6 + i / 6) % 1;
+        ctx.fillStyle = 'rgba(245,252,255,' + 0.9 * (1 - u) + ')';
+        circle(ctx, hw - 2 + u * 20, 6 - Math.sin(u * Math.PI) * 17 + u * u * 14, 2.4 * (1 - u * 0.5) + 0.6);
+        ctx.fill();
+        circle(ctx, -hw + 4 - u * 18, 9 - Math.sin(u * Math.PI) * 8, 2 * (1 - u * 0.4) + 0.5);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  };
+
+  // The roller coaster car, same drawing parts: 0 behind Vippe (rear seat, wheels), 1 in front (nose, lap bar).
+  // (cx, y) = middle of the rail's top edge in px.
+  Art.coasterCart = function (ctx, cx, y, w, ang, t, part) {
+    ctx.save();
+    ctx.translate(cx, y);
+    ctx.rotate(ang);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const hw = w / 2;
+    if (part === 0) {
+      // the rear of the car and the wheels
+      ctx.fillStyle = '#6a1018';
+      rr(ctx, -hw, -34, w * 0.5, 30, 6);
+      ctx.fill();
+      ctx.strokeStyle = '#3a060c';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = '#9a2028';
+      rr(ctx, -hw + 5, -30, 10, 24, 4);
+      ctx.fill();
+      for (const wx of [-hw * 0.58, hw * 0.52]) {
+        ctx.fillStyle = '#23232a';
+        circle(ctx, wx, -6, 8);
+        ctx.fill();
+        ctx.fillStyle = '#c9ced4';
+        circle(ctx, wx, -6, 3.4);
+        ctx.fill();
+        ctx.strokeStyle = '#6a6a76';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const a = t * 12 + (i * Math.PI) / 3;
+          ctx.moveTo(wx - Math.cos(a) * 7, -6 - Math.sin(a) * 7);
+          ctx.lineTo(wx + Math.cos(a) * 7, -6 + Math.sin(a) * 7);
+        }
+        ctx.stroke();
+      }
+    } else {
+      // the front body with its nose, over Vippe's legs
+      const g = ctx.createLinearGradient(0, -26, 0, -2);
+      g.addColorStop(0, '#ff6a58');
+      g.addColorStop(1, '#c4261c');
+      ctx.beginPath();
+      ctx.moveTo(-hw + 2, -3);
+      ctx.lineTo(-hw, -22);
+      ctx.quadraticCurveTo(-hw, -26, -hw + 6, -26);
+      ctx.lineTo(hw - 14, -26);
+      ctx.quadraticCurveTo(hw + 6, -20, hw + 12, -9);
+      ctx.lineTo(hw + 8, -3);
+      ctx.closePath();
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#4a0c10';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = '#fff4e0';
+      ctx.fillRect(-hw + 3, -17, w - 6, 4);
+      // star and headlight
+      ctx.fillStyle = '#ffd23a';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? 2.5 : 6;
+        const px = -hw * 0.3 + Math.cos(a) * r, py = -13 + Math.sin(a) * r;
+        if (i) ctx.lineTo(px, py);
+        else ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#fff7c0';
+      circle(ctx, hw + 5, -12, 4);
+      ctx.fill();
+      glowAt(ctx, hw + 8, -12, 18, '#fff0a0', 0.3 + 0.5 * lightK);
+      // the lap bar across Vippe's tummy, with yellow grips
+      ctx.strokeStyle = '#2e2e38';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(hw * 0.22, -26);
+      ctx.lineTo(hw * 0.22, -38);
+      ctx.stroke();
+      ctx.strokeStyle = '#9aa3ad';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(-hw * 0.2, -39);
+      ctx.lineTo(hw * 0.32, -39);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffd23a';
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(-hw * 0.2, -39);
+      ctx.lineTo(-hw * 0.2 + 7, -39);
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+
+  // Vippe as a human cannonball (the ship mode of the park): a crash helmet, a flying scarf and speed streaks. s = size in px.
+  Art.cannonball = function (ctx, s, expr, skinId, t) {
+    const h = s * 0.4;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // speed streaks and a trail of sparks behind
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    for (let i = 0; i < 5; i++) {
+      const y = (i - 2) * s * 0.17, len = s * (0.55 + (i % 3) * 0.28), x0 = -s * 0.52 - ((t * 5 + i * 0.37) % 1) * s * 0.35;
+      ctx.lineWidth = 2.2 - Math.abs(i - 2) * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x0 - len, y);
+      ctx.stroke();
+    }
+    const fl = 0.75 + 0.25 * Math.sin(t * 50);
+    ctx.fillStyle = '#ff9a2e';
+    tri(ctx, -s * 0.4, -s * 0.1, -s * 0.4, s * 0.1, (-0.4 - 0.5 * fl) * s, 0);
+    ctx.fill();
+    ctx.fillStyle = '#fff3b0';
+    tri(ctx, -s * 0.4, -s * 0.05, -s * 0.4, s * 0.05, (-0.4 - 0.26 * fl) * s, 0);
+    ctx.fill();
+    // the flying scarf
+    ctx.strokeStyle = '#e8353a';
+    ctx.lineWidth = s * 0.1;
+    ctx.beginPath();
+    ctx.moveTo(-h * 0.5, h * 0.78);
+    ctx.bezierCurveTo(-s * 0.55, h * 0.7 + Math.sin(t * 22) * 3, -s * 0.75, h * 0.9, -s * 0.98 - Math.sin(t * 18) * 3, h * 0.55 + Math.sin(t * 20 + 1) * 4);
+    ctx.stroke();
+    ctx.strokeStyle = '#fff4e0';
+    ctx.lineWidth = s * 0.035;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.58, h * 0.82);
+    ctx.lineTo(-s * 0.7, h * 0.86);
+    ctx.stroke();
+    Art.cube(ctx, s * 0.78, expr, skinId, 1);
+    // the helmet over the hair: a white dome with a red stripe, goggle strap and chin strap
+    const by = -s * 0.17;
+    ctx.beginPath();
+    ctx.ellipse(0, by, h * 1.12, s * 0.3, 0, Math.PI, 0);
+    ctx.lineTo(h * 1.12, by);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(-h, by - s * 0.3, h, by);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(1, '#b8c4d4');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = s * 0.045;
+    ctx.stroke();
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, by, h * 1.12, s * 0.3, 0, Math.PI, 0);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = '#e8353a';
+    ctx.fillRect(-s * 0.07, by - s * 0.35, s * 0.14, s * 0.4);
+    ctx.restore();
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = s * 0.05;
+    ctx.beginPath();
+    ctx.moveTo(-h * 1.12, by);
+    ctx.lineTo(h * 1.12, by);
+    ctx.stroke();
+    ctx.lineWidth = s * 0.03;
+    ctx.beginPath();
+    ctx.moveTo(-h * 0.9, by);
+    ctx.lineTo(-h * 0.78, h * 0.62);
+    ctx.moveTo(h * 0.9, by);
+    ctx.lineTo(h * 0.78, h * 0.62);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd23a';
+    circle(ctx, 0, by - s * 0.2, s * 0.045);
+    ctx.fill();
+  };
+
   // shared with the renderer (render.js draws the jungle fields, the rapids and the cave with these)
   Art.leaf = leaf;
   Art.fernTuft = fernTuft;

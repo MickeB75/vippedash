@@ -35,13 +35,16 @@
 
   // Shared scratch object returned by moveOf — read it right away and never keep a reference,
   // so the bot's hot loop (millions of steps) allocates nothing.
-  const MV = { dx: 0, dy: 0, a: 0, k: 0 };
+  const MV = { dx: 0, dy: 0, a: 0, k: 0, vy: 0 };
 
   // The player's x-based "level clock" offset/state of a moving hazard, at player position x.
   // mv.type: 'bob' (sine bob), 'pop' (jack-in-the-box), 'drop' (falling/rising nun), 'swing' (pendulum),
   // 'leap' (a piranha jumping out of the river, see Builder.piranha()),
   // 'throw' (a pawn thrown by the level 4 king boss, see level.js Builder.pawn() — or, with mv.hx set, a
-  // hazard/coin thrown by a stationary thrower standing at a fixed point, see Builder.lob()).
+  // hazard/coin thrown by a stationary thrower standing at a fixed point, see Builder.lob()),
+  // 'orbit' (Nöjesparken's Ferris-wheel gondolas, see Builder.wheel(): MV.dx/dy = the hanging point minus the
+  // wheel's centre, MV.vy = its vertical speed in blocks/s) and 'roll' (a barrel rolling towards the player,
+  // see Builder.barrel(): MV.dx = clamp(k * (mv.bx - x), -4, max), mv.bx = the barrel's own x, MV.a = the roll angle).
   // `lvl` (optional) is only used for the beat clock (bob/pop/swing): when the level has speed zones,
   // moveOf needs the real elapsed time at x, not just x / P.SPEED (see timeAt below). step() passes it;
   // callers without a level clock nearby (or on a level with no speed zones) can omit it.
@@ -50,6 +53,7 @@
     MV.dy = 0;
     MV.a = 0;
     MV.k = 0;
+    MV.vy = 0;
     const mv = o.mv;
     if (!mv) return MV;
     if (mv.type === 'drop') {
@@ -75,10 +79,28 @@
       MV.k = p;
       return MV;
     }
+    if (mv.type === 'roll') {
+      // a barrel rolling towards the player: x-based (not the beat clock), so it meets the player exactly at
+      // its own x; once passed it keeps rolling away behind (down to -4)
+      let dx = mv.k * (mv.bx - x);
+      if (dx < -4) dx = -4;
+      else if (dx > mv.max) dx = mv.max;
+      MV.dx = dx;
+      MV.a = -dx / 0.45;
+      return MV;
+    }
     const t = lvl ? timeAt(lvl, x) : x / P.SPEED;
     const u = t / (mv.beats * BEAT) + (mv.phase || 0);
     if (mv.type === 'bob') {
       MV.dy = mv.amp * Math.sin(2 * Math.PI * u);
+      MV.vy = mv.amp * Math.cos(2 * Math.PI * u) * (2 * Math.PI) / (mv.beats * BEAT);
+    } else if (mv.type === 'orbit') {
+      // a Ferris-wheel gondola: its hanging point circles the wheel's centre counter-clockwise, one turn per
+      // mv.beats beats (u already holds the gondola's own phase offset)
+      const ang = 2 * Math.PI * u;
+      MV.dx = mv.R * Math.cos(ang);
+      MV.dy = mv.R * Math.sin(ang);
+      MV.vy = mv.R * Math.cos(ang) * (2 * Math.PI) / (mv.beats * BEAT);
     } else if (mv.type === 'pop') {
       const f = u - Math.floor(u);
       const k = f < 0.08 ? f / 0.08 : f < 0.5 ? 1 : f < 0.65 ? 1 - (f - 0.5) / 0.15 : 0;
@@ -219,6 +241,51 @@
   }
   const RAFT_CX = 0.5;
 
+  // ---- Nöjesparken's rails (cart mode) ----
+  // lvl.tracks (always an array, empty by default — see level.js Builder.track()/Level) holds compiled rails:
+  // { x0, x1, style, gaps, xs, hs, ms } where xs/hs are the knots and ms the slope (blocks per block) at each
+  // knot. Between two knots the height is a cubic Hermite curve, so it is C1 and a run of knots on one straight
+  // line is a straight ramp. trackAt fills TS with the height (h), the slope (dh) and the style, and returns
+  // the height, or null where there is no rail (inside a gap, or outside every track). The cart mode rides
+  // this surface the same way the raft rides the rapids: its floor is the height at the middle of the player.
+  const TS = { h: 0, dh: 0, style: null };
+  function trackAt(lvl, x) {
+    const ts = lvl && lvl.tracks;
+    if (!ts || !ts.length) return null;
+    for (let i = 0; i < ts.length; i++) {
+      const tr = ts[i];
+      if (x < tr.x0 || x >= tr.x1) continue;
+      TS.style = tr.style;
+      const g = tr.gaps;
+      for (let j = 0; j < g.length; j++) if (x >= g[j][0] && x < g[j][1]) return null;
+      const xs = tr.xs, hs = tr.hs, ms = tr.ms;
+      let lo = 0, hi = xs.length - 2;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (xs[mid] <= x) lo = mid;
+        else hi = mid - 1;
+      }
+      const w = xs[lo + 1] - xs[lo], t = (x - xs[lo]) / w, t2 = t * t, t3 = t2 * t;
+      TS.h = (2 * t3 - 3 * t2 + 1) * hs[lo] + (t3 - 2 * t2 + t) * w * ms[lo] + (-2 * t3 + 3 * t2) * hs[lo + 1] + (t3 - t2) * w * ms[lo + 1];
+      TS.dh = ((6 * t2 - 6 * t) * (hs[lo] - hs[lo + 1])) / w + (3 * t2 - 4 * t + 1) * ms[lo] + (3 * t2 - 2 * t) * ms[lo + 1];
+      return TS.h;
+    }
+    return null;
+  }
+  function trackHeight(lvl, x) {
+    return trackAt(lvl, x);
+  }
+  // 'flume' / 'coaster' if x lies inside a track (also over a gap), else null — render picks the vehicle with it
+  function trackStyleAt(lvl, x) {
+    const ts = lvl && lvl.tracks;
+    if (ts) for (let i = 0; i < ts.length; i++) if (x >= ts[i].x0 && x < ts[i].x1) return ts[i].style;
+    return null;
+  }
+  // slope (blocks per block) of the rail at x, 0 where there is none
+  function trackSlope(lvl, x) {
+    return trackAt(lvl, x) === null ? 0 : TS.dh;
+  }
+
   function setMode(s, portal) {
     const oldH = boxH(s);
     s.mode = portal.mode;
@@ -252,7 +319,8 @@
     // ---- input + gravity ----
     if (s.mode === 'cube') {
       if (s.grounded && (held || fresh)) {
-        s.vy = -s.gdir * P.JUMP_V;
+        // + s.vy: 0 on the floor and on static blocks, the gondola's own speed when standing on a moving one
+        s.vy = -s.gdir * P.JUMP_V + s.vy;
         s.grounded = false;
         s.pressAge = 99;
         if (ev) ev.push('jump');
@@ -265,7 +333,11 @@
       s.vy += (held ? P.SHIP_UP : -P.SHIP_DOWN) * up * dt;
       if (s.vy > P.SHIP_VUP) s.vy = P.SHIP_VUP;
       else if (s.vy < -P.SHIP_VDOWN) s.vy = -P.SHIP_VDOWN;
-    } else if (s.mode === 'raft') {
+    } else if (s.mode === 'raft' || s.mode === 'cart') {
+      // Nöjesparken's 'cart' mode (log / roller-coaster car) behaves exactly like the raft below, except that
+      // its floor is the rail (trackAt) instead of the rapids, and that a cart that is riding the rail is not
+      // held to MAX_FALL (a steep dive is followed down; only a cart already in the air is capped).
+      const ride = s.mode === 'cart' && s.grounded;
       // the raft: jumps like a cube, but its floor is the rapids' water surface (see rapidsAt). While it
       // rides the surface, s.vy is the surface's own vertical speed, so a jump (P.JUMP_V on top of it) off a
       // rising wave goes higher and off a falling one lower; when the surface falls away faster than gravity
@@ -277,7 +349,7 @@
         if (ev) ev.push('jump');
       }
       s.vy += s.gdir * P.G * dt;
-      if (s.gdir < 0 ? s.vy < -P.MAX_FALL : s.vy > P.MAX_FALL) s.vy = s.gdir * P.MAX_FALL;
+      if (!ride && (s.gdir < 0 ? s.vy < -P.MAX_FALL : s.vy > P.MAX_FALL)) s.vy = s.gdir * P.MAX_FALL;
     } else if (s.mode === 'lane') {
       // Stratusvägen's two-lane street: runs on the ground like cube (same gravity, no ceiling flip),
       // but a fresh press never jumps — it toggles which lane (0 near, 1 far) the player is headed to.
@@ -318,18 +390,39 @@
     s.y += s.vy * dt;
     // the raft integrates exactly (y += v0 dt + g dt^2 / 2 instead of v1 dt): then a raft riding a wave lets go
     // as soon as the surface falls away faster than gravity (not 2x as fast, as the plain step would need)
-    if (s.mode === 'raft') s.y -= 0.5 * s.gdir * P.G * dt * dt;
+    if (s.mode === 'raft' || s.mode === 'cart') s.y -= 0.5 * s.gdir * P.G * dt * dt;
     s.grounded = false;
 
     // a hole in the floor: no ground under you, and once you've fallen deep enough you come out of the
     // roof of the layer below (same x, y shifted up so the fall is continuous)
-    const hole = lvl.drops.length && s.mode !== 'raft' ? holeAt(lvl, s) : null;
+    const hole = lvl.drops.length && s.mode !== 'raft' && s.mode !== 'cart' ? holeAt(lvl, s) : null;
     if (s.mode === 'raft') {
       // the water surface under the middle of the raft is the floor (it can lie below 0 in a trough)
       const fy = rapidsAt(lvl, s.x + RAFT_CX);
       if (s.y <= fy) {
         s.y = fy;
         s.vy = RS.dh * speedAt(lvl, s.x);
+        s.grounded = true;
+      }
+    } else if (s.mode === 'cart') {
+      // the rail under the middle of the cart is the floor. No rail (a gap): no floor — fall to y <= 0 and
+      // you're out. Come out of a gap more than 0.6 under the rail and you've hit the far end of it.
+      const fy = trackAt(lvl, s.x + RAFT_CX);
+      if (fy === null) {
+        if (s.y <= 0) {
+          s.dead = true;
+          s.cause = 'fall';
+          s.dmg = 12;
+          return s;
+        }
+      } else if (s.y < fy - 0.6) {
+        s.dead = true;
+        s.cause = 'solid';
+        s.dmg = 12;
+        return s;
+      } else if (s.y <= fy) {
+        s.y = fy;
+        s.vy = TS.dh * speedAt(lvl, s.x);
         s.grounded = true;
       }
     } else if (hole) {
@@ -353,22 +446,34 @@
     const n = near.length;
 
     // ---- solids ----
+    // A solid with o.mv and a box (bx0..by1: Ferris-wheel gondolas) is moved by moveOf first; standing on one
+    // you ride along (landing sets vy to the gondola's own speed, so jumps and landings work while it rises or
+    // sinks). Static solids take exactly the old path (pvy = 0).
     for (let i = 0; i < n; i++) {
       const o = near[i];
       if (o.t !== 'solid') continue;
       if (o.lane != null && Math.abs(s.laneP - o.lane) >= P.LANE_HIT) continue;
-      if (s.x < o.x + o.w && s.x + 1 > o.x && s.y < o.y + o.h && s.y + ph > o.y) {
-        const top = o.y + o.h, bot = o.y;
-        const cubeLike = s.mode === 'cube' || s.mode === 'raft';
+      let ox0 = o.x, ox1 = o.x + o.w, oy0 = o.y, oy1 = o.y + o.h, pvy = 0;
+      if (o.mv !== undefined && o.bx0 !== undefined) {
+        const mo = moveOf(o, s.x, lvl);
+        ox0 = o.bx0 + mo.dx;
+        ox1 = o.bx1 + mo.dx;
+        oy0 = o.by0 + mo.dy;
+        oy1 = o.by1 + mo.dy;
+        pvy = mo.vy;
+      }
+      if (s.x < ox1 && s.x + 1 > ox0 && s.y < oy1 && s.y + ph > oy0) {
+        const top = oy1, bot = oy0;
+        const cubeLike = s.mode === 'cube' || s.mode === 'raft' || s.mode === 'cart';
         const canTop = !cubeLike || s.gdir < 0;
         const canBot = !cubeLike || s.gdir > 0;
-        if (canTop && s.vy <= 0 && prevY >= top - P.LAND_TOL) {
+        if (canTop && s.vy - pvy <= 0 && prevY >= top - pvy * dt - P.LAND_TOL) {
           s.y = top;
-          s.vy = 0;
+          s.vy = pvy;
           if (s.gdir < 0) s.grounded = true;
-        } else if (canBot && s.vy >= 0 && prevY + ph <= bot + P.LAND_TOL) {
+        } else if (canBot && s.vy - pvy >= 0 && prevY + ph <= bot - pvy * dt + P.LAND_TOL) {
           s.y = bot - ph;
-          s.vy = 0;
+          s.vy = pvy;
           if (s.gdir > 0) s.grounded = true;
         } else {
           s.dead = true;
@@ -428,5 +533,5 @@
     return s;
   }
 
-  VD.Physics = { spawn, clone, step, boxH, moveOf, speedAt, timeAt, rapidsHeight };
+  VD.Physics = { spawn, clone, step, boxH, moveOf, speedAt, timeAt, rapidsHeight, trackHeight, trackStyleAt, trackSlope };
 })();

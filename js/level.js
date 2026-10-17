@@ -32,6 +32,9 @@
       // Level exposes them as lvl.rapids) and the jaguar chase zones (graphics only)
       this.rapidZones = [];
       this.chases = [];
+      // level 6 "Nöjesparken": the rails of the cart mode (see track()) and the loop-the-loop zones (see loop())
+      this.tracks = [];
+      this.loops = [];
     }
     add(o) {
       o.id = this.nextId++;
@@ -243,8 +246,73 @@
       });
     }
     // a clown balloon bobbing at head height (mv.type 'bob')
-    balloon(x, y, { bob = 0.6, beats = 4, phase = 0 } = {}) {
-      return this.add({ t: 'haz', kind: 'balloon', x, y, w: 1, h: 1.6, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.55, hy1: y + 1.5, dmg: 12, mv: { type: 'bob', amp: bob, beats, phase } });
+    // (style: 'party' in Nöjesparken = a cheerful party balloon; undefined = the clown balloon, as before)
+    balloon(x, y, { bob = 0.6, beats = 4, phase = 0, style } = {}) {
+      const o = { t: 'haz', kind: 'balloon', x, y, w: 1, h: 1.6, hx0: x + 0.2, hx1: x + 0.8, hy0: y + 0.55, hy1: y + 1.5, dmg: 12, mv: { type: 'bob', amp: bob, beats, phase } };
+      if (style !== undefined) o.style = style;
+      return this.add(o);
+    }
+    // ---- level 6 "Nöjesparken": the rail (cart mode), Ferris wheels, barrels and the loop ----
+    // A rail for the 'cart' player mode from x0 to x1. pts = knots [[x, h], ...] (x0 = pts[0][0], x1 = the last
+    // x, h >= 0.5): the height between knots is a smooth C1 curve (a cubic Hermite spline whose slope at a
+    // knot is the harmonic mean of the two neighbouring slopes, or 0 at a crest, a trough and the two ends), so
+    // knots on one straight line make a straight ramp and a crest/trough is rounded and never overshoots. A knot
+    // may carry its own slope as a third number, [x, h, slope]. opts.style: 'flume' (log flume: wooden trough on
+    // stilts) or 'coaster' (red steel rail on lattice supports). opts.gaps: [[a, b], ...] stretches without a
+    // rail (the cart has no floor there). Read the height back with VD.Physics.trackHeight(lvl, x).
+    track(x0, x1, pts, { style = 'coaster', gaps = [] } = {}) {
+      if (pts.length < 2) throw new Error('track(): need at least two knots');
+      if (pts[0][0] !== x0 || pts[pts.length - 1][0] !== x1) throw new Error('track(): x0/x1 must equal the first/last knot x');
+      const n = pts.length, xs = [], hs = [], d = [], ms = [];
+      for (let i = 0; i < n; i++) {
+        xs.push(pts[i][0]);
+        hs.push(pts[i][1]);
+        if (hs[i] < 0.5) throw new Error('track(): knot height < 0.5 at x=' + xs[i]);
+        if (i > 0 && xs[i] <= xs[i - 1]) throw new Error('track(): knots must increase in x (x=' + xs[i] + ')');
+      }
+      for (let i = 0; i + 1 < n; i++) d.push((hs[i + 1] - hs[i]) / (xs[i + 1] - xs[i]));
+      for (let i = 0; i < n; i++) {
+        let m = 0;
+        if (pts[i][2] !== undefined) m = pts[i][2];
+        else if (i > 0 && i + 1 < n && d[i - 1] * d[i] > 0) m = (2 * d[i - 1] * d[i]) / (d[i - 1] + d[i]);
+        ms.push(m);
+      }
+      const t = { x0, x1, style, gaps: gaps.map((g) => [g[0], g[1]]), xs, hs, ms };
+      this.tracks.push(t);
+      return t;
+    }
+    // A Ferris wheel: n solid gondolas hang evenly around a circle of radius R centred (cx, cy), the wheel turning
+    // counter-clockwise once per `beats` beats (mv.type 'orbit' in physics.js; they always hang straight down).
+    // The gondola's box with its hanging point in the centre is bx0..bx1 x by0..by1 (2 wide, 1.2 tall, hanging 0.2
+    // under the point); moveOf offsets it by the point's position on the circle. The roof is what you stand on; the
+    // sides and the floor kill like any block. o.x/o.w and o.y/o.h cover the whole sweep so lvl.query finds them.
+    // Also adds the 'ferris' landmark (drawn behind). Put a water(.., 'pond') under it.
+    wheel(cx, cy, R, { n = 8, beats = 16, phase = 0 } = {}) {
+      for (let i = 0; i < n; i++) {
+        this.add({
+          t: 'solid', style: 'gondola', idx: i, n,
+          x: cx - R - 1.5, w: 2 * R + 3, y: cy - R - 1.4, h: 2 * R + 1.2,
+          bx0: cx - 1, bx1: cx + 1, by0: cy - 1.4, by1: cy - 0.2,
+          mv: { type: 'orbit', cx, cy, R, beats, phase: phase + i / n },
+        });
+      }
+      this.landmark('ferris', cx, { cy, R, n, beats, phase });
+    }
+    // A barrel rolling towards the player along the floor at y: it is at x exactly when the player is, and rolls
+    // k blocks left for every block the player runs (k = 0.6: a closing speed of 1.6 x run speed), starting at most
+    // `max` blocks ahead (mv.type 'roll' in physics.js; MV.a is its roll angle for the art).
+    barrel(x, y = 0, { k = 0.6, max = 12 } = {}) {
+      return this.add({
+        t: 'haz', kind: 'barrel', x: x - 4, w: max + 5, y, h: 1,
+        hx0: x + 0.15, hx1: x + 0.85, hy0: y, hy1: y + 0.85, dmg: 12,
+        mv: { type: 'roll', k, max, bx: x },
+      });
+    }
+    // loop-the-loop over [x0, x1]: graphics only (the rail is flat and there are no obstacles inside it).
+    // While the player's x is inside, render turns the whole world one full turn around the player.
+    loop(x0, x1) {
+      this.loops.push({ x0, x1 });
+      this.landmark('loop', (x0 + x1) / 2, { x0, x1 });
     }
     // ---- level 7 "Amazonas": the rainforest river, the rapids (raft mode), piranhas and jaguars ----
     // a stretch of white-water: inside [x0, x1] the water surface is a travelling sine wave of height amp and
@@ -363,6 +431,9 @@
       // Amazonas: raft water zones (VD.Physics.rapidsHeight) and jaguar chase zones — always arrays, empty elsewhere
       this.rapids = (b.rapidZones || []).slice().sort((a, c) => a.x0 - c.x0);
       this.chases = (b.chases || []).slice().sort((a, c) => a.x0 - c.x0);
+      // Nöjesparken: the cart rails (VD.Physics.trackHeight) and loop-the-loop zones — always arrays, empty elsewhere
+      this.tracks = (b.tracks || []).slice().sort((a, c) => a.x0 - c.x0);
+      this.loops = (b.loops || []).slice().sort((a, c) => a.x0 - c.x0);
       this.houses = b.houses || [];
       this.people = b.people || [];
       for (const list of [this.objs, this.checkpoints, this.decos, this.texts]) for (const o of list) if (o.layer == null) o.layer = this.layerAt(o.x);
@@ -2767,6 +2838,238 @@
   }
 
   // ======================================================================
+  // LEVEL 6 — Nöjesparken, an amusement park. Few checkpoints (7 in 120 s), so the timing windows are kinder than
+  // the neighbours'. The new tricks: Ferris-wheel gondolas that move (physics.js moveOf 'orbit', solids with a
+  // box), barrels that roll towards you ('roll'), the 'cart' mode (a log in the flume, a car on the roller coaster:
+  // it rides a rail, jumps like the raft and falls through gaps in the rail) and a loop-the-loop.
+  // Entrance (cube) -> Ferris wheels (hop from gondola to gondola) -> the fun house (cube, then a ball in a rolling
+  // barrel) -> log flume (cart) -> cannon (ship) -> roller coaster with a loop (cart) -> fireworks.
+  // ======================================================================
+  function buildPark() {
+    const b = new Builder();
+
+    // ============ AREAS (each starts on a bar of the music) ============
+    b.area('gate', -60, 'ENTRÉN', 'Welcome to the amusement park!');
+    b.area('wheel', 160, 'PARISERHJULET', 'Jump from gondola to gondola');
+    b.area('funhouse', 352, 'LUSTIGA HUSET', 'Nothing is what it seems…');
+    b.area('barrel', 464, 'TUNNAN', 'Tap to flip — the barrel spins!');
+    b.area('flume', 544, 'STOCKRÄNNAN', 'Hold on — big splash ahead!');
+    b.area('cannon', 752, 'KANONEN', 'Hold to fly over the park');
+    b.area('coaster', 928, 'BERGBANAN', 'Keep your arms inside the cart!');
+    b.area('loop', 1088, 'LOOPEN', 'Round and round — to the fireworks!');
+
+    // the rails first: hazard heights below are read off the real rail
+    // log flume: flat entry, the chain lift (long uphill), three steep falls
+    b.track(534, 748, [[534, 0.5], [566, 0.5], [622, 7.5], [627, 1.0], [654, 1.0], [664, 5.0], [669, 1.0], [686, 1.0], [712, 8.0], [718, 0.5], [748, 0.5]], { style: 'flume' });
+    // roller coaster: climbs, plunges (the car leaves the rail at each crest), gaps to jump over, a flat stretch for the loop
+    b.track(916, 1264, [[916, 1.0], [958, 1.0], [982, 6.5], [988, 1.0], [1012, 1.0], [1026, 4.5], [1032, 1.0], [1044, 1.0], [1072, 8.0], [1078, 1.0], [1106, 1.0], [1128, 5.0], [1134, 1.0], [1196, 1.0], [1216, 8.0], [1222, 1.0], [1264, 1.0]], { style: 'coaster', gaps: [[940, 943.8], [1002, 1006], [1036, 1039.8], [1098, 1102.2], [1232, 1236.2]] });
+    const th = (x) => VD.Physics.trackHeight({ tracks: b.tracks }, x);
+    // a hazard standing on the rail at x (the rail height under its middle)
+    const onRail = (x, style) => b.spike(x, +th(x + 0.5).toFixed(2), style);
+
+    // ============ ENTRÉN (0 – 160) — calm start, every window wide ============
+    b.checkpoint(0);
+    b.text(12, 4.6, 'Level # · Nöjesparken', 0.55);
+    b.text(12, 3.9, 'Hop the cones and climb the stands!', 0.4);
+    b.spike(28, 0, 'cone');
+    b.spike(40, 0, 'cone');
+    b.spikes(52, 2, 0, 'cone');
+    b.block(64, 0, 3, 1, 'stand');
+    b.balloon(65, 2.3, { bob: 0.4, beats: 4, phase: 0.0, style: 'party' });
+    b.spike(72, 0, 'cone');
+    b.balloon(80, 1.4, { bob: 0.5, beats: 4, phase: 0.25, style: 'party' });
+    b.spike(88, 0, 'cone');
+    b.spike(89.5, 0, 'cone');
+    b.block(94, 0, 5, 1, 'stand');
+    b.block(99, 0, 3, 2, 'stand');
+    b.spike(110, 0, 'cone');
+    b.block(116, 0, 3, 1, 'stand');
+    b.spike(117.5, 1, 'cone');
+    b.spike(128, 0, 'cone');
+    b.spike(129.5, 0, 'cone');
+    b.block(140, 0, 4, 1, 'stand');
+    b.balloon(141, 2.3, { bob: 0.4, beats: 4, phase: 0.5, style: 'party' });
+    b.spike(152, 0, 'cone');
+
+    // ============ PARISERHJULET (160 – 352) — hop from gondola to gondola over the ponds ============
+    b.checkpoint(160);
+    b.text(164, 5.0, 'Jump onto the gondolas!', 0.45);
+    b.spike(172, 0, 'cone');
+    b.wheel(192, 5.9, 4.5, { n: 8, beats: 16, phase: 0.1 });
+    b.water(186, 12, 'pond');
+    b.spike(208, 0, 'cone');
+    b.spike(216, 0, 'cone');
+    b.block(224, 0, 3, 1, 'stand');
+    b.spike(236, 0, 'cone');
+    b.wheel(250, 6.1, 5, { n: 8, beats: 16, phase: 0.06875 });
+    b.water(243.5, 13, 'pond');
+    b.spikes(264, 2, 0, 'cone');
+    b.spike(276, 0, 'cone');
+    b.block(284, 0, 3, 1, 'stand');
+    b.spike(296, 0, 'cone');
+    b.wheel(312, 6.1, 5, { n: 10, beats: 16, phase: 0.0475 });
+    b.water(305.5, 13, 'pond');
+    b.spike(328, 0, 'cone');
+    b.spike(338, 0, 'cone');
+
+    // ============ LUSTIGA HUSET (352 – 464) — cube, mirrored screen, rolling barrels ============
+    b.checkpoint(352);
+    b.corridor(352, 464, 9, 'funhouse');
+    b.mirror(368, 448);
+    b.text(356, 4.6, 'Watch out for the rolling barrels!', 0.45);
+    b.barrel(378);
+    b.block(390, 0, 2, 1, 'funblock');
+    b.barrel(398);
+    b.block(408, 0, 4, 1, 'funblock');
+    b.block(412, 0, 3, 2, 'funblock');
+    b.barrel(424);
+    b.spikes(432, 3, 0, 'cone');
+    b.block(440, 0, 3, 1, 'funblock');
+    b.barrel(458);
+
+    // ============ TUNNAN (464 – 544) — ball inside a rolling barrel ============
+    b.text(470, 4.2, 'TAP to flip gravity!', 0.45);
+    b.portal(466, 'ball', { ceil: 7 });
+    b.corridor(466, 540, 7, 'barrel');
+    b.spikes(478, 3, 0, 'cone');
+    b.spikesDown(486, 3, 7, 'cone');
+    b.block(494, 0, 2, 2, 'funblock');
+    b.spikesDown(500, 3, 7, 'cone');
+    b.spikes(508, 3, 0, 'cone');
+    b.block(516, 5, 2, 2, 'funblock');
+    b.spikesDown(522, 2, 7, 'cone');
+    b.spikes(528, 2, 0, 'cone');
+    b.portal(538, 'cart');
+
+    // ============ STOCKRÄNNAN (544 – 752) — log flume (cart) ============
+    b.checkpoint(544, 'cart', th(544.5));
+    const lamp = (x, clear = 2.4) => b.spikeDown(x, +(th(x + 0.5) + clear).toFixed(2), 'lamp');
+    const bal = (x, up, o = {}) => b.balloon(x, +(th(x + 0.5) + up).toFixed(2), Object.assign({ bob: 0.4, beats: 4, style: 'party' }, o));
+    b.text(548, 6.2, 'Jump the cones, duck the lamps!', 0.4);
+    // entry trough
+    onRail(552, 'cone');
+    onRail(560, 'cone');
+    lamp(562, 2.2);
+    // the chain lift
+    onRail(576, 'cone');
+    onRail(588, 'cone');
+    onRail(589, 'cone');
+    lamp(598, 2.4);
+    bal(606, 1.3, { phase: 0.25 });
+    onRail(612, 'cone');
+    onRail(617, 'cone'); // right before the crest
+    // drop A (flies from 621 to 625), then the first valley
+    onRail(634, 'cone');
+    onRail(635, 'cone');
+    onRail(636, 'cone');
+    lamp(644, 2.4);
+    onRail(647, 'cone');
+    // hump B (flies from 664 to 668)
+    onRail(657, 'cone');
+    // second valley
+    bal(676, 1.3, { phase: 0.5 });
+    onRail(682, 'cone');
+    // second lift
+    onRail(692, 'cone');
+    lamp(700, 2.4);
+    onRail(706, 'cone');
+    // drop C into the pond: the big splash
+    b.water(714, 30, 'pond');
+    bal(726, 1.2, { phase: 0.0 });
+    onRail(732, 'cone');
+    onRail(738, 'cone');
+    b.portal(744, 'cube', { y: 1 });
+
+    // ============ KANONEN (752 – 928) — ship ============
+    b.checkpoint(752);
+    b.text(754, 4.6, 'HOLD to fly — out of the cannon!', 0.45);
+    b.portal(760, 'ship', { ceil: 9 });
+    b.corridor(760, 922, 9, 'bunting');
+    // tent poles from the floor and tent cloth from the ceiling, about 4 blocks apart; a pair every half bar
+    const tents = [[776, 1.1], [784, 2.4], [792, 3.8], [800, 2.6], [808, 1.2], [816, 2.8], [824, 4.2], [832, 3.0], [840, 1.4], [848, 2.2], [856, 3.6], [864, 4.4], [872, 3.2], [880, 1.6], [888, 2.8], [896, 3.8], [904, 2.4]];
+    tents.forEach(([x, f]) => {
+      b.block(x, 0, 2, f, 'tent');
+      b.block(x, f + 3.8, 2, 9 - (f + 3.8), 'tent');
+    });
+    // string-light lamps hanging in the open stretches between the tents, and a few party balloons
+    [[780, 7.4], [796, 7.8], [812, 7.0], [828, 7.6], [844, 7.2], [868, 6.8], [884, 7.6], [900, 7.2]].forEach(([x, top]) => b.spikeDown(x, top, 'lamp'));
+    [[788, 4.6, 0.0], [804, 5.2, 0.5], [820, 4.0, 0.25], [836, 5.0, 0.75], [852, 4.4, 0.0], [892, 5.2, 0.5]].forEach(([x, y, ph]) => b.balloon(x, y, { bob: 0.6, beats: 4, phase: ph, style: 'party' }));
+    b.portal(920, 'cart');
+
+    // ============ BERGBANAN (928 – 1088) — roller coaster (cart) ============
+    b.checkpoint(928, 'cart', th(928.5));
+    b.text(930, 5.2, 'Hold on — gaps in the rail!', 0.45);
+    const beam = (x, w, clear = 2.4) => b.block(x, +(th(x + 0.5) + clear).toFixed(2), w, 0.6, 'girder');
+    b.block(947, 1.0, 2, 1, 'girder');
+    onRail(964, 'cone');
+    onRail(972, 'cone');
+    onRail(992, 'cone');
+    onRail(993, 'cone');
+    onRail(994, 'cone');
+    beam(996.5, 4, 2.4);
+    onRail(1018, 'cone');
+    onRail(1052, 'cone');
+    onRail(1062, 'cone');
+    onRail(1084, 'cone');
+    onRail(1085, 'cone');
+
+    // ============ LOOPEN (1088 – finish) ============
+    b.checkpoint(1088, 'cart', th(1088.5));
+    onRail(1112, 'cone');
+    onRail(1113, 'cone');
+    onRail(1114, 'cone');
+    b.block(1138, 1.0, 2, 1, 'girder');
+    onRail(1148, 'cone');
+    // the loop-the-loop: flat rail and nothing else from 1156 to 1196
+    onRail(1204, 'cone');
+    onRail(1210, 'cone');
+    onRail(1226, 'cone');
+    onRail(1240, 'cone');
+    onRail(1241, 'cone');
+    onRail(1242, 'cone');
+    b.text(1150, 5.2, 'Hands up — the loop!', 0.45);
+    b.loop(1168, 1184);
+    b.finish(1248);
+
+    // ============ NEAR SCENERY ============
+    // the entrance: sign, lamp posts and visitors waving from behind the cones
+    b.deco('parksign', 4, { text: 'NÖJESPARKEN' });
+    [[18, 0], [34, 1], [58, 2], [78, 3], [102, 4], [122, 5], [136, 0], [150, 2]].forEach(([x, v]) => b.deco('visitor', x, { v }));
+    [24, 60, 104, 144].forEach((x) => b.deco('lamppost', x));
+    // the Ferris wheels: visitors on the banks between the ponds
+    b.deco('parksign', 164, { text: 'PARISERHJULET' });
+    [[176, 1], [204, 3], [230, 4], [270, 0], [290, 5], [322, 2], [342, 3]].forEach(([x, v]) => b.deco('visitor', x, { v }));
+    [180, 212, 240, 268, 300, 334].forEach((x) => b.deco('lamppost', x));
+    // the fun house door
+    b.deco('parksign', 340, { text: 'LUSTIGA HUSET' });
+    // the log flume
+    b.deco('parksign', 548, { text: 'STOCKRÄNNAN' });
+    [[570, 5], [596, 1], [640, 3], [684, 0], [736, 4]].forEach(([x, v]) => b.deco('visitor', x, { v }));
+    [560, 604, 650, 700, 740].forEach((x) => b.deco('lamppost', x));
+    // the cannon and the coaster, lit up in the evening
+    b.deco('parksign', 754, { text: 'KANONEN' });
+    [[772, 2], [812, 4], [850, 1], [890, 3]].forEach(([x, v]) => b.deco('visitor', x, { v }));
+    [768, 796, 824, 852, 880, 908].forEach((x) => b.deco('lamppost', x));
+    b.deco('parksign', 932, { text: 'BERGBANAN' });
+    [[952, 0], [1008, 5], [1056, 2], [1092, 4], [1144, 1], [1212, 3]].forEach(([x, v]) => b.deco('visitor', x, { v }));
+    [940, 996, 1048, 1094, 1146, 1228].forEach((x) => b.deco('lamppost', x));
+    b.deco('finish', 1248);
+
+    // ============ MID-LAYER LANDMARKS ============
+    b.landmark('gate', 6);
+    b.landmark('carousel', 112);
+    b.landmark('funhouse', 350, { side: 'entrance' });
+    b.landmark('funhouse', 544, { side: 'exit' });
+    b.landmark('flumehill', 640);
+    b.landmark('cannon', 760);
+    b.landmark('droptower', 860);
+    b.landmark('droptower', 1020);
+    b.landmark('fireworks', 1088);
+
+    return b;
+  }
+
+  // ======================================================================
   // THEMES — everything the renderer and the music need to know per level
   // ======================================================================
   const HOME_THEME = {
@@ -2939,6 +3242,31 @@
     song: 'amazonas',
   };
 
+  const PARK_THEME = {
+    // a summer day at the amusement park: bright blue noon at the gate -> warm afternoon over the flume ->
+    // golden sunset at the cannon -> deep blue evening with all the lights on over the roller coaster
+    sky: [
+      { x: -100, top: '#3a9be8', bot: '#cdeeff', far: '#7fa9c4', dark: 0, sun: 0.15 },
+      { x: 352, top: '#4a9ae0', bot: '#e8f2ff', far: '#86a8c0', dark: 0, sun: 0.3 },
+      { x: 544, top: '#5a96d4', bot: '#ffe6b8', far: '#93a0b0', dark: 0.04, sun: 0.48 },
+      { x: 752, top: '#c86a6a', bot: '#ffc27a', far: '#8a6a7a', dark: 0.12, sun: 0.78 },
+      { x: 928, top: '#3a3a8a', bot: '#e07a8a', far: '#4a3a6a', dark: 0.3, sun: 0.95 },
+      { x: 1088, top: '#141a4a', bot: '#4a3a8a', far: '#20204a', dark: 0.48, sun: 1.15 },
+      { x: 1300, top: '#0a0e30', bot: '#2a2a6a', far: '#141838', dark: 0.55, sun: 1.25 },
+    ],
+    field: { default: 'amusement' },
+    ground: { gate: 'parkpath', wheel: 'parkpath', funhouse: 'funfloor', barrel: 'funfloor', flume: 'parkpath', cannon: 'parkpath', coaster: 'parkpath', loop: 'parkpath' },
+    glow: { gate: '#fff4c4', wheel: '#ffe0f0', funhouse: '#ff9ad6', barrel: '#ffd36a', flume: '#bdf4ff', cannon: '#ffb070', coaster: '#ff6ad0', loop: '#ffe14a' },
+    far: { default: 'parkskyline' },
+    farExtra: [],
+    midFill: { funhouse: null, barrel: null, default: 'mixed' },
+    midStep: [4, 6],
+    indoor: { funhouse: 'funhouse', barrel: 'barrel' },
+    beams: ['gate'],
+    lights: 752, // string lights and lit rides glow from this x on (render.js), stronger as it gets darker
+    song: 'park',
+  };
+
   const STRATUS_THEME = {
     // a Halloween dusk on a quiet suburban horseshoe street: warm porch-light orange sinking into deep
     // purple night by the time Vippe reaches nr 1
@@ -3019,21 +3347,29 @@
       build: buildChess, theme: CHESS_THEME,
     },
     {
-      id: 'ocean', num: 6, name: 'Djupet', route: 'Korallrevet › Manetsvärmen › Valens buk › Ytan',
+      id: 'park', num: 6, name: 'Nöjesparken', route: 'Entrén › Pariserhjulet › Lustiga huset › Stockrännan › Kanonen › Bergbanan',
+      localOnly: true, // not released yet
+      difficulty: 4, diffName: 'Very Hard', reward: 190,
+      winTitle: 'Parkens mästare!',
+      winSub: 'Over the Ferris wheel, through the fun house, down the log flume, out of the cannon and round the roller coaster, all the way to the fireworks.',
+      build: buildPark, theme: PARK_THEME,
+    },
+    {
+      id: 'ocean', num: 7, name: 'Djupet', route: 'Korallrevet › Manetsvärmen › Valens buk › Ytan',
       difficulty: 4, diffName: 'Very Hard', reward: 200,
       winTitle: 'Djupets mästare!',
       winSub: 'Past the urchins, through the wreck, over the current, straight through a whale and up into the light.',
       build: buildOcean, theme: OCEAN_THEME,
     },
     {
-      id: 'amazonas', num: 7, name: 'Amazonas', route: 'Regnskogen › Floden › Forsen › Tripp Troppen › Jaguarjakten',
+      id: 'amazonas', num: 8, name: 'Amazonas', route: 'Regnskogen › Floden › Forsen › Tripp Troppen › Jaguarjakten',
       difficulty: 4, diffName: 'Very Hard', reward: 225,
       winTitle: 'Djungelns konung!',
       winSub: 'Past the piranhas, down the rapids, through the terrifying Tripp Troppen hill and away from the jaguar, all the way to the Amazon at sunset.',
       build: buildAmazonas, theme: AMAZONAS_THEME,
     },
     {
-      id: 'nightmare', num: 8, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
+      id: 'nightmare', num: 9, name: 'Mardrömmen', route: 'Kyrkogården › Klostret › Katakomberna › Cirkusen',
       difficulty: 5, diffName: 'Nightmare', reward: 250, health: 135, age: 16, strobe: true,
       winTitle: 'Du överlevde natten!',
       winSub: 'Past the graves, the bloody nuns, the catacombs and the clowns, and out before the bell struck one.',
@@ -3057,6 +3393,7 @@
     return new Level(def.build(), def);
   };
   VD.Level = Level;
+  VD.Builder = Builder; // for the tuning scratch pages in tools/
   // level 4 "Schackmatt": exported so render.js can draw the king and his pawns at the same distances
   // the physics (Builder.pawn(), physics.js moveOf's 'throw' case) use
   VD.KING_AHEAD = KING_AHEAD;

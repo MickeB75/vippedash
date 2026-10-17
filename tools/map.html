@@ -191,6 +191,7 @@
     // VERTICAL EXTENT — how tall the drawing needs to be, from the objects actually in view
     // ======================================================================
     function topOf(o) {
+      if (o.t === 'solid' && o.mv && o.bx0 != null) return o.by1 + o.mv.R; // a Ferris-wheel gondola: its highest roof
       if (o.t === 'solid') return o.y + o.h;
       if (o.t === 'haz') return Math.max(o.y + (o.h || 0), o.hy1);
       if (o.t === 'pad') return o.y + o.h;
@@ -228,6 +229,7 @@
         bot = Math.min(bot, botOf(o));
       }
       for (const c of lvl.corridors) if (c.x1 > x0 && c.x0 < x1) top = Math.max(top, c.ceil);
+      for (const tr of lvl.tracks) if (tr.x1 > x0 && tr.x0 < x1) for (const h of tr.hs) top = Math.max(top, h + 1.5); // cart rails
       for (const cp of lvl.checkpoints) if (cp.x >= x0 && cp.x < x1) top = Math.max(top, (cp.y || 0) + 3, cp.ceil || 0);
       for (const seg of botSegs) for (const p of seg.points) if (p.x >= x0 && p.x < x1) { top = Math.max(top, p.y + 1); bot = Math.min(bot, p.y - 0.5); }
       rowYTop.push(top + 1.5);
@@ -404,6 +406,7 @@
     }
 
     function drawObj(o, x0, x1, r) {
+      if (o.t === 'solid' && o.mv && o.bx0 != null) return; // drawn by drawGondola
       if (o.t === 'solid') {
         const px = xPix(o.x, x0), py = yPix(o.y + o.h, r);
         const w = o.w * scale, h = o.h * scale;
@@ -493,6 +496,9 @@
       if (mv.type === 'drop') {
         const xa = o.x - mv.trigger, xb = xa + mv.fall;
         for (let i = 0; i <= 24; i++) xs.push(xa + (xb - xa) * (i / 24));
+      } else if (mv.type === 'roll') {
+        // a rolling barrel: its whole path, from `max` blocks ahead to 4 blocks behind its meeting point
+        for (let i = 0; i <= 24; i++) xs.push(mv.bx - 4 + (mv.max + 4) * (i / 24));
       } else {
         const period = 4 * mv.beats, cx = (o.hx0 + o.hx1) / 2;
         for (let i = 0; i <= 24; i++) xs.push(cx - period / 2 + period * (i / 24));
@@ -523,6 +529,35 @@
           ctx.lineWidth = 1.5;
           ctx.fillRect(px0, py0, px1 - px0, py1 - py0);
           ctx.strokeRect(px0, py0, px1 - px0, py1 - py0);
+          ctx.restore();
+        }
+      }
+    }
+
+    // Nöjesparken: a Ferris-wheel gondola (a solid with a box that circles the wheel). Faint: the roofs it passes
+    // through in one turn; solid: where it is when the bot passes the wheel's centre.
+    function drawGondola(o, x0, x1, r) {
+      const mv = o.mv, period = 4 * mv.beats, box = (dx, dy) => [xPix(o.bx0 + dx, x0), yPix(o.by1 + dy, r), (o.bx1 - o.bx0) * scale, (o.by1 - o.by0) * scale];
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,60,60,0.22)';
+      for (let i = 0; i < 32; i++) {
+        const mo = Ph.moveOf(o, mv.cx - period / 2 + period * (i / 32));
+        const b = box(mo.dx, mo.dy);
+        ctx.fillRect(b[0], b[1], b[2], 3);
+      }
+      ctx.restore();
+      if (showBot) {
+        for (const dxp of [-6, -3, 0, 3, 6]) {
+          const bp = closestBotPoint(mv.cx + dxp, 1.6);
+          if (!bp) continue;
+          const mo = Ph.moveOf(o, bp.x), b = box(mo.dx, mo.dy);
+          ctx.save();
+          ctx.fillStyle = COL.movingNow;
+          ctx.strokeStyle = COL.hazardStroke;
+          ctx.lineWidth = 1;
+          ctx.globalAlpha = 0.55;
+          ctx.fillRect(b[0], b[1], b[2], b[3]);
+          ctx.strokeRect(b[0], b[1], b[2], b[3]);
           ctx.restore();
         }
       }
@@ -644,7 +679,35 @@
         const w = o.w || 1;
         if (o.x + w <= x0 || o.x >= x1) continue;
         drawObj(o, x0, x1, r);
-        if (o.mv) drawMovingOverlay(o, x0, x1, r);
+        if (o.mv) { if (o.t === 'solid') drawGondola(o, x0, x1, r); else drawMovingOverlay(o, x0, x1, r); }
+      }
+
+      // ---- cart rails (Nöjesparken's log flume / roller coaster): the rail height, with its gaps left out ----
+      for (const tr of lvl.tracks) {
+        if (tr.x1 <= x0 || tr.x0 >= x1) continue;
+        ctx.strokeStyle = tr.style === 'flume' ? '#c58a4a' : '#e0524a';
+        ctx.lineWidth = 3;
+        let pen = false;
+        for (let x = Math.max(tr.x0, x0); x <= Math.min(tr.x1, x1); x += 0.25) {
+          const h = Ph.trackHeight(lvl, x);
+          if (h === null) { if (pen) ctx.stroke(); pen = false; continue; }
+          const px = xPix(x, x0), py = yPix(h, r);
+          if (!pen) { ctx.beginPath(); ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+
+      // ---- loop-the-loop zones (graphics only) ----
+      for (const lp of lvl.loops) {
+        if (lp.x1 <= x0 || lp.x0 >= x1) continue;
+        ctx.fillStyle = 'rgba(255,225,74,0.12)';
+        ctx.fillRect(xPix(Math.max(lp.x0, x0), x0), track, (Math.min(lp.x1, x1) - Math.max(lp.x0, x0)) * scale, trackH(r));
+        if (lp.x0 >= x0 && lp.x0 < x1) {
+          ctx.fillStyle = '#ffe14a';
+          ctx.font = '9px system-ui, sans-serif';
+          ctx.fillText('loop', xPix(lp.x0, x0) + 3, track + 10);
+        }
       }
 
       // ---- checkpoints ----
