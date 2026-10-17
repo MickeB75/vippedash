@@ -299,25 +299,25 @@
         [78, 80, { end: true }],
       ],
     },
-    // level 7 "Stratusvägens alla helgon": a dusk Halloween street, the easiest level, ~78 bars (~2:00).
-    // 0-4 a happy woman throws candy (bright bouncy intro, oompah bass); 4-24 zucchini/cars/footballs
-    // lane-switching (full tune, then a xylophone "skeleton bones" plink variant); 24-36 the tune again
-    // with a spooky theremin-like lead doubling; 36-39 a camera swing around the street with no
-    // obstacles (one chorus phrase in C minor, slower, spooky church organ); 39-58 after the checkpoint,
-    // the dumbbells (back to major, energetic); 58-78 a rocket skateboard, the biggest, most energetic
-    // version, a step up to D major.
+    // level 7 "Stratusvägens alla helgon": a dusk Halloween street, the easiest level, ~80 bars (~2:05).
+    // 0-6 a run-up to and past a happy woman throwing candy (bright bouncy intro, oompah bass); 6-26
+    // zucchini/cars/footballs lane-switching (full tune, then a xylophone "skeleton bones" plink variant);
+    // 26-38 the tune again with a spooky theremin-like lead doubling; 38-41 a camera swing around the
+    // street with no obstacles (one chorus phrase in C minor, slower, spooky church organ); 41-60 after the
+    // checkpoint, the dumbbells (back to major, energetic); 60-80 a rocket skateboard, the biggest, most
+    // energetic version, a step up to D major.
     stratus: {
       endChord: 'D',
       phrase: 'section',
       sections: [
-        [0, 4, { prog: 'candy', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true }],
-        [4, 12, { prog: 'parade', drums: 'main', bass: 'oompah', arp: 'up', lead: 'S1' }],
-        [12, 24, { prog: 'parade2', drums: 'drop', bass: 'octave', arp: 'wave', lead: 'S2', tone: 'xylo' }],
-        [24, 36, { prog: 'parade', drums: 'half', bass: 'long', arp: 'wave', lead: 'S3', tone: 'theremin', pad: true }],
-        [36, 39, { prog: 'spooky', drums: 'sparse', organ: true, lead: 'S4' }],
-        [39, 58, { prog: 'parade3', drums: 'train', bass: 'octave', arp: 'fast', lead: 'S1' }],
-        [58, 78, { prog: 'parade4', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'S5', pad: true }],
-        [78, 80, { end: true }],
+        [0, 6, { prog: 'candy', drums: 'intro', bass: null, arp: 'up', lead: null, pad: true }],
+        [6, 14, { prog: 'parade', drums: 'main', bass: 'oompah', arp: 'up', lead: 'S1' }],
+        [14, 26, { prog: 'parade2', drums: 'drop', bass: 'octave', arp: 'wave', lead: 'S2', tone: 'xylo' }],
+        [26, 38, { prog: 'parade', drums: 'half', bass: 'long', arp: 'wave', lead: 'S3', tone: 'theremin', pad: true }],
+        [38, 41, { prog: 'spooky', drums: 'sparse', organ: true, lead: 'S4' }],
+        [41, 60, { prog: 'parade3', drums: 'train', bass: 'octave', arp: 'fast', lead: 'S1' }],
+        [60, 80, { prog: 'parade4', drums: 'drop', bass: 'octave', arp: 'fast', lead: 'S5', pad: true }],
+        [80, 82, { end: true }],
       ],
     },
   };

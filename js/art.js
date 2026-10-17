@@ -3848,15 +3848,21 @@
     ctx.textBaseline = 'middle';
     ctx.fillText(text, x, base - postH - bh / 2 + 1);
   }
-  near.sign_place = function (ctx, x, base, d, t, bs, font) {
+  // street = Stratusvägen: the sign stands on the far kerb, so it gets tall posts to clear the house row
+  const STREET_POST = 130;
+  near.sign_place = function (ctx, x, base, d, t, bs, font, street) {
     ctx.font = '26px ' + font;
     const tw = ctx.measureText(d.text).width;
-    signBoard(ctx, x, base, tw + 40, 44, 60, '#1a5fae', '#ffffff', d.text, '#ffffff', '26px ' + font);
+    signBoard(ctx, x, base, tw + 40, 44, street ? STREET_POST : 60, '#1a5fae', '#ffffff', d.text, '#ffffff', '26px ' + font);
   };
-  near.sign_region = function (ctx, x, base, d, t, bs, font) {
-    signBoard(ctx, x, base, 190, 60, 56, '#6b3b1c', '#f3e6d0', '', '#fff', '26px ' + font);
+  near.sign_region = function (ctx, x, base, d, t, bs, font, street) {
+    const postH = street ? STREET_POST : 56;
+    ctx.font = '26px ' + font;
+    // on the street the board grows to fit long names
+    const bw = street ? Math.max(190, ctx.measureText(d.text).width + 100) : 190;
+    signBoard(ctx, x, base, bw, 60, postH, '#6b3b1c', '#f3e6d0', '', '#fff', '26px ' + font);
     // Uppland coat of arms: golden orb on red
-    const sx = x - 62, sy = base - 56 - 50;
+    const sx = x - bw / 2 + 33, sy = base - postH - 50;
     ctx.fillStyle = T('#c8102e');
     ctx.beginPath();
     ctx.moveTo(sx - 14, sy);
@@ -3874,10 +3880,10 @@
     ctx.font = '26px ' + font;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(d.text, x - 40, base - 56 - 29);
+    ctx.fillText(d.text, sx + 22, base - postH - 29);
   };
-  near.sign_dist = function (ctx, x, base, d, t, bs, font) {
-    signBoard(ctx, x, base, 190, 42, 64, '#1a5fae', '#ffffff', d.text + '  ' + d.dist + ' ➜', '#ffffff', '22px ' + font);
+  near.sign_dist = function (ctx, x, base, d, t, bs, font, street) {
+    signBoard(ctx, x, base, 190, 42, street ? STREET_POST : 64, '#1a5fae', '#ffffff', d.text + '  ' + d.dist + ' ➜', '#ffffff', '22px ' + font);
   };
   near.sign_moose = function (ctx, x, base) {
     ctx.fillStyle = T('#777');

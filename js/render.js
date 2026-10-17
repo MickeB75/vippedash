@@ -538,8 +538,9 @@
       this.drawGround(ctx, camX, t, inT, L);
       if (this.theme.lanes) {
         this.drawLaneRoad(ctx, camX, t);
-        this.drawNear(ctx, camX, t, false, L);
         this.drawHouses(ctx, camX, t);
+        // street scenery (signs, lamps, ...) stands on the far kerb, in front of the house row
+        this.drawNear(ctx, camX, t, false, L);
         this.drawPeople(ctx, camX, t, px);
         this.drawParkedBoards(ctx, camX, t);
       }
@@ -2527,6 +2528,7 @@
 
   // ------------------------------------------------------------------ near scenery (world anchored)
   // inside = only the decorations that belong inside a cave/hall (drawn over the indoor background)
+  const STREET_KERB_DECOS = new Set(['sign_place', 'sign_region', 'sign_dist', 'sign_moose', 'lamp', 'bench', 'fence', 'mailbox', 'flagpole']);
   R.drawNear = function (ctx, camX, t, inside, L = 0) {
     const decos = this.lvl.decos;
     for (const d of decos) {
@@ -2534,7 +2536,10 @@
       if (d.x > camX + 30) break;
       if (!!d.inside !== inside || (d.layer || 0) !== L) continue;
       const f = Art.near[d.type];
-      if (f) f(ctx, sx(d.x, camX), GY, d, t, BS, FONT);
+      // Stratusvägen: roadside furniture stands on the far kerb instead of mid-street (street = true, so
+      // the signs also get tall posts)
+      const street = !!this.theme.lanes && STREET_KERB_DECOS.has(d.type);
+      if (f) f(ctx, sx(d.x, camX), street ? this.roadFarKerbY() : GY, d, t, BS, FONT, street);
       else VD.lintMiss && VD.lintMiss('deco', d.type);
       // Amazonas' glowing eyes and mushrooms are also lifted above the darkness mask (see drawDarkness)
       if (d.type === 'eyes') this._eyeSpots.push({ x: sx(d.x, camX), y: GY - (d.y != null ? d.y : 1.6) * BS, size: (d.size || 1) * BS * 0.34, seed: d.x, color: Art.eyeColor(d.x * 3) });
@@ -4000,9 +4005,9 @@
   // a gap this small or smaller between two numbered far-row houses reads as one attached terrace run,
   // bridged with unnumbered filler units of the same style; a bigger gap gets background streetscape instead
   const TERRACE_MAX = 34;
-  // the known cul-de-sac gap in the plan (between nr 56 and nr 50, roughly x 380-470): show it as a short
+  // the known cul-de-sac gap in the plan (between nr 56 and nr 50, roughly x 412-502): show it as a short
   // side street receding into the distance, with 54/52 standing tiny and far back
-  const CULDESAC_X = [370, 480];
+  const CULDESAC_X = [402, 512];
   const FILLER_KINDS = ['shed', 'fence', 'garden', 'parking', 'carport', 'bin'];
 
   // one streetscape pass, computed once per level load (see R.build) and cached on this.streetProps — a
@@ -4043,8 +4048,8 @@
     }
     if (far.length) fillerRun(far[far.length - 1].x + 5, lvl.finishX - 10, 91);
     // one small playground, tucked into a wide gap well clear of the cul-de-sac (the "toppen" stretch)
-    for (let i = props.length - 1; i >= 0; i--) if (props[i].t === 'filler' && Math.abs(props[i].x - 776) < 5) props.splice(i, 1);
-    props.push({ x: 776, kind: 'playground', t: 'filler', seed: 5 });
+    for (let i = props.length - 1; i >= 0; i--) if (props[i].t === 'filler' && Math.abs(props[i].x - 808) < 5) props.splice(i, 1);
+    props.push({ x: 808, kind: 'playground', t: 'filler', seed: 5 });
     props.sort((a, b) => a.x - b.x);
     return props;
   }

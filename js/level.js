@@ -2233,13 +2233,13 @@
   // ======================================================================
   function buildStratus() {
     const b = new Builder();
-    const FINISH = 1400;
+    const FINISH = 1432;
 
     // fixed thrower positions (art draws the actual people later; layout only needs where they stand)
-    const NR66 = { x: 14, handY: 2.2 }; // happy woman, long black hair — throws candy
-    const NR62 = { x: 236, handY: 2.0 }; // angry younger woman in a leaf dress — throws zucchini
-    const NR50 = { x: 520, footY: 0.3 }; // happy man — kicks footballs
-    const NR15 = { x: 836, handY: 1.6 }; // angry, shorter, tattooed man — throws dumbbells
+    const NR66 = { x: 46, handY: 2.2 }; // happy woman, long black hair — throws candy
+    const NR62 = { x: 268, handY: 2.0 }; // angry younger woman in a leaf dress — throws zucchini
+    const NR50 = { x: 552, footY: 0.3 }; // happy man — kicks footballs
+    const NR15 = { x: 868, handY: 1.6 }; // angry, shorter, tattooed man — throws dumbbells
     b.person('nr66', NR66.x, { handY: NR66.handY, mood: 'happy', hair: 'black', throws: 'candy' });
     b.person('nr62', NR62.x, { handY: NR62.handY, mood: 'angry', hair: 'blond', throws: 'zucchini' });
     b.person('nr50', NR50.x, { footY: NR50.footY, mood: 'happy', throws: 'football' });
@@ -2247,174 +2247,178 @@
 
     // ============ AREAS ============
     b.area('nr66', -60, 'NR 66', 'Bus eller godis!');
-    b.area('ostra', 96, 'ÖSTRA BENET', 'Nr 64');
-    b.area('nr62', 200, 'NR 62', 'Zucchinikriget');
-    b.area('gang', 300, 'NR 60–56', 'Bus eller godis-gänget');
-    b.area('nr50', 470, 'NR 50', 'Straffsparken'); // also covers the (banner-less) swing zone, 584–620
-    b.area('toppen', 624, 'TOPPEN', 'Nr 23–17');
-    b.area('nr15', 800, 'NR 15', 'Hantelhörnan');
-    b.area('nvhorn', 900, 'NORDVÄSTRA HÖRNET', 'Raketbrädan');
-    b.area('upploppet', 936, 'UPPLOPPET', 'Nr 13 → 1');
+    b.area('ostra', 128, 'ÖSTRA BENET', 'Nr 64');
+    b.area('nr62', 232, 'NR 62', 'Zucchinikriget');
+    b.area('gang', 332, 'NR 60–56', 'Bus eller godis-gänget');
+    b.area('nr50', 502, 'NR 50', 'Straffsparken'); // also covers the (banner-less) swing zone, 620–652
+    b.area('toppen', 656, 'TOPPEN', 'Nr 23–17');
+    b.area('nr15', 832, 'NR 15', 'Hantelhörnan');
+    b.area('nvhorn', 932, 'NORDVÄSTRA HÖRNET', 'Raketbrädan');
+    b.area('upploppet', 968, 'UPPLOPPET', 'Nr 13 → 1');
 
-    // ============ #1 NR 66 (0 – 96): candy from the doorway, no hazards at all ============
+    // ============ #0 INTRO (0 – 32): a calm approach down the street, nr 66 coming into view ============
+    // The run starts 32 blocks (2 bars) before nr 66's house comes into view, so Vippe runs up to her. Every
+    // x below is the original street layout + 32 (render.js/audio.js are tuned to it: the stratus song has a
+    // 2-bar-longer opening section). No hazards here, only the first candies.
+    // ============ #1 NR 66 (32 – 128): candy from the doorway, no hazards at all ============
     b.checkpoint(0);
     b.text(12, 4.6, 'Level # · Stratusvägens alla helgon', 0.55);
     b.text(12, 3.9, 'Hold to keep jumping. Bus eller godis!', 0.4);
     b.house(NR66.x, 66, 'far');
-    b.house(50, 33, 'near');
-    // ~6 candies thrown from her hand, arriving in the air at jump height, 8 blocks apart
-    for (let x = 4; x <= 44; x += 8) {
+    b.house(82, 33, 'near');
+    // ~9 candies thrown from her hand, arriving in the air at jump height, 8 blocks apart (the first three,
+    // x 12–28, arrive during the intro, while she is still coming into view)
+    for (let x = 12; x <= 76; x += 8) {
       b.coin(x, 2.0, { mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
     }
-    b.portal(48, 'lane');
+    b.portal(80, 'lane');
     // ~5 candies landing in the lanes — far, far, near, far, near — so switching catches them
-    b.coin(54, 0.3, { lane: 1, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
-    b.coin(62, 0.3, { lane: 1, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
-    b.coin(70, 0.3, { lane: 0, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
-    b.coin(78, 0.3, { lane: 1, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
-    b.coin(86, 0.3, { lane: 0, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
-    b.portal(90, 'cube');
+    b.coin(86, 0.3, { lane: 1, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.coin(94, 0.3, { lane: 1, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.coin(102, 0.3, { lane: 0, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.coin(110, 0.3, { lane: 1, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.coin(118, 0.3, { lane: 0, mv: { type: 'throw', hx: NR66.x, hy: NR66.handY, trigger: 16, fall: 16, arc: 1.5 } });
+    b.portal(122, 'cube');
 
-    // ============ #2 ÖSTRA BENET (96 – 200): warm-up speed bumps, nr 64 in the background ============
-    b.house(130, 64, 'far');
-    b.house(170, 31, 'near');
-    b.bump(104);
-    b.bump(118);
-    b.bump(132);
-    b.bump(146);
-    b.bump(160);
-    b.bump(174);
-    b.coin(112, 2.0, {});
-    b.coin(154, 2.0, {});
-    b.text(188, 5.8, 'Speed bumps — just a little hop!', 0.4);
+    // ============ #2 ÖSTRA BENET (128 – 232): warm-up speed bumps, nr 64 in the background ============
+    b.house(162, 64, 'far');
+    b.house(202, 31, 'near');
+    b.bump(136);
+    b.bump(150);
+    b.bump(164);
+    b.bump(178);
+    b.bump(192);
+    b.bump(206);
+    b.coin(144, 2.0, {});
+    b.coin(186, 2.0, {});
+    b.text(220, 5.8, 'Speed bumps — just a little hop!', 0.4);
 
-    // ============ #3 NR 62 (200 – 300): Zucchinikriget — an angry gardener lobs zucchini ============
+    // ============ #3 NR 62 (232 – 332): Zucchinikriget — an angry gardener lobs zucchini ============
     b.house(NR62.x, 62, 'far');
-    b.house(280, 29, 'near');
+    b.house(312, 29, 'near');
     // 3 zucchini landing on the ground — jump over (trigger - fall = 6 >= 4, long since landed by the time
     // the player is close enough to reach it — see the safety-window comment above Builder.lob())
-    b.lob(212, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 });
-    b.lob(228, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 });
     b.lob(244, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 });
-    b.portal(248, 'lane');
+    b.lob(260, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 });
+    b.lob(276, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 });
+    b.portal(280, 'lane');
     // 4 more, each landing in ONE lane — switch to the other
-    b.lane(b.lob(256, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 0);
-    b.lane(b.lob(268, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 1);
-    b.lane(b.lob(280, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 0);
-    b.lane(b.lob(292, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 1);
+    b.lane(b.lob(288, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 0);
+    b.lane(b.lob(300, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 1);
+    b.lane(b.lob(312, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 0);
+    b.lane(b.lob(324, 0, { kind: 'zucchini', from: [NR62.x, NR62.handY], trigger: 14, fall: 8, arc: 2 }), 1);
 
-    // ============ #4 NR 60–56 (300 – 470): trick-or-treat gang, lane mode continues ============
-    b.house(320, 60, 'far');
-    b.house(350, 58, 'far');
-    b.house(380, 56, 'far');
-    b.house(410, 27, 'near');
+    // ============ #4 NR 60–56 (332 – 502): trick-or-treat gang, lane mode continues ============
+    b.house(352, 60, 'far');
+    b.house(382, 58, 'far');
+    b.house(412, 56, 'far');
+    b.house(442, 27, 'near');
     // the cul-de-sac junction (54, 52 live down the side street, not on the main row) — an open gap in
-    // the house row around x 400–430, kept clear of gameplay obstacles too
-    b.lane(b.block(316, 0, 3, 1.2, 'car'), 0);
-    b.coin(336, 0.3, { lane: 1 }); // a lure in the lane you're NOT forced into
-    b.lane(b.thorny(352, 0, 2, 1.4, 'kids'), 1);
-    b.coin(368, 0.3, { lane: 0 });
-    b.lane(b.thorny(386, 0, 1, 1, 'pumpkin'), 0);
-    b.lane(b.thorny(440, 0, 1, 1.2, 'bin'), 1);
-    b.coin(456, 0.3, { lane: 0 });
+    // the house row around x 432–462, kept clear of gameplay obstacles too
+    b.lane(b.block(348, 0, 3, 1.2, 'car'), 0);
+    b.coin(368, 0.3, { lane: 1 }); // a lure in the lane you're NOT forced into
+    b.lane(b.thorny(384, 0, 2, 1.4, 'kids'), 1);
+    b.coin(400, 0.3, { lane: 0 });
+    b.lane(b.thorny(418, 0, 1, 1, 'pumpkin'), 0);
+    b.lane(b.thorny(472, 0, 1, 1.2, 'bin'), 1);
+    b.coin(488, 0.3, { lane: 0 });
 
-    // ============ #5 NR 50 (470 – 584): Straffsparken — a happy dad kicks footballs ============
+    // ============ #5 NR 50 (502 – 616): Straffsparken — a happy dad kicks footballs ============
     b.house(NR50.x, 50, 'far');
-    b.house(548, 48, 'far');
-    b.house(530, 25, 'near');
+    b.house(580, 48, 'far');
+    b.house(562, 25, 'near');
     // balls rolling/bouncing in low, arriving exactly when the player gets there (trigger === fall, like a
     // thrown candy but with almost no arc) — switch lanes to meet them
-    b.coin(480, 0.3, { style: 'football', lane: 1, mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 0.6 } });
-    b.coin(494, 0.3, { style: 'football', lane: 0, mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 0.6 } });
-    b.coin(508, 0.3, { style: 'football', lane: 1, mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 0.6 } });
-    b.portal(524, 'cube');
-    b.bump(538);
+    b.coin(512, 0.3, { style: 'football', lane: 1, mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 0.6 } });
+    b.coin(526, 0.3, { style: 'football', lane: 0, mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 0.6 } });
+    b.coin(540, 0.3, { style: 'football', lane: 1, mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 0.6 } });
+    b.portal(556, 'cube');
+    b.bump(570);
     // balls arriving high — jump to catch, like nr 66's candy
-    b.coin(546, 2.0, { style: 'football', mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 3 } });
-    b.coin(560, 2.0, { style: 'football', mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 3 } });
-    b.coin(574, 2.0, { style: 'football', mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 3 } });
-    b.text(478, 5.8, 'A floorball goal on the driveway', 0.4);
+    b.coin(578, 2.0, { style: 'football', mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 3 } });
+    b.coin(592, 2.0, { style: 'football', mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 3 } });
+    b.coin(606, 2.0, { style: 'football', mv: { type: 'throw', hx: NR50.x, hy: NR50.footY, trigger: 16, fall: 16, arc: 3 } });
 
-    // ============ #6 camera swing (584 – 620): empty — flat ground, cube mode, no hazards or coins ============
-    b.swing(588, 620);
+    // ============ #6 camera swing (616 – 656): empty — flat ground, cube mode, no hazards or coins ============
+    b.swing(620, 652);
 
     // ============ #7 cp1, right after the swing (≈ halfway through, ≈ 60 s) ============
-    b.checkpoint(624);
+    b.checkpoint(656);
 
-    // ============ #8 TOPPEN (624 – 800): round the top, nr 23–17, past the garage row ============
-    b.house(630, 23, 'far');
-    b.house(654, 21, 'far');
-    b.house(678, 19, 'far');
-    b.house(640, 40, 'near');
-    b.house(668, 38, 'near');
-    b.house(696, 36, 'near');
-    b.house(724, 34, 'near');
-    b.bump(636);
-    b.bump(652);
+    // ============ #8 TOPPEN (656 – 832): round the top, nr 23–17, past the garage row ============
+    b.house(662, 23, 'far');
+    b.house(686, 21, 'far');
+    b.house(710, 19, 'far');
+    b.house(672, 40, 'near');
+    b.house(700, 38, 'near');
+    b.house(728, 36, 'near');
+    b.house(756, 34, 'near');
     b.bump(668);
-    b.portal(684, 'lane');
-    b.house(730, 17, 'far');
-    b.house(752, 30, 'near');
-    b.house(780, 28, 'near');
-    b.house(808, 26, 'near');
+    b.bump(684);
+    b.bump(700);
+    b.portal(716, 'lane');
+    b.house(762, 17, 'far');
+    b.house(784, 30, 'near');
+    b.house(812, 28, 'near');
+    b.house(840, 26, 'near');
     // the garage row: a trailer, parked cars, and candy as a lure
-    b.lane(b.block(696, 0, 3, 1.3, 'trailer'), 1);
-    b.lane(b.block(716, 0, 2.5, 1.2, 'car'), 0);
-    b.coin(736, 0.3, { lane: 1 });
-    b.lane(b.block(752, 0, 2.5, 1.2, 'car'), 1);
-    b.coin(768, 0.3, { lane: 0 });
-    b.portal(784, 'cube');
+    b.lane(b.block(728, 0, 3, 1.3, 'trailer'), 1);
+    b.lane(b.block(748, 0, 2.5, 1.2, 'car'), 0);
+    b.coin(768, 0.3, { lane: 1 });
+    b.lane(b.block(784, 0, 2.5, 1.2, 'car'), 1);
+    b.coin(800, 0.3, { lane: 0 });
+    b.portal(816, 'cube');
 
-    // ============ #9 NR 15 (800 – 900): Hantelhörnan — a short, angry man throws dumbbells ============
+    // ============ #9 NR 15 (832 – 932): Hantelhörnan — a short, angry man throws dumbbells ============
     b.house(NR15.x, 15, 'far');
     // 4 dumbbells, landing and staying — jump over, same safety window as the zucchini
-    b.lob(806, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
-    b.lob(822, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
     b.lob(838, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
     b.lob(854, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
-    b.text(802, 5.8, 'Dumbbells — jump over!', 0.4);
+    b.lob(870, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
+    b.lob(886, 0, { kind: 'dumbbell', from: [NR15.x, NR15.handY], trigger: 14, fall: 8, arc: 2 });
+    b.text(834, 5.8, 'Dumbbells — jump over!', 0.4);
 
-    // ============ #10 NORDVÄSTRA HÖRNET (900 – 936): the NW corner, hop on the rocket skateboard ============
-    b.house(920, 24, 'near');
-    b.coin(906, 2.0, {});
-    b.coin(922, 1.0, {});
-    b.text(908, 5.8, 'A rocket skateboard!', 0.45);
-    b.board(916, FINISH);
+    // ============ #10 NORDVÄSTRA HÖRNET (932 – 968): the NW corner, hop on the rocket skateboard ============
+    b.house(952, 24, 'near');
+    b.coin(938, 2.0, {});
+    b.coin(954, 1.0, {});
+    b.text(940, 5.8, 'A rocket skateboard!', 0.45);
+    b.board(948, FINISH);
 
-    // ============ #11 UPPLOPPET (936 – finish): the west leg down to nr 1, ×1.5 speed ============
-    b.speed(936, 1404, 1.5);
-    b.text(940, 6.2, 'Speed up!', 0.5);
-    b.bump(960);
-    b.bump(990);
-    b.bump(1020);
-    b.bump(1050);
-    b.coin(975, 2.0, {});
-    b.coin(1035, 2.0, {});
-    b.portal(1080, 'lane');
-    b.lane(b.block(1104, 0, 2.5, 1.2, 'car'), 0);
-    b.coin(1119, 0.3, { lane: 1 });
-    b.lane(b.block(1134, 0, 3, 1.3, 'trailer'), 1);
-    b.coin(1149, 0.3, { lane: 0 });
-    b.lane(b.thorny(1164, 0, 2, 1.4, 'kids'), 0);
-    b.coin(1179, 0.3, { lane: 1 });
-    b.lane(b.block(1194, 0, 2.5, 1.2, 'car'), 1);
-    b.coin(1209, 0.3, { lane: 0 });
-    b.portal(1220, 'cube');
-    b.bump(1244);
-    b.bump(1274);
-    b.bump(1304);
-    b.bump(1334);
-    b.coin(1259, 2.0, {});
-    b.coin(1319, 2.0, {});
+    // ============ #11 UPPLOPPET (968 – finish): the west leg down to nr 1, ×1.5 speed ============
+    b.speed(968, 1436, 1.5);
+    b.text(972, 6.2, 'Speed up!', 0.5);
+    b.bump(992);
+    b.bump(1022);
+    b.bump(1052);
+    b.bump(1082);
+    b.coin(1007, 2.0, {});
+    b.coin(1067, 2.0, {});
+    b.portal(1112, 'lane');
+    b.lane(b.block(1136, 0, 2.5, 1.2, 'car'), 0);
+    b.coin(1151, 0.3, { lane: 1 });
+    b.lane(b.block(1166, 0, 3, 1.3, 'trailer'), 1);
+    b.coin(1181, 0.3, { lane: 0 });
+    b.lane(b.thorny(1196, 0, 2, 1.4, 'kids'), 0);
+    b.coin(1211, 0.3, { lane: 1 });
+    b.lane(b.block(1226, 0, 2.5, 1.2, 'car'), 1);
+    b.coin(1241, 0.3, { lane: 0 });
+    b.portal(1252, 'cube');
+    b.bump(1276);
+    b.bump(1306);
+    b.bump(1336);
+    b.bump(1366);
+    b.coin(1291, 2.0, {});
+    b.coin(1351, 2.0, {});
     // the last 40 blocks are clear — just a couple more candies on the way to nr 1
-    b.coin(1375, 1.5, {});
-    b.coin(1390, 2.0, {});
+    b.coin(1407, 1.5, {});
+    b.coin(1422, 2.0, {});
     b.finish(FINISH);
 
     // far row (background), west leg: 13, 11, 9, 7, 5, 3, 1
     {
       const nums = [13, 11, 9, 7, 5, 3, 1];
-      const x0 = 960, step = (1350 - 960) / (nums.length - 1);
+      const x0 = 992, step = (1382 - 992) / (nums.length - 1);
       nums.forEach((n, i) => {
         const x = Math.round(x0 + step * i);
         b.house(x, n, 'far');
@@ -2423,45 +2427,44 @@
     // near row (foreground kerb), west leg: 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2
     {
       const nums = [22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2];
-      const x0 = 940, step = (1360 - 940) / (nums.length - 1);
+      const x0 = 972, step = (1392 - 972) / (nums.length - 1);
       nums.forEach((n, i) => b.house(Math.round(x0 + step * i), n, 'near'));
     }
 
     // ============ NEAR SCENERY (world-anchored) ============
     b.deco('sign_region', 4, { text: 'STRATUSVÄGEN' });
-    b.deco('fence', 14, { len: 8 });
-    b.deco('lamp', 30);
-    b.deco('lamp', 84);
-    b.deco('bench', 108);
-    b.deco('lamp', 150);
-    b.deco('sign_place', 200, { text: 'Nr 62' });
-    b.deco('lamp', 260);
-    b.deco('lamp', 340);
-    b.deco('sign_place', 470, { text: 'Nr 50' });
-    b.deco('lamp', 500);
-    b.deco('lamp', 560);
-    b.deco('sign_place', 624, { text: 'Toppen' });
-    b.deco('lamp', 660);
-    b.deco('lamp', 740);
-    b.deco('sign_place', 800, { text: 'Nr 15' });
-    b.deco('lamp', 860);
-    b.deco('sign_place', 900, { text: 'Nordvästra hörnet' });
-    b.deco('lamp', 950);
-    b.deco('lamp', 1100);
-    b.deco('lamp', 1250);
+    b.deco('lamp', 62);
+    b.deco('lamp', 116);
+    b.deco('bench', 140);
+    b.deco('lamp', 182);
+    b.deco('sign_place', 232, { text: 'Nr 62' });
+    b.deco('lamp', 292);
+    b.deco('lamp', 372);
+    b.deco('sign_place', 502, { text: 'Nr 50' });
+    b.deco('lamp', 532);
+    b.deco('lamp', 592);
+    b.deco('sign_place', 662, { text: 'Toppen' });
+    b.deco('lamp', 692);
+    b.deco('lamp', 772);
+    b.deco('sign_place', 832, { text: 'Nr 15' });
+    b.deco('lamp', 892);
+    b.deco('sign_place', 932, { text: 'Nordvästra hörnet' });
+    b.deco('lamp', 982);
+    b.deco('lamp', 1132);
+    b.deco('lamp', 1282);
     b.deco('finish', FINISH);
 
     // ============ MID-LAYER LANDMARKS ============
-    b.landmark('cottage', 20, { color: '#5a3a7a' });
-    b.landmark('villa', 140, { seed: 3 });
-    b.landmark('cottage', 236, { color: '#7a4a2a' });
-    b.landmark('villa', 340, { seed: 11 });
-    b.landmark('cottage', 520, { color: '#3a5a7a' });
-    b.landmark('cottage', 654, { color: '#5a3a7a' });
-    b.landmark('villa', 780, { seed: 17 });
-    b.landmark('cottage', 836, { color: '#6a2a2a' });
-    b.landmark('villa', 1030, { seed: 23 });
-    b.landmark('villa', 1220, { seed: 29 });
+    b.landmark('cottage', 52, { color: '#5a3a7a' });
+    b.landmark('villa', 172, { seed: 3 });
+    b.landmark('cottage', 268, { color: '#7a4a2a' });
+    b.landmark('villa', 372, { seed: 11 });
+    b.landmark('cottage', 552, { color: '#3a5a7a' });
+    b.landmark('cottage', 686, { color: '#5a3a7a' });
+    b.landmark('villa', 812, { seed: 17 });
+    b.landmark('cottage', 868, { color: '#6a2a2a' });
+    b.landmark('villa', 1062, { seed: 23 });
+    b.landmark('villa', 1252, { seed: 29 });
     b.landmark('home', FINISH + 10);
 
     return b;
