@@ -2595,7 +2595,6 @@
     b.water(136, 2, 'mud');
     b.thorny(142, 0, 1, 1, 'thornbush');
     b.thorny(146, 0, 1, 1, 'thornbush');
-    b.block(154, 0, 2, 1, 'root');
     b.spikes(158, 3, 0, 'thorn');
     b.block(166, 0, 3, 1, 'log');
     b.block(169, 0, 3, 2, 'root');
