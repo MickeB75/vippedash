@@ -2577,26 +2577,26 @@
     b.checkpoint(0);
     b.text(12, 4.6, 'Level # · Amazonas', 0.55);
     b.text(12, 3.9, 'Thorns, roots and mud!', 0.4);
-    b.spike(26, 0, 'thorn');
+    b.spikes(26, 2, 0, 'thorn');
     b.thorny(36, 0, 1, 1, 'thornbush');
     b.block(44, 0, 3, 1, 'log');
-    b.spikes(50, 2, 0, 'thorn');
+    b.spikes(50, 3, 0, 'thorn');
     b.block(58, 0, 3, 1, 'root');
     b.block(61, 0, 3, 2, 'root');
-    b.spike(68, 0, 'thorn');
+    b.spikes(68, 2, 0, 'thorn');
     b.water(74, 2, 'mud');
     b.thorny(82, 0, 1, 1, 'thornbush');
-    b.spikes(90, 2, 0, 'thorn');
+    b.spikes(90, 3, 0, 'thorn');
     // the first jaguar: it springs out of the bush ahead and lands in front of you
     b.text(100, 4.6, 'A jaguar!', 0.45);
     b.jaguar(112, 0, { from: [115, 0.4] });
     b.block(124, 0, 3, 1, 'log');
-    b.spike(128, 0, 'thorn');
+    b.spikes(128, 2, 0, 'thorn');
     b.water(136, 2, 'mud');
     b.thorny(142, 0, 1, 1, 'thornbush');
     b.thorny(146, 0, 1, 1, 'thornbush');
     b.block(154, 0, 2, 1, 'root');
-    b.spikes(158, 2, 0, 'thorn');
+    b.spikes(158, 3, 0, 'thorn');
     b.block(166, 0, 3, 1, 'log');
     b.block(169, 0, 3, 2, 'root');
     b.water(176, 2, 'mud');
@@ -2606,10 +2606,10 @@
 
     // ============ FLODEN (208 – 400) ============
     b.checkpoint(208);
-    b.spike(216, 0, 'thorn');
+    b.spikes(216, 2, 0, 'thorn');
     b.water(224, 2, 'river');
     b.piranha(224.5, { beats: 2, phase: 0.92 });
-    b.spikes(232, 2, 0, 'thorn');
+    b.spikes(232, 3, 0, 'thorn');
     // stepping stones and lily pads across a wide channel
     b.water(240, 12, 'river');
     b.block(241, 0, 2, 1, 'riverstone');
@@ -2626,14 +2626,14 @@
     b.block(300, 0, 3, 1, 'log');
     b.water(308, 2, 'river');
     b.piranha(308.5, { beats: 2, phase: 0.4 });
-    b.spike(314, 0, 'thorn');
+    b.spikes(314, 2, 0, 'thorn');
     b.water(320, 10, 'river');
     b.block(321, 0, 2, 1, 'riverstone');
     b.block(325, 0, 2, 0.3, 'lilypad');
     b.block(328, 0, 2, 1, 'riverstone');
     b.piranha(325.5, { beats: 2, phase: 0.6 });
     b.jaguar(340, 0, { from: [343, 0.4] });
-    b.spikes(352, 2, 0, 'thorn');
+    b.spikes(352, 3, 0, 'thorn');
     b.water(360, 2, 'river');
     b.piranha(360.5, { beats: 2, phase: 0.92 });
     b.block(368, 0, 2, 1, 'log');
@@ -2674,22 +2674,22 @@
     b.dark(624, 944, { dim: 0.5 }); // darker inside the hill, but you see the whole screen
     b.corridor(624, 770, 4.6, 'roots');
     b.text(630, 3.8, 'Nobody comes out of Tripp Troppen…', 0.4);
-    b.spike(640, 0, 'stalagmite');
+    b.spikes(640, 2, 0, 'stalagmite');
     b.frogDown(650, 4.6, { bob: 0.6, beats: 4, phase: 0.2 });
-    b.spikes(656, 2, 0, 'stalagmite');
+    b.spikes(656, 3, 0, 'stalagmite');
     b.block(668, 0, 2, 1, 'earth');
     b.bird(678.4, 2.0, 'bat');
-    b.spike(680, 0, 'stalagmite');
+    b.spikes(680, 2, 0, 'stalagmite');
     b.scare(700, 'spider');
     b.frogDown(704, 4.6, { bob: 0.6, beats: 4, phase: 0.5 });
-    b.spikes(708, 2, 0, 'stalagmite');
+    b.spikes(708, 3, 0, 'stalagmite');
     b.block(718, 0, 3, 1, 'earth');
     b.block(721, 0, 3, 2, 'earth');
     b.spikeDown(730, 3.2, 'stalactite');
     b.spike(731, 0, 'stalagmite');
     b.spikes(740, 2, 0, 'stalagmite');
     b.frogDown(741, 4.2, { bob: 0.3, beats: 4, phase: 0.8 });
-    b.spike(752, 0, 'stalagmite');
+    b.spikes(752, 2, 0, 'stalagmite');
 
     // ============ TRIPP TROPPENS DJUP — ship (768 – 944) ============
     b.checkpoint(768, 'ship', 3.65, 8);
@@ -2754,19 +2754,19 @@
     b.checkpoint(944);
     b.chase(946, 1240);
     b.text(954, 4.6, 'RUN!', 0.55);
-    b.spike(968, 0, 'thorn');
+    b.spikes(968, 2, 0, 'thorn');
     b.block(976, 0, 3, 1, 'log');
     b.spike(981, 0, 'thorn');
     b.jaguar(992, 0, { from: [995, 0.4] });
     b.thorny(1004, 0, 1, 1, 'thornbush');
-    b.spikes(1012, 2, 0, 'thorn');
+    b.spikes(1012, 3, 0, 'thorn');
     b.block(1022, 0, 3, 1, 'root');
     b.block(1025, 0, 3, 2, 'root');
     b.water(1034, 2, 'mud');
     b.jaguar(1046, 0, { from: [1049, 0.4] });
-    b.spikes(1060, 2, 0, 'thorn');
+    b.spikes(1060, 3, 0, 'thorn');
     b.block(1068, 0, 3, 1, 'log');
-    b.spike(1072, 0, 'thorn');
+    b.spikes(1072, 2, 0, 'thorn');
     b.thorny(1080, 0, 2, 1.2, 'thornbush');
     b.jaguar(1092, 0, { from: [1095, 0.4] });
     b.spikes(1104, 3, 0, 'thorn');
@@ -2776,13 +2776,13 @@
     b.spikes(1135, 2, 0, 'thorn');
     b.jaguar(1144, 0, { from: [1147, 0.4] });
     b.thorny(1156, 0, 1, 1, 'thornbush');
-    b.spikes(1164, 2, 0, 'thorn');
+    b.spikes(1164, 3, 0, 'thorn');
     b.block(1174, 0, 3, 1, 'log');
     b.block(1177, 0, 3, 2, 'root');
     b.jaguar(1192, 0, { from: [1195, 0.4] });
-    b.spikes(1204, 2, 0, 'thorn');
+    b.spikes(1204, 3, 0, 'thorn');
     b.thorny(1214, 0, 1, 1, 'thornbush');
-    b.spike(1222, 0, 'thorn');
+    b.spikes(1222, 2, 0, 'thorn');
     b.water(1228, 2.75, 'mud');
     b.finish(1240);
 
