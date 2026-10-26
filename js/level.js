@@ -35,6 +35,8 @@
       // level 6 "Nöjesparken": the rails of the cart mode (see track()) and the loop-the-loop zones (see loop())
       this.tracks = [];
       this.loops = [];
+      // level 10 "Sjunde himlen": low-gravity zones, see lowgrav() (always an array, empty by default)
+      this.gravs = [];
     }
     add(o) {
       o.id = this.nextId++;
@@ -357,6 +359,45 @@
         mv: { type: 'bob', amp: bob, beats, phase },
       });
     }
+    // ---- level 10 "Sjunde himlen": diving angels, low gravity, the archangel and his light waves ----
+    // A classic angel diving at you (mv.type 'dive' in physics.js moveOf). (x, y) is the lowest point of the dive,
+    // where the angel and the player meet: the angel is at x exactly when the player is, having plunged from far up
+    // at the top right (it comes into view about 11 blocks, a second, before it can touch you), levelled out into a
+    // low swoop and flown straight at you; after that it pulls up and flaps away behind you. It closes in at k blocks
+    // per block you run (k 0.5..0.85 keeps it in view for 10+ blocks), starts `max` blocks to the right of x and `top`
+    // above y, follows dy = top * u^p (u = 1 at the start .. 0 at the meeting), and climbs `rise` blocks over the
+    // last `out` blocks behind you. The hitbox (0.6 x 0.8, resting on y) is a small box at the meeting only: what it
+    // asks of you is to be in the air (y low) or on the ground (y high) at that very moment.
+    // o.x/o.w and o.y/o.h cover the whole sweep so that lvl.query/visible find it.
+    angel(x, y, { k = 0.7, max = 9, top = 11, p = 2, out = 4, rise = 5 } = {}) {
+      return this.add({
+        t: 'haz', kind: 'angel', x: x - out - 1, w: max + out + 3, y, h: top + 1,
+        hx0: x + 0.2, hx1: x + 0.8, hy0: y, hy1: y + 0.8, dmg: 12,
+        mv: { type: 'dive', k, max, top, p, out, rise, bx: x },
+      });
+    }
+    // A zone of low gravity for the cube: from x0 to x1 gravity (and the fall-speed cap) is g times normal, so jumps
+    // are about twice as long and high and floaty (see physics.js gravAt). Zones must not overlap.
+    lowgrav(x0, x1, g = 0.5) {
+      this.gravs.push({ x0, x1, g });
+    }
+    // The archangel boss: hovers KING_AHEAD blocks ahead of the player while x is inside [x0, x1] (drawing only;
+    // the light waves he sends are wave() hazards)
+    archangel(x0, x1) {
+      this.boss = { kind: 'archangel', x0, x1 };
+    }
+    // A wave of light rolling along the floor (or a platform at height y) towards the player: it starts at the
+    // archangel's feet, KING_AHEAD blocks ahead of the player, when the player is at x - max / k, and reaches x
+    // exactly when the player does (the same 'roll' motion as barrel(), k blocks left per block you run). Hitbox
+    // 0.7 x 0.7, low enough for a jump. render finds each start with o.mv.bx - o.mv.max / o.mv.k.
+    wave(x, y = 0, { k = 0.6 } = {}) {
+      const max = (KING_AHEAD * k) / (1 + k);
+      return this.add({
+        t: 'haz', kind: 'wave', x: x - 4, w: max + 5, y, h: 1,
+        hx0: x + 0.15, hx1: x + 0.85, hy0: y, hy1: y + 0.7, dmg: 12,
+        mv: { type: 'roll', k, max, bx: x },
+      });
+    }
     // ---- level 6: screen effects and jump scares ----
     // dim (0..1): Amazonas' Tripp Troppen — the whole screen just gets darker by that much, no lantern hole
     dark(x0, x1, { r = 7, dim = null } = {}) {
@@ -434,6 +475,8 @@
       // Nöjesparken: the cart rails (VD.Physics.trackHeight) and loop-the-loop zones — always arrays, empty elsewhere
       this.tracks = (b.tracks || []).slice().sort((a, c) => a.x0 - c.x0);
       this.loops = (b.loops || []).slice().sort((a, c) => a.x0 - c.x0);
+      // Sjunde himlen: low-gravity zones (VD.Physics.gravAt) — always an array, empty elsewhere
+      this.gravs = (b.gravs || []).slice().sort((a, c) => a.x0 - c.x0);
       this.houses = b.houses || [];
       this.people = b.people || [];
       for (const list of [this.objs, this.checkpoints, this.decos, this.texts]) for (const o of list) if (o.layer == null) o.layer = this.layerAt(o.x);
@@ -3069,6 +3112,220 @@
   }
 
   // ======================================================================
+  // LEVEL 10 — Sjunde himlen (seventh heaven). The most brutal level, wrapped in the most beautiful scenery:
+  // classic angels (white robe, golden halo, big feathered wings) dive down at you out of the sky on the beat.
+  // Pearly gates (cube, stairs of gold) -> the golden streets (angel waves, pillars, orbs, pads) -> the palace
+  // (ship with angel wings, pillars from floor and ceiling, cherubs) -> the starry sky (cube in LOW GRAVITY: long
+  // floating hops between star platforms over the void) -> the throne room (the archangel hews his flaming sword
+  // into the floor and waves of light roll at you). Only 4 checkpoints, no health bar, 67 ms on the hard presses.
+  // ======================================================================
+  function buildHeaven() {
+    const b = new Builder();
+    const sp = (x, n = 1, y = 0) => b.spikes(x, n, y, 'light'); // golden crystal spikes of light
+    // a wave of light from the archangel's sword that reaches x just as you do (it starts KING_AHEAD blocks ahead
+    // of you, 8 blocks before x at k 0.875, so the sword hits the floor on the beat); y > 0 rolls along a platform
+    const W = (x, y = 0, k = 0.875) => b.wave(x, y, { k });
+
+    // ============ AREAS (each starts on a bar of the music) ============
+    b.area('gate', -60, 'PÄRLEPORTEN', 'Beautiful… and deadly');
+    b.area('streets', 256, 'GULDGATORNA', 'The angels are watching you');
+    b.area('palace', 560, 'PALATSET', 'Spread your wings!');
+    b.area('stars', 736, 'STJÄRNHIMLEN', 'Light as a feather');
+    b.area('throne', 1040, 'TRONSALEN', 'The archangel draws his sword');
+
+    // ============ PÄRLEPORTEN (0 – 256): ~30 blocks of warm-up, then light spikes, cloud blocks and the golden
+    // stairs up through the pearly gate; the first angels dive (one at a time, then in formation) ============
+    b.checkpoint(0);
+    b.text(12, 4.6, 'Level # · Sjunde himlen', 0.55);
+    sp(32);
+    sp(40, 2);
+    b.block(48, 0, 3, 1, 'cloud');
+    sp(58, 3);
+    b.angel(72, 0, { k: 0.6 }); // the first angel: jump when it reaches you
+    sp(84, 3);
+    b.angel(96, 0);
+    sp(97.9);
+    // the golden stairs up to the pearly gate (x ~ 128), each jump over a bed of spikes
+    b.block(104, 0, 3, 1, 'goldstep');
+    sp(107, 5);
+    b.block(111.4, 0, 3, 2, 'goldstep');
+    sp(114.4, 5);
+    b.block(118.8, 0, 19, 3, 'goldstep'); // the landing under the gate
+    sp(122, 3, 3);
+    b.angel(126, 4.5);
+    b.angel(132, 3);
+    b.angel(133.7, 4.5);
+    sp(144.05, 3); // a triple
+    b.angel(154, 0); b.angel(155.6, 1.5); // formation: an angel low, one high right behind
+    b.pad(164); sp(169.5, 3); // pad, then a triple
+    b.angel(180, 0); sp(182.1); // angel, then a spike
+    sp(190, 12); b.orb(193.8, 1.3); b.orb(198.6, 1.3); // a long bed of spikes and two orbs
+    sp(208, 2); b.angel(210, 0); // double, then an angel
+    sp(218.2, 3); b.angel(222, 1.5); // triple, then a high angel as you land
+    sp(231.9); b.angel(234, 0); // spike, then an angel
+
+
+    // ============ GULDGATORNA (256 – 560): angel waves in time with the music, marble pillars, orbs and pads ============
+    b.angel(266, 0); b.angel(267.7, 1.5); b.angel(269.4, 0); // three angels: low, high, low
+    sp(278.1, 3); b.angel(282, 1.5); b.angel(283.6, 0); // triple, high angel, low angel
+    b.angel(292, 0); b.angel(296, 1.5); b.angel(300, 0); b.angel(304, 1.5); // four angels, one per beat
+    b.angel(312, 0); sp(314.1); b.angel(318.6, 1.5); // angel, spike, high angel
+    b.block(328, 0, 1, 1, 'pillar'); sp(329, 5); b.block(333.8, 0, 1, 1, 'pillar'); sp(334.8, 5); b.block(339.6, 0, 1, 1.5, 'pillar'); // pillar hop
+    sp(347.9, 2); b.angel(350, 0); // double, then an angel
+    b.checkpoint(368);
+    sp(378, 12); b.orb(381.6, 1.3); b.orb(386.4, 1.3); // a long bed of spikes and two orbs
+    b.block(400, 0, 3, 1, 'marble'); b.block(403, 0, 3, 2, 'marble'); sp(412, 3); // marble steps, then a triple
+    sp(422, 3); sp(428, 3); sp(434, 3); // three triples in a row
+    b.angel(444, 0); b.angel(445.6, 1.5); // formation: an angel low, one high right behind
+    b.pad(454); sp(459.5, 3); // pad, then a triple
+    b.angel(470, 0); sp(472.4, 2); // angel, then a double
+    sp(482.1, 3); b.angel(486, 1.5); b.angel(487.7, 0); // triple, high angel, low angel
+    b.angel(496, 0); b.angel(500, 1.5); b.angel(504, 0); b.angel(508, 1.5); // four angels, one per beat
+    b.angel(516, 0); b.angel(517.7, 1.5); b.angel(519.4, 0); // three angels: low, high, low
+    sp(527.8, 3); b.angel(532, 1.5); // triple, then a high angel as you land
+
+    // ============ PALATSET (560 – 736), on angel wings: ship, ceiling 9 ============
+    b.text(546, 4.6, 'SPREAD YOUR WINGS!', 0.5);
+    b.portal(568, 'ship', { ceil: 9 });
+    b.corridor(568, 728, 9, 'palace');
+    // pairs of marble pillars (floor and ceiling) with a gap of 3.6 centred on gc, every 8 blocks
+    const gate = (x, gc, gap = 3.6, w = 2) => {
+      b.block(x, 0, w, gc - gap / 2, 'pillar');
+      b.block(x, gc + gap / 2, w, 9 - gc - gap / 2, 'pillar');
+      return gc;
+    };
+    const hall = [3.4, 2.6, 4.6, 3, 5, 2.6, 4.2, 3, 5.4, 2.6, 4.6, 3.2, 5, 2.8, 4, 3, 4.8, 2.6];
+    hall.forEach((gc, i) => gate(580 + 8 * i, gc));
+    // angels diving into the gaps: you have to slip past above or below them
+    [2, 4, 6, 8, 10, 12, 14, 16].forEach((i, n) => b.angel(581 + 8 * i, +(hall[i] + (n % 2 ? -0.9 : 0.1)).toFixed(1)));
+    // cherubs hovering in the halls between the pillars
+    b.bird(604, 4.2, 'cherub');
+    b.bird(644, 4.6, 'cherub');
+    b.bird(684, 4.2, 'cherub');
+    b.bird(708, 3.6, 'cherub');
+    b.portal(724, 'cube', { y: 3 });
+
+    // ============ STJÄRNHIMLEN (736 – 1040): low gravity! long floating hops over the void ============
+    b.checkpoint(736);
+    b.text(738, 4.6, 'LOW GRAVITY!', 0.5);
+    b.lowgrav(744, 1032);
+    sp(764); // the first floaty hop
+    sp(772, 3);
+    b.water(784, 8.1, 'void'); // a void: 8 blocks of nothing, one floaty hop
+    b.water(800, 8.1, 'void'); b.water(814.1, 8.1, 'void'); b.water(825.2, 8.1, 'void'); // three islands, one hop each
+    b.water(844, 8, 'void'); b.block(847, 1.5, 2, 0.6, 'star'); sp(847.5, 1, 2.1); // a star platform with a spike on it
+    b.water(858, 14, 'void'); b.orb(862, 1.5); b.orb(866, 2.5); // orbs across a wide void
+    b.water(878, 8.15, 'void'); b.angel(887.65, 1.5); b.water(892.15, 8.15, 'void'); b.angel(902.8, 1.5); b.water(907.3, 8.15, 'void'); b.angel(918.45, 1.5); // three islands, an angel sweeping over each
+    b.water(928, 8.1, 'void'); b.angel(938.1, 1.5); // an angel over the landing
+    b.water(946, 18, 'void'); b.block(952, 1.5, 3, 0.6, 'star'); sp(952.5, 1, 2.1); b.block(958, 3.5, 2, 0.6, 'star'); // star platforms in the sky
+    sp(972, 6); sp(979.2); b.angel(981.2, 1.5); // a wide bed of spikes, an angel as you land
+    b.water(990, 24.5, 'void'); b.block(995, 1.5, 2, 0.6, 'star'); sp(995.5, 1, 2.1); b.block(1001, 3.5, 2.5, 0.6, 'star'); b.block(1008.5, 1.5, 2, 0.6, 'star'); sp(1009, 1, 2.1); // star platforms in the sky
+
+    // ============ TRONSALEN (1040 – 1460): the archangel hews his flaming sword into the floor ============
+    b.text(1026, 4.6, 'GRAVITY IS BACK!', 0.5);
+    b.archangel(1048, 1460);
+    W(1060); // a wave
+    W(1070); sp(1072.25); // wave, then a spike
+    sp(1079.75, 3); W(1082); // triple, then a wave
+    b.checkpoint(1104);
+    W(1112); sp(1114.25); // wave, then a spike
+    sp(1121.75, 3); W(1124); // triple, then a wave
+    W(1132); W(1134.5); // two waves
+    b.block(1143, 0, 7, 1, 'marble'); sp(1150, 3); b.block(1155, 0, 6, 1, 'marble'); // marble blocks over a spike bed
+    sp(1167.6, 3); b.angel(1172, 1.5); // triple, then a high angel as you land
+    W(1182); sp(1184.25, 2); // wave, then a double
+    sp(1193.75); W(1196); // spike, then a wave
+    b.angel(1203.75, 0); W(1206); // angel, then a wave
+    W(1216); W(1220); W(1224); W(1228); // four waves, one per beat
+    sp(1237.75, 2); W(1240); // double, then a wave
+    W(1248); sp(1250.25, 3); // wave, then a triple
+    b.angel(1260, 0); sp(1262.1); b.angel(1266.6, 1.5); // angel, spike, high angel
+    b.block(1276, 0, 3, 1, 'marble'); b.block(1279, 0, 3, 2, 'marble'); sp(1288.25, 3); // marble steps, then a triple
+    sp(1298.1, 3); b.angel(1302, 1.5); b.angel(1303.6, 0); // triple, high angel, low angel
+    W(1312); sp(1314.25, 3); W(1316.5); // wave, triple, wave
+    W(1326); b.angel(1327.7, 1.5); W(1329.7); // combo
+    b.angel(1338, 0); b.angel(1339.7, 1.5); b.angel(1341.4, 0); // three angels: low, high, low
+    sp(1349.75, 3); W(1352); b.angel(1356, 1.5); // combo
+    W(1364); sp(1366.25, 2); W(1368.5); // combo
+    b.angel(1380, 0); W(1382); sp(1384.25, 3); // combo
+    sp(1394.1, 3); b.angel(1398, 1.5); b.angel(1399.6, 0); // triple, high angel, low angel
+    W(1408); sp(1410.25, 2); W(1412.5); // combo
+    b.angel(1422, 0); b.angel(1423.7, 1.5); b.angel(1425.4, 0); // three angels: low, high, low
+
+    // ============ NEAR SCENERY ============
+    b.deco('cloudpuff', 10);
+    b.deco('goldlamp', 20);
+    b.deco('statue', 40);
+    b.deco('goldlamp', 56);
+    b.deco('harp', 76, { y: 3.4 });
+    b.deco('cloudpuff', 92);
+    b.deco('goldlamp', 100);
+    b.deco('statue', 146);
+    b.deco('fountain', 164);
+    b.deco('goldlamp', 184);
+    b.deco('harp', 196, { y: 3.8 });
+    b.deco('statue', 214);
+    b.deco('cloudpuff', 228);
+    b.deco('goldlamp', 246);
+    b.deco('fountain', 266);
+    b.deco('goldlamp', 284);
+    b.deco('statue', 300);
+    b.deco('harp', 316, { y: 4.2 });
+    b.deco('goldlamp', 332);
+    b.deco('fountain', 348);
+    b.deco('statue', 362);
+    b.deco('goldlamp', 392);
+    b.deco('cloudpuff', 408);
+    b.deco('harp', 420, { y: 3.6 });
+    b.deco('statue', 440);
+    b.deco('goldlamp', 460);
+    b.deco('fountain', 478);
+    b.deco('statue', 498);
+    b.deco('goldlamp', 518);
+    b.deco('harp', 532, { y: 4 });
+    b.deco('statue', 552);
+    b.deco('statue', 576, { inside: true });
+    b.deco('goldlamp', 592, { inside: true });
+    b.deco('statue', 624, { inside: true });
+    b.deco('goldlamp', 648, { inside: true });
+    b.deco('statue', 672, { inside: true });
+    b.deco('goldlamp', 696, { inside: true });
+    b.deco('statue', 718, { inside: true });
+    b.deco('cloudpuff', 752);
+    b.deco('harp', 772, { y: 4.4 });
+    b.deco('cloudpuff', 796);
+    b.deco('harp', 840, { y: 4.8 });
+    b.deco('cloudpuff', 884);
+    b.deco('harp', 920, { y: 4.6 });
+    b.deco('cloudpuff', 964);
+    b.deco('harp', 1000, { y: 4.4 });
+    b.deco('goldlamp', 1046, { inside: true });
+    b.deco('statue', 1068, { inside: true });
+    b.deco('fountain', 1094, { inside: true });
+    b.deco('goldlamp', 1120, { inside: true });
+    b.deco('statue', 1150, { inside: true });
+    b.deco('harp', 1180, { inside: true, y: 3.8 });
+    b.deco('goldlamp', 1210, { inside: true });
+    b.deco('statue', 1240, { inside: true });
+    b.deco('fountain', 1270, { inside: true });
+    b.deco('goldlamp', 1300, { inside: true });
+    b.deco('statue', 1330, { inside: true });
+    b.deco('harp', 1360, { inside: true, y: 4 });
+    b.deco('goldlamp', 1390, { inside: true });
+    b.deco('statue', 1418, { inside: true });
+    b.deco('goldlamp', 1442, { inside: true });
+    b.deco('finish', 1460);
+
+    // ============ MID-LAYER LANDMARKS ============
+    b.landmark('pearlgate', 128);
+    b.landmark('palacegate', 560);
+    b.landmark('throne', 1460);
+
+    b.finish(1460);
+    return b;
+  }
+
+  // ======================================================================
   // THEMES — everything the renderer and the music need to know per level
   // ======================================================================
   const HOME_THEME = {
@@ -3308,6 +3565,30 @@
     song: 'stratus',
   };
 
+  const HEAVEN_THEME = {
+    // beautiful but deadly: golden morning at the pearly gates -> warm gold over the streets -> pale lilac palace
+    // light -> a deep violet starry sky full of nebulae -> a blinding white-gold throne room
+    sky: [
+      { x: -100, top: '#7fc4ff', bot: '#fff6d8', far: '#e8d9b0', dark: 0, sun: 0.1 },
+      { x: 256, top: '#8ab8ff', bot: '#ffe9a8', far: '#e6c98a', dark: 0, sun: 0.2 },
+      { x: 560, top: '#b8a8ff', bot: '#fff0f6', far: '#d8c8e8', dark: 0, sun: 0.3 },
+      { x: 736, top: '#1a1450', bot: '#7a5ac8', far: '#3a2a78', dark: 0.2, sun: 0.5 },
+      { x: 1040, top: '#ffd86a', bot: '#fffbe8', far: '#f0d890', dark: 0, sun: 0.15 },
+      { x: 1500, top: '#ffe48a', bot: '#ffffff', far: '#f6e4a8', dark: 0, sun: 0.1 },
+    ],
+    field: { default: 'heavenclouds' },
+    ground: { gate: 'cloudgold', streets: 'goldstreet', palace: 'marblefloor', stars: 'nebula', throne: 'goldcarpet' },
+    glow: { gate: '#fff4c4', streets: '#ffe08a', palace: '#f4e8ff', stars: '#b8c8ff', throne: '#fff0b0' },
+    far: { default: 'heavencity' },
+    farExtra: [],
+    midFill: { default: null },
+    midStep: [4, 6],
+    indoor: { palace: 'palace', throne: 'throneroom' },
+    beams: ['gate', 'streets'],
+    mist: ['gate'],
+    song: 'heaven',
+  };
+
   // ======================================================================
   // LEVEL LIST — difficulty sets the coin reward (see game.js)
   // ======================================================================
@@ -3372,6 +3653,13 @@
       winTitle: 'Du överlevde natten!',
       winSub: 'Past the graves, the bloody nuns, the catacombs and the clowns, and out before the bell struck one.',
       build: buildNightmare, theme: NIGHTMARE_THEME,
+    },
+    {
+      id: 'heaven', num: 10, name: 'Sjunde himlen', route: 'Pärleporten › Guldgatorna › Palatset › Stjärnhimlen › Tronsalen',
+      difficulty: 6, diffName: 'Insane', reward: 300, localOnly: true,
+      winTitle: 'Välkommen till sjunde himlen!',
+      winSub: "Through the pearly gates, down the golden streets, on angel wings through the palace, across the stars and past the archangel's sword, all the way to the throne.",
+      build: buildHeaven, theme: HEAVEN_THEME,
     },
   ];
 

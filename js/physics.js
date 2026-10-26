@@ -44,7 +44,9 @@
   // hazard/coin thrown by a stationary thrower standing at a fixed point, see Builder.lob()),
   // 'orbit' (Nöjesparken's Ferris-wheel gondolas, see Builder.wheel(): MV.dx/dy = the hanging point minus the
   // wheel's centre, MV.vy = its vertical speed in blocks/s) and 'roll' (a barrel rolling towards the player,
-  // see Builder.barrel(): MV.dx = clamp(k * (mv.bx - x), -4, max), mv.bx = the barrel's own x, MV.a = the roll angle).
+  // see Builder.barrel(): MV.dx = clamp(k * (mv.bx - x), -4, max), mv.bx = the barrel's own x, MV.a = the roll angle)
+  // and 'dive' (Sjunde himlen's diving angels, see Builder.angel() — the angel flies in from the upper right and
+  // swoops down to its lowest point at x = mv.bx, then climbs away behind the player; see the 'dive' case below).
   // `lvl` (optional) is only used for the beat clock (bob/pop/swing): when the level has speed zones,
   // moveOf needs the real elapsed time at x, not just x / P.SPEED (see timeAt below). step() passes it;
   // callers without a level clock nearby (or on a level with no speed zones) can omit it.
@@ -77,6 +79,32 @@
       MV.dx = (handX - o.x) * (1 - p);
       MV.dy = (handY - o.y) * (1 - p) + mv.arc * 4 * p * (1 - p);
       MV.k = p;
+      return MV;
+    }
+    if (mv.type === 'dive') {
+      // a diving angel (Builder.angel()): like the barrel it flies towards the player at mv.k blocks per block run
+      // and meets the player exactly at its own x (mv.bx), but along a curve: from far up at the top right it
+      // plunges steeply and levels out into a low swoop (dy = top * u^p, u = dx / max), and after the meeting it
+      // pulls up and away behind the player. Everything is a function of x only, so physics and drawing agree.
+      //   MV.dx / MV.dy  offset of the hitbox from its resting spot (bx, y) — the lowest point of the dive
+      //   MV.a   body angle in radians: PI/2 = flying level to the left, > PI/2 = head down in the dive, < PI/2 =
+      //          climbing away (heading + PI/2, i.e. 0 = upright, PI = head straight down)
+      //   MV.k   0 = start of the dive (wings swept back) .. 0.5 = the swoop (wings spread) .. 1 = climbing away
+      const dx0 = mv.k * (mv.bx - x);
+      if (dx0 >= 0) {
+        const u = (dx0 > mv.max ? mv.max : dx0) / mv.max;
+        MV.dx = u * mv.max;
+        MV.dy = mv.top * Math.pow(u, mv.p);
+        // slope of the path (blocks down per block flown), the heading is atan(slope) below horizontal
+        MV.a = Math.PI / 2 + Math.atan((mv.top * mv.p * Math.pow(u, mv.p - 1)) / mv.max);
+        MV.k = 0.5 * (1 - u);
+      } else {
+        const w = (dx0 < -mv.out ? mv.out : -dx0) / mv.out; // 0..1 over the `out` blocks behind the player
+        MV.dx = -w * mv.out;
+        MV.dy = mv.rise * w * w;
+        MV.a = Math.PI / 2 - Math.atan((2 * mv.rise * w) / mv.out);
+        MV.k = 0.5 + 0.5 * w;
+      }
       return MV;
     }
     if (mv.type === 'roll') {
@@ -204,6 +232,21 @@
     return t;
   }
 
+  // ---- Sjunde himlen's low-gravity zones ----
+  // lvl.gravs (always an array, empty by default — see level.js Builder.lowgrav()/Level) holds { x0, x1, g } zones,
+  // sorted by x0. gravAt is the gravity multiplier at x: g inside a zone, exactly 1 everywhere else (and on every
+  // level without zones, which takes the fast path). Only the cube mode feels it: gravity and the fall-speed cap
+  // MAX_FALL are both multiplied by it, so a jump is longer, higher and floatier but can still be tuned by the bot.
+  function gravAt(lvl, x) {
+    const zs = lvl && lvl.gravs;
+    if (!zs || !zs.length) return 1;
+    for (let i = 0; i < zs.length; i++) {
+      const z = zs[i];
+      if (x >= z.x0 && x < z.x1) return z.g;
+    }
+    return 1;
+  }
+
   // ---- Amazonas' rapids (raft mode) ----
   // lvl.rapids (always an array, empty by default — see level.js Builder.rapids()/Level) holds
   // { x0, x1, amp, len, base } water zones. Inside one the surface is base + amp * sin(2 pi (x - x0) / len) * env,
@@ -325,9 +368,12 @@
         s.pressAge = 99;
         if (ev) ev.push('jump');
       }
-      s.vy += s.gdir * P.G * dt;
+      // gg = 1 except inside a low-gravity zone (Sjunde himlen); P.G * 1 and P.MAX_FALL * 1 are exact
+      const gg = gravAt(lvl, s.x);
+      s.vy += s.gdir * P.G * gg * dt;
       // cap falling speed only (never the upward launch from pads)
-      if (s.gdir < 0 ? s.vy < -P.MAX_FALL : s.vy > P.MAX_FALL) s.vy = s.gdir * P.MAX_FALL;
+      const maxFall = P.MAX_FALL * gg;
+      if (s.gdir < 0 ? s.vy < -maxFall : s.vy > maxFall) s.vy = s.gdir * maxFall;
     } else if (s.mode === 'ship') {
       const up = -s.gdir;
       s.vy += (held ? P.SHIP_UP : -P.SHIP_DOWN) * up * dt;
@@ -533,5 +579,5 @@
     return s;
   }
 
-  VD.Physics = { spawn, clone, step, boxH, moveOf, speedAt, timeAt, rapidsHeight, trackHeight, trackStyleAt, trackSlope };
+  VD.Physics = { spawn, clone, step, boxH, moveOf, speedAt, timeAt, gravAt, rapidsHeight, trackHeight, trackStyleAt, trackSlope };
 })();

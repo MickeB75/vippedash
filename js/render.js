@@ -66,6 +66,7 @@
   // ------------------------------------------------------------------ precompute parallax layers
   R.build = function (lvl) {
     this.lvl = lvl;
+    Art.setHeaven(lvl.id === 'heaven'); // heaven reuses block names of older levels ('marble', 'pillar') and wins only while it is loaded
     const th = (this.theme = lvl.theme);
     this.sky = th.sky;
     const pick = (map, id) => (id in map ? map[id] : map.default);
@@ -118,6 +119,14 @@
           far.push({ u, t: 'fartower', h: 1.8 + rnd() * 1.2, seed });
           u += 1.0 + rnd() * 1.4;
         }
+      } else if (kind === 'heavencity') {
+        // Sjunde himlen: golden towers, domes and colonnades standing on small clouds, with the odd floating temple
+        const r = rnd(), seed = Math.floor(rnd() * 1e6);
+        if (r < 0.32) far.push({ u, t: 'hspire', w: 0.6 + rnd() * 0.5, h: 1.8 + rnd() * 1.6, seed });
+        else if (r < 0.56) far.push({ u, t: 'hdome', w: 1.5 + rnd() * 1.0, h: 1.3 + rnd() * 0.9, seed });
+        else if (r < 0.8) far.push({ u, t: 'hcolon', w: 1.8 + rnd() * 1.6, h: 0.9 + rnd() * 0.7, seed });
+        else far.push({ u, t: 'hisland', w: 1.4 + rnd() * 0.8, h: 1.5 + rnd() * 1.0, seed });
+        u += 1.4 + rnd() * 2.4;
       } else {
         if (kind && kind !== 'pine' && kind !== 'mixed') VD.lintMiss && VD.lintMiss('far', kind);
         const pine = kind === 'pine' || rnd() < 0.55;
@@ -139,7 +148,7 @@
     this.worldLm = [];
     this.fireworksX = null;
     for (const L of lvl.landmarks) {
-      if (L.type === 'ferris' || L.type === 'cannon') this.worldLm.push(L);
+      if (L.type === 'ferris' || L.type === 'cannon' || Art.heavenLm[L.type]) this.worldLm.push(L); // heaven's gates and throne stand in world space too
       else if (L.type === 'fireworks') this.fireworksX = L.X;
       else if (L.type !== 'loop') mid.push({ u: (L.X - PX) * pM + HALF, d: L, t: L.type, hw: MID_HALFWIDTH[L.type] || hwHorror[L.type] || 6 });
     }
@@ -582,6 +591,12 @@
         } else if (inKind === 'barrel') {
           this.drawBarrelRoom(ctx, camX, t);
           this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'palace') {
+          this.drawPalace(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
+        } else if (inKind === 'throneroom') {
+          this.drawThroneRoom(ctx, camX, t);
+          this.drawNear(ctx, camX, t, true, L);
         } else {
           if (inKind !== 'hall') VD.lintMiss && VD.lintMiss('indoor', inKind);
           this.drawHall(ctx, camX, t);
@@ -591,6 +606,7 @@
       }
       this.drawGround(ctx, camX, t, inT, L);
       if (inT < 1 && !L) this.drawParkWorld(ctx, camX, t, G);
+      if (this.lvl.id === 'heaven') this.drawHeavenWorld(ctx, camX, t);
       if (this.theme.lanes) {
         this.drawLaneRoad(ctx, camX, t);
         this.drawHouses(ctx, camX, t);
@@ -687,8 +703,12 @@
       }
       ctx.globalAlpha = 1;
     }
+    // Sjunde himlen: from the palace on the sky turns to night with stars and nebulae (and the sun steps aside)
+    const heavenStar = this.lvl.id === 'heaven' ? areaWeight(this.lvl, ['stars'], center, 30) : 0;
+    Art.setStarry(heavenStar);
+    if (heavenStar > 0) this.drawHeavenSky(ctx, camX, t, heavenStar);
     // sun
-    if (sky.sun < 1.15) {
+    if (sky.sun < 1.15 && heavenStar < 0.98) {
       const sunX = 1010 - sky.sun * 260, sunY = 90 + sky.sun * 460;
       const col = sky.sun < 0.5 ? U.mixHex('#fff7cf', '#ffd27a', sky.sun * 2) : U.mixHex('#ffd27a', '#ff5a3a', Math.min(1, (sky.sun - 0.5) * 2));
       const gl = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 150);
@@ -997,6 +1017,9 @@
           ctx.fillRect(x - 1.5, base - h - 18, 3, 3);
           ctx.fillStyle = farDark;
         }
+      } else if (f.t.charAt(0) === 'h') {
+        this.drawHeavenFar(ctx, f, x, base, sky);
+        ctx.fillStyle = farDark;
       } else VD.lintMiss && VD.lintMiss('far', f.t);
     }
 
@@ -1197,6 +1220,10 @@
     }
     if (style === 'gorge') {
       this.drawGorgeField(ctx, x0, x1, mb, offM, t);
+      return;
+    }
+    if (style === 'heavenclouds') {
+      this.drawHeavenField(ctx, x0, x1, mb, offM, t);
       return;
     }
     const base = { jungle: '#1f5a28', meadow: '#7dbb4e', golden: '#b6b25a', park: '#7a9a5a', farm: '#8ba55a', lawn: '#6f9f52', forest: '#3f6b34', bog: '#7b8a55', glade: '#86c05a', plaza: '#a19d93', graves: '#332b22', fairground: '#5f3f2e',
@@ -3583,7 +3610,7 @@
         ctx.stroke();
       } else if (st === 'parkpath' || st === 'funfloor') {
         this.drawParkGround(ctx, camX, t, x0, x1, st);
-      } else VD.lintMiss && VD.lintMiss('ground', st);
+      } else this.drawHeavenGround(ctx, camX, t, x0, x1, st); // the heaven floors (or lintMiss for a style nobody knows)
     }
   };
 
@@ -4712,6 +4739,8 @@
         }
         ctx.restore();
         Art.bulbString(ctx, x0 - 6, y + 12, x1 + 6, y + 12, 5, 28, t, 2);
+      } else if (c.style === 'palace') {
+        this.drawHeavenCorridor(ctx, camX, t, x0, x1, y);
       } else {
         if (c.style !== 'fyris') VD.lintMiss && VD.lintMiss('corridor', c.style);
         // leafy canopy of the riverside trees
@@ -4740,12 +4769,694 @@
     }
   };
 
+  // ------------------------------------------------------------------ level 10 "Sjunde himlen" (heaven): backgrounds, floors, the archangel
+  // the far skyline: towers, domes and colonnades on small clouds (the far layer scrolls slowly, so these are cheap silhouettes with a lit side)
+  R.drawHeavenFar = function (ctx, f, x, base, sky) {
+    const lit = U.mixHex(sky.far, '#ffffff', 0.5), shade = U.mixHex(sky.far, '#8a78c4', 0.3), gold = U.mixHex('#e8b43c', sky.far, 0.15);
+    const u = BS * 0.5;
+    ctx.lineJoin = 'round';
+    // the cloud the piece stands on
+    ctx.fillStyle = U.mixHex(sky.bot, '#ffffff', 0.55);
+    ctx.beginPath();
+    ctx.ellipse(x, base + 2, (f.w || 1) * u * 1.3 + 22, 11, 0, 0, TAU);
+    ctx.ellipse(x - 16, base - 2, 22, 11, 0, 0, TAU);
+    ctx.ellipse(x + 18, base, 26, 12, 0, 0, TAU);
+    ctx.fill();
+    if (f.t === 'hspire') {
+      const w = f.w * u * 0.55, h = f.h * u * 1.4;
+      ctx.fillStyle = lit;
+      ctx.fillRect(x - w, base - h, w * 2, h);
+      ctx.fillStyle = shade;
+      ctx.fillRect(x, base - h, w, h);
+      ctx.fillStyle = lit;
+      ctx.fillRect(x - w * 1.25, base - h * 0.62, w * 2.5, h * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(x - w * 1.2, base - h);
+      ctx.lineTo(x, base - h - w * 3.2);
+      ctx.lineTo(x + w * 1.2, base - h);
+      ctx.closePath();
+      ctx.fillStyle = gold;
+      ctx.fill();
+      ctx.fillRect(x - 1, base - h - w * 3.2 - 12, 2, 12);
+      ctx.fillStyle = U.mixHex(sky.far, '#fff4c0', 0.7);
+      for (let i = 0; i < 3; i++) ctx.fillRect(x - w * 0.3, base - h * (0.2 + i * 0.22), w * 0.6, h * 0.1);
+    } else if (f.t === 'hdome') {
+      const w = f.w * u * 0.9, h = f.h * u * 0.9;
+      ctx.fillStyle = lit;
+      ctx.fillRect(x - w, base - h * 0.55, w * 2, h * 0.55);
+      ctx.fillStyle = shade;
+      ctx.fillRect(x, base - h * 0.55, w, h * 0.55);
+      ctx.fillStyle = gold;
+      ctx.beginPath();
+      ctx.ellipse(x, base - h * 0.55, w * 0.78, h * 0.55, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = U.mixHex(gold, '#ffffff', 0.45);
+      ctx.beginPath();
+      ctx.ellipse(x - w * 0.2, base - h * 0.62, w * 0.3, h * 0.3, 0, Math.PI, Math.PI * 1.5);
+      ctx.fill();
+      ctx.fillStyle = gold;
+      ctx.fillRect(x - 1.5, base - h * 1.1 - 12, 3, 14);
+      ctx.fillStyle = U.mixHex(sky.far, '#fff4c0', 0.7);
+      for (let i = -2; i <= 2; i++) ctx.fillRect(x + i * w * 0.36 - 3, base - h * 0.4, 6, h * 0.3);
+    } else if (f.t === 'hcolon') {
+      const w = f.w * u * 0.9, h = f.h * u;
+      ctx.fillStyle = lit;
+      ctx.fillRect(x - w, base - h - 7, w * 2, 8);
+      ctx.beginPath();
+      ctx.moveTo(x - w - 4, base - h - 7);
+      ctx.lineTo(x, base - h - 7 - h * 0.45);
+      ctx.lineTo(x + w + 4, base - h - 7);
+      ctx.closePath();
+      ctx.fillStyle = gold;
+      ctx.fill();
+      ctx.fillStyle = lit;
+      const n = Math.max(3, Math.round(w / 8));
+      for (let i = 0; i < n; i++) ctx.fillRect(x - w + 3 + (i * (w * 2 - 8)) / (n - 1), base - h, 5, h);
+    } else {
+      // a floating island with a little temple on it
+      const w = f.w * u * 0.8, h = f.h * u * 0.9;
+      ctx.fillStyle = shade;
+      ctx.beginPath();
+      ctx.moveTo(x - w, base - h * 0.5);
+      ctx.lineTo(x + w, base - h * 0.5);
+      ctx.lineTo(x + w * 0.2, base + 6);
+      ctx.lineTo(x - w * 0.3, base + 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = lit;
+      ctx.fillRect(x - w * 0.5, base - h * 0.95, w, h * 0.45);
+      ctx.beginPath();
+      ctx.moveTo(x - w * 0.62, base - h * 0.95);
+      ctx.lineTo(x, base - h * 1.3);
+      ctx.lineTo(x + w * 0.62, base - h * 0.95);
+      ctx.closePath();
+      ctx.fillStyle = gold;
+      ctx.fill();
+    }
+    ctx.fillStyle = lit;
+  };
+
+  // the sky of the star area: a field of twinkling stars and two soft nebulae (k = 0..1, how far into that part of the level)
+  R.drawHeavenSky = function (ctx, camX, t, k) {
+    if (k <= 0.01) return;
+    ctx.save();
+    ctx.globalAlpha = k;
+    const off = camX * BS * 0.05;
+    for (const [nx, ny, nr, c0] of [[330, 190, 330, '#d05ae0'], [980, 120, 380, '#4a7cf0'], [720, 330, 300, '#7a4ad0']]) {
+      const cx = (((nx - off) % (W + 600)) + W + 600) % (W + 600) - 300;
+      const g = ctx.createRadialGradient(cx, ny, 10, cx, ny, nr);
+      g.addColorStop(0, U.rgba(c0, 0.5));
+      g.addColorStop(1, U.rgba(c0, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - nr, ny - nr, nr * 2, nr * 2);
+    }
+    ctx.fillStyle = '#ffffff';
+    for (const s of this.stars) {
+      const x = (((s.x - off * (0.4 + s.r * 0.3)) % W) + W) % W;
+      ctx.globalAlpha = k * (0.5 + 0.5 * Math.sin(t * 2 + s.p));
+      ctx.fillRect(x, s.y, s.r * 1.3, s.r * 1.3);
+    }
+    ctx.restore();
+  };
+
+  // mid-layer band of cloud banks (field 'heavenclouds'); drawn into the field strip above the ground
+  R.drawHeavenField = function (ctx, x0, x1, mb, offM, t) {
+    const k = Art.starry();
+    const step = 54, top = U.mixHex('#ffffff', '#8a78d0', k * 0.75), bot = U.mixHex('#e4e6fa', '#4a3a98', k * 0.8);
+    const g = ctx.createLinearGradient(0, mb - 40, 0, GY + 4);
+    g.addColorStop(0, top);
+    g.addColorStop(1, bot);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.rect(x0, mb - 2, x1 - x0, GY - mb + 6);
+    for (let x = gridStart(x0, offM * BS, step) - step; x < x1 + step; x += step) {
+      const i = Math.round((x + offM * BS) / step), r = 18 + pm(i * 29, 20);
+      ctx.moveTo(x + r, mb);
+      ctx.arc(x, mb, r, 0, TAU);
+      ctx.moveTo(x + step * 0.5 + r * 0.7, mb + 2);
+      ctx.arc(x + step * 0.5, mb + 2, r * 0.7, 0, TAU);
+    }
+    ctx.fill();
+    // a golden edge light on top of the banks
+    ctx.strokeStyle = U.rgba(U.mixHex('#ffe08a', '#9ab8ff', k), 0.6);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = gridStart(x0, offM * BS, step) - step; x < x1 + step; x += step) {
+      const i = Math.round((x + offM * BS) / step), r = 18 + pm(i * 29, 20);
+      ctx.moveTo(x - r * 0.8, mb - r * 0.55);
+      ctx.arc(x, mb, r, Math.PI * 1.2, Math.PI * 1.7);
+    }
+    ctx.stroke();
+  };
+
+  // ---------- floors ----------
+  R.drawHeavenGround = function (ctx, camX, t, x0, x1, st) {
+    const w = x1 - x0;
+    if (w <= 0) return;
+    const off = camX * BS;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, GY - 8, w, H - GY + 8);
+    ctx.clip();
+    if (st === 'cloudgold') {
+      // the gates stand on a bank of cloud lit gold from above
+      const g = ctx.createLinearGradient(0, GY, 0, H);
+      g.addColorStop(0, '#fff7da');
+      g.addColorStop(0.35, '#f7e3ac');
+      g.addColorStop(1, '#e7c880');
+      ctx.fillStyle = g;
+      ctx.fillRect(x0, GY, w, H - GY);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      for (let x = gridStart(x0, off, 30) - 30; x < x1 + 30; x += 30) {
+        const i = Math.round((x + off) / 30);
+        ctx.moveTo(x + 17, GY + 9);
+        ctx.arc(x + 2, GY + 9, 15 + pm(i * 7, 4), 0, TAU);
+      }
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,210,100,0.9)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let x = gridStart(x0, off, 30) - 30; x < x1 + 30; x += 30) {
+        const i = Math.round((x + off) / 30), r = 15 + pm(i * 7, 4);
+        ctx.moveTo(x + 2 - r * 0.9, GY + 9 - r * 0.5);
+        ctx.arc(x + 2, GY + 9, r, Math.PI * 1.15, Math.PI * 1.85);
+      }
+      ctx.stroke();
+      // soft cloud wisps drifting through the bank
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      for (let x = gridStart(x0, off * 0.8, 150) - 150; x < x1 + 150; x += 150) {
+        const i = Math.round((x + off * 0.8) / 150);
+        ctx.beginPath();
+        ctx.ellipse(x + 40 + Math.sin(t * 0.4 + i) * 10, GY + 44 + pm(i * 13, 90), 54, 9, 0, 0, TAU);
+        ctx.ellipse(x + 70 + Math.sin(t * 0.4 + i) * 10, GY + 40 + pm(i * 13, 90), 30, 8, 0, 0, TAU);
+        ctx.fill();
+      }
+    } else if (st === 'goldstreet') {
+      // golden paving in three receding rows of big slabs
+      ctx.fillStyle = '#b8801a';
+      ctx.fillRect(x0, GY, w, H - GY);
+      const rows = [[GY, 38, 1.0], [GY + 38, 54, 1.3], [GY + 92, 80, 1.7]];
+      for (let r = 0; r < rows.length; r++) {
+        const [ry, rh, wk] = rows[r], bw = BS * wk, rowOff = off * (0.9 + r * 0.05) + (r & 1) * bw * 0.5;
+        for (let x = gridStart(x0, rowOff, bw) - bw; x < x1 + bw; x += bw) {
+          const i = Math.round((x + rowOff) / bw), k = U.hash(i * 17 + r * 101);
+          const g = ctx.createLinearGradient(0, ry, 0, ry + rh);
+          g.addColorStop(0, U.mixHex('#ffe27a', '#fff2b0', k * 0.6));
+          g.addColorStop(1, U.mixHex('#e0a41c', '#c88e10', k));
+          ctx.fillStyle = g;
+          Art.rr(ctx, x + 1.5, ry + 1.5, bw - 3, rh - 3, 4);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.45)';
+          ctx.fillRect(x + 6, ry + 4, bw * 0.4, 2.4);
+        }
+      }
+      // a glint travelling along the gold
+      const gx = x0 + (((t * 120) % (w + 200)) - 100);
+      const sg = ctx.createLinearGradient(gx - 60, 0, gx + 60, 0);
+      sg.addColorStop(0, 'rgba(255,255,255,0)');
+      sg.addColorStop(0.5, 'rgba(255,255,255,0.4)');
+      sg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(gx - 60, GY, 120, 38);
+      ctx.fillStyle = '#fff6c0';
+      ctx.fillRect(x0, GY, w, 3);
+    } else if (st === 'marblefloor') {
+      // polished marble tiles in cream and lilac with a gold inlay and a soft reflection
+      ctx.fillStyle = '#efe9f8';
+      ctx.fillRect(x0, GY, w, H - GY);
+      const tw = BS * 2;
+      for (let r = 0; r < 3; r++) {
+        const ry = GY + 6 + r * 54, rh = 54, tOff = off * (0.9 + r * 0.06);
+        for (let x = gridStart(x0, tOff, tw) - tw; x < x1 + tw; x += tw) {
+          const i = Math.round((x + tOff) / tw);
+          ctx.fillStyle = (i + r) & 1 ? '#f9f5ff' : '#ddd3ee';
+          ctx.fillRect(x, ry, tw, rh);
+          ctx.strokeStyle = 'rgba(140,125,185,0.35)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, ry, tw, rh);
+          ctx.strokeStyle = 'rgba(150,135,195,0.4)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(x + 14 + pm(i * 29, 40), ry + 8);
+          ctx.quadraticCurveTo(x + 40, ry + 24 + pm(i * 7, 12), x + 30 + pm(i * 13, 50), ry + rh - 8);
+          ctx.stroke();
+        }
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      for (let x = gridStart(x0, off, 170) - 170; x < x1 + 170; x += 170) {
+        ctx.beginPath();
+        ctx.moveTo(x + 40, GY + 6);
+        ctx.lineTo(x + 70, GY + 6);
+        ctx.lineTo(x + 20, H);
+        ctx.lineTo(x - 10, H);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.fillStyle = '#f2bd34';
+      ctx.fillRect(x0, GY, w, 6);
+      ctx.fillStyle = '#ffe9a0';
+      ctx.fillRect(x0, GY, w, 2);
+      ctx.fillStyle = '#e0a21c';
+      ctx.fillRect(x0, GY + 60, w, 3);
+    } else if (st === 'nebula') {
+      // the floor of the star area: glassy violet panels over the abyss with a cold glowing edge
+      const g = ctx.createLinearGradient(0, GY, 0, H);
+      g.addColorStop(0, '#4a3aa8');
+      g.addColorStop(1, '#150a40');
+      ctx.fillStyle = g;
+      ctx.fillRect(x0, GY, w, H - GY);
+      for (let x = gridStart(x0, off * 0.6, 260) - 260; x < x1 + 260; x += 260) {
+        const i = Math.round((x + off * 0.6) / 260), nx = x + 120, ny = GY + 70 + pm(i * 19, 50);
+        const ng = ctx.createRadialGradient(nx, ny, 4, nx, ny, 130);
+        const c0 = ['#e060e8', '#4a9cff', '#9a5aff'][pm(i, 3)];
+        ng.addColorStop(0, U.rgba(c0, 0.5));
+        ng.addColorStop(1, U.rgba(c0, 0));
+        ctx.fillStyle = ng;
+        ctx.fillRect(nx - 130, ny - 130, 260, 260);
+      }
+      ctx.strokeStyle = 'rgba(190,210,255,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let x = gridStart(x0, off, BS * 2) - BS * 2; x < x1 + BS * 2; x += BS * 2) {
+        ctx.moveTo(x, GY + 4);
+        ctx.lineTo(x - 30, H);
+      }
+      for (const yy of [GY + 52, GY + 112]) {
+        ctx.moveTo(x0, yy);
+        ctx.lineTo(x1, yy);
+      }
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      for (let i = Math.floor((off * 0.9 + x0) / 31) - 1; i <= Math.ceil((off * 0.9 + x1) / 31); i++) {
+        ctx.globalAlpha = 0.35 + 0.65 * Math.abs(Math.sin(t * 2 + i));
+        ctx.fillRect(i * 31 - off * 0.9, GY + 12 + pm(i * 47, 140), 2, 2);
+      }
+      ctx.globalAlpha = 1;
+      const eg = ctx.createLinearGradient(0, GY - 12, 0, GY + 18);
+      eg.addColorStop(0, 'rgba(190,215,255,0)');
+      eg.addColorStop(0.45, 'rgba(210,230,255,0.9)');
+      eg.addColorStop(1, 'rgba(190,215,255,0)');
+      ctx.fillStyle = eg;
+      ctx.fillRect(x0, GY - 12, w, 30);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x0, GY, w, 3);
+    } else if (st === 'goldcarpet') {
+      // a crimson royal carpet with gold trim and woven diamonds, laid on pale marble
+      ctx.fillStyle = '#efe6f4';
+      ctx.fillRect(x0, GY, w, H - GY);
+      const cg = ctx.createLinearGradient(0, GY, 0, H);
+      cg.addColorStop(0, '#b02a46');
+      cg.addColorStop(1, '#70183a');
+      ctx.fillStyle = cg;
+      ctx.fillRect(x0, GY + 5, w, H - GY - 5);
+      ctx.strokeStyle = '#f2bd34';
+      ctx.lineWidth = 3;
+      for (let x = gridStart(x0, off, BS) - BS; x < x1 + BS; x += BS) {
+        for (const [cy2, hh] of [[GY + 52, 22], [GY + 112, 22]]) {
+          ctx.beginPath();
+          ctx.moveTo(x + BS / 2, cy2 - hh);
+          ctx.lineTo(x + BS - 6, cy2);
+          ctx.lineTo(x + BS / 2, cy2 + hh);
+          ctx.lineTo(x + 6, cy2);
+          ctx.closePath();
+          ctx.stroke();
+          ctx.fillStyle = '#ffe58a';
+          circle(ctx, x + BS / 2, cy2, 3.4);
+          ctx.fill();
+        }
+      }
+      ctx.fillStyle = '#f2bd34';
+      ctx.fillRect(x0, GY + 5, w, 5);
+      ctx.fillRect(x0, GY + 150, w, 5);
+      ctx.fillStyle = '#ffe9a0';
+      ctx.fillRect(x0, GY + 5, w, 2);
+      // the gold fringe along the walking edge
+      ctx.fillStyle = '#e0a21c';
+      for (let x = gridStart(x0, off, 9) - 9; x < x1 + 9; x += 9) ctx.fillRect(x + 1, GY + 10, 4, 7);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x0, GY, w, 5);
+    } else {
+      VD.lintMiss && VD.lintMiss('ground', st);
+    }
+    ctx.restore();
+  };
+
+  // ---------- interiors ----------
+  // sky seen through a tall arched window: x/y = the window's top-left corner, drawn clipped to the arch
+  function heavenWindow(ctx, x, y, ww, wh, t, seed, starry) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x, y + wh);
+    ctx.lineTo(x, y + ww / 2);
+    ctx.arc(x + ww / 2, y + ww / 2, ww / 2, Math.PI, 0);
+    ctx.lineTo(x + ww, y + wh);
+    ctx.closePath();
+    ctx.clip();
+    const g = ctx.createLinearGradient(0, y, 0, y + wh);
+    g.addColorStop(0, starry ? '#2a2070' : '#8fcaff');
+    g.addColorStop(1, starry ? '#8a6ad8' : '#fff4d0');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, ww, wh);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(x + ww * 0.4 + Math.sin(t * 0.3 + seed) * 5, y + wh * 0.62, ww * 0.34, 12, 0, 0, TAU);
+    ctx.ellipse(x + ww * 0.62, y + wh * 0.7, ww * 0.3, 10, 0, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#e0a21c';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(x, y + wh);
+    ctx.lineTo(x, y + ww / 2);
+    ctx.arc(x + ww / 2, y + ww / 2, ww / 2, Math.PI, 0);
+    ctx.lineTo(x + ww, y + wh);
+    ctx.stroke();
+    ctx.strokeStyle = '#fff3c0';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+  }
+  // a fluted marble pilaster of the hall (x = left edge)
+  function heavenPilaster(ctx, x, pw, top) {
+    const g = ctx.createLinearGradient(x, 0, x + pw, 0);
+    g.addColorStop(0, '#d2cde6');
+    g.addColorStop(0.35, '#ffffff');
+    g.addColorStop(1, '#bcb7d4');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, top, pw, GY - top);
+    ctx.strokeStyle = 'rgba(140,130,185,0.45)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let i = 1; i < 5; i++) {
+      ctx.moveTo(x + (pw * i) / 5, top + 14);
+      ctx.lineTo(x + (pw * i) / 5, GY - 12);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#f2bd34';
+    ctx.fillRect(x - 6, top, pw + 12, 14);
+    ctx.fillRect(x - 6, GY - 14, pw + 12, 14);
+    ctx.strokeStyle = '#8a5408';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 6, top, pw + 12, 14);
+    ctx.strokeRect(x - 6, GY - 14, pw + 12, 14);
+  }
+
+  // the palace: a pale lilac marble hall with arched windows onto the sky, gold pilasters and shafts of light
+  R.drawPalace = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#f6ecff');
+    g.addColorStop(1, '#e9dcf6');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const off = camX * BS * 0.5, step = 250;
+    const start = gridStart(0, off, step) - step;
+    for (let x = start; x < W + step; x += step) {
+      const i = Math.round((x + off) / step);
+      heavenWindow(ctx, x + 70, 70, 110, 330, t, i, false);
+      // a shaft of light slanting down from the window to the floor
+      ctx.fillStyle = 'rgba(255,240,170,0.2)';
+      ctx.beginPath();
+      ctx.moveTo(x + 70, 150);
+      ctx.lineTo(x + 180, 150);
+      ctx.lineTo(x + 130, GY);
+      ctx.lineTo(x - 90, GY);
+      ctx.closePath();
+      ctx.fill();
+      heavenPilaster(ctx, x + step - 22, 34, 40);
+    }
+    // gilded frieze and vaulted ribs along the top
+    ctx.fillStyle = '#f2bd34';
+    ctx.fillRect(0, 0, W, 26);
+    ctx.fillStyle = '#ffe9a0';
+    ctx.fillRect(0, 22, W, 3);
+    ctx.fillStyle = '#e0a21c';
+    for (let x = gridStart(0, off, 36) - 36; x < W + 36; x += 36) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + 18, 20);
+      ctx.lineTo(x + 36, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(200,170,220,0.7)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let x = start; x < W + step; x += step) {
+      ctx.moveTo(x, 26);
+      ctx.quadraticCurveTo(x + step / 2, 60, x + step, 26);
+    }
+    ctx.stroke();
+    // golden lanterns hanging from the vaults
+    for (let x = start; x < W + step; x += step) {
+      const lx = x + step * 0.5 + 16, sw = Math.sin(t * 0.9 + x * 0.01) * 4;
+      ctx.strokeStyle = '#c98a10';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(lx, 26);
+      ctx.lineTo(lx + sw, 70);
+      ctx.stroke();
+      Art.glowAt(ctx, lx + sw, 82, 44, '#ffe27a', 0.8);
+      ctx.fillStyle = '#fff6c0';
+      ctx.beginPath();
+      ctx.ellipse(lx + sw, 82, 9, 13, 0, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = '#c98a10';
+      ctx.stroke();
+    }
+    this.drawMotes(ctx, camX, t, 0.35, '#fff6c0');
+  };
+
+  // the throne room: a vast white-gold hall, tall stained-glass windows, banners and a blinding glow ahead
+  R.drawThroneRoom = function (ctx, camX, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, GY);
+    g.addColorStop(0, '#ffe9a0');
+    g.addColorStop(1, '#fffaf0');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, GY + 4);
+    const gl = ctx.createRadialGradient(W * 0.72, GY * 0.55, 30, W * 0.72, GY * 0.55, 620);
+    gl.addColorStop(0, 'rgba(255,255,255,0.95)');
+    gl.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(0, 0, W, GY);
+    const off = camX * BS * 0.45, step = 210;
+    const start = gridStart(0, off, step) - step;
+    const glass = ['#4a7cf0', '#f2bd34', '#e05a8a', '#ffffff'];
+    for (let x = start; x < W + step; x += step) {
+      const i = Math.round((x + off) / step), wx = x + 70, ww = 70, wt = 60, wh = 300;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(wx, wt + wh);
+      ctx.lineTo(wx, wt + ww / 2);
+      ctx.arc(wx + ww / 2, wt + ww / 2, ww / 2, Math.PI, 0);
+      ctx.lineTo(wx + ww, wt + wh);
+      ctx.closePath();
+      ctx.clip();
+      for (let p = 0; p < 3; p++) {
+        ctx.fillStyle = glass[pm(i + p, 4)];
+        ctx.fillRect(wx + (p * ww) / 3, wt, ww / 3 + 1, wh);
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.beginPath();
+      ctx.moveTo(wx + ww / 2, wt + 40);
+      ctx.lineTo(wx + ww / 2 + 12, wt + 120);
+      ctx.lineTo(wx + ww / 2, wt + 100);
+      ctx.lineTo(wx + ww / 2 - 12, wt + 120);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 2;
+      for (let yy = wt + 30; yy < wt + wh; yy += 34) {
+        ctx.beginPath();
+        ctx.moveTo(wx, yy);
+        ctx.lineTo(wx + ww, yy + 14);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.strokeStyle = '#d99a14';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(wx, wt + wh);
+      ctx.lineTo(wx, wt + ww / 2);
+      ctx.arc(wx + ww / 2, wt + ww / 2, ww / 2, Math.PI, 0);
+      ctx.lineTo(wx + ww, wt + wh);
+      ctx.stroke();
+      // coloured light pooling on the floor
+      ctx.fillStyle = U.rgba(glass[pm(i, 4)], 0.16);
+      ctx.beginPath();
+      ctx.moveTo(wx, wt + wh - 40);
+      ctx.lineTo(wx + ww, wt + wh - 40);
+      ctx.lineTo(wx + ww + 70, GY);
+      ctx.lineTo(wx - 60, GY);
+      ctx.closePath();
+      ctx.fill();
+      heavenPilaster(ctx, x + step - 34, 40, 30);
+      // a crimson banner with a golden sun between the windows
+      const bx = x + step * 0.5 + 100;
+      ctx.fillStyle = '#b02a46';
+      ctx.beginPath();
+      ctx.moveTo(bx - 22, 40);
+      ctx.lineTo(bx + 22, 40);
+      ctx.lineTo(bx + 22, 200 + Math.sin(t * 1.4 + i) * 3);
+      ctx.lineTo(bx, 180);
+      ctx.lineTo(bx - 22, 200 + Math.sin(t * 1.4 + i + 1) * 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#f2bd34';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = '#ffe58a';
+      circle(ctx, bx, 98, 11);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#f2bd34';
+    ctx.fillRect(0, 0, W, 28);
+    ctx.fillStyle = '#ffe9a0';
+    ctx.fillRect(0, 24, W, 3);
+    this.drawMotes(ctx, camX, t, 0.5, '#ffffff');
+  };
+
+  // soft motes of light drifting up inside the halls
+  R.drawMotes = function (ctx, camX, t, a, col) {
+    ctx.fillStyle = col;
+    for (let i = 0; i < 26; i++) {
+      const ph = (t * 0.06 + i * 0.0381) % 1, x = (((i * 197 - camX * BS * (0.3 + (i % 3) * 0.12)) % (W + 40)) + W + 40) % (W + 40) - 20;
+      ctx.globalAlpha = a * Math.sin(ph * Math.PI) * (0.5 + 0.5 * Math.sin(t * 3 + i));
+      circle(ctx, x + Math.sin(t + i) * 8, GY - ph * (GY + 20), 1.6 + (i % 3) * 0.7);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  // the vaulted marble roof of the flying stretch: drawn from the top of the screen down to the corridor's ceiling y
+  R.drawHeavenCorridor = function (ctx, camX, t, x0, x1, y) {
+    const g = ctx.createLinearGradient(0, 0, 0, y);
+    g.addColorStop(0, '#d8c8ee');
+    g.addColorStop(1, '#f4ecfb');
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, 0, x1 - x0, y);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, 0, x1 - x0, y + 40);
+    ctx.clip();
+    const step = 120, off = camX * BS;
+    // coffers of the vault and gold ribs
+    ctx.strokeStyle = 'rgba(160,140,200,0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = gridStart(x0, off, step) - step; x < x1 + step; x += step) {
+      ctx.rect(x + 14, 14, step - 28, Math.max(10, y - 40));
+    }
+    ctx.stroke();
+    // the scalloped hem of the vault
+    ctx.fillStyle = '#f7f1fd';
+    ctx.beginPath();
+    ctx.moveTo(x0, y - 2);
+    for (let x = gridStart(x0, off, step) - step; x < x1 + step; x += step) {
+      ctx.lineTo(x, y - 2);
+      ctx.quadraticCurveTo(x + step / 2, y + 30, x + step, y - 2);
+    }
+    ctx.lineTo(x1 + step, y - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#f2bd34';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (let x = gridStart(x0, off, step) - step; x < x1 + step; x += step) {
+      ctx.moveTo(x, y - 2);
+      ctx.quadraticCurveTo(x + step / 2, y + 30, x + step, y - 2);
+    }
+    ctx.stroke();
+    ctx.restore();
+    // glowing lamps hanging at the arches
+    for (let x = gridStart(x0, off, step) - step; x < x1 + step; x += step) {
+      if (x + step * 0.5 < x0 || x + step * 0.5 > x1) continue;
+      Art.glowAt(ctx, x + step * 0.5, y + 20, 36, '#ffe27a', 0.85);
+      ctx.fillStyle = '#fff6c0';
+      circle(ctx, x + step * 0.5, y + 18, 5);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#f2bd34';
+    ctx.fillRect(x0, y - 4, x1 - x0, 4);
+  };
+
+  // the heaven stage props: gates, palace entrance and throne, standing in the world behind the player
+  R.drawHeavenWorld = function (ctx, camX, t) {
+    const mid = camX + HALF;
+    for (const d of this.worldLm || []) {
+      const f = Art.heavenLm[d.type];
+      if (!f || Math.abs(d.X - mid) > HALF + 14) continue;
+      // the gate may stand on a platform (the pearly gates do): lift it onto the highest block resting on the ground at its x
+      if (d.baseH == null) {
+        d.baseH = 0;
+        for (const o of this.lvl.objs) if (o.t === 'solid' && o.y < 0.5 && o.x <= d.X && o.x + o.w >= d.X) d.baseH = Math.max(d.baseH, o.y + o.h);
+      }
+      // a gate on a platform is shrunk so that its arch still fits under the top of the screen
+      const sc = d.baseH > 0 ? Math.min(1, (11.1 - d.baseH) / 11.8) : 1, gx = sx(d.X, camX), gyy = GY - d.baseH * BS;
+      ctx.save();
+      ctx.translate(gx, gyy);
+      ctx.scale(sc, sc);
+      ctx.translate(-gx, -gyy);
+      f(ctx, gx, gyy, d, t);
+      ctx.restore();
+    }
+  };
+
+  // the archangel in the throne room. Scenery only (the waves are the hazards): he hovers KING_AHEAD blocks in front of the player, swings his
+  // sword up one beat before each light wave starts, strikes down exactly when it does, and bows and rises into the light at the end
+  R.drawArchangel = function (ctx, camX, t, G) {
+    const boss = this.lvl.boss;
+    const px = G.s ? G.s.x : camX + PX;
+    const ahead = VD.KING_AHEAD || 15;
+    if (px < boss.x0 - 3 || px > boss.x1 + 22) return;
+    if (this._waveLvl !== this.lvl) {
+      // where each wave starts: the player's x at which the roll begins (see Builder.wave in level.js)
+      const set = new Set();
+      for (const o of this.lvl.objs) if (o.kind === 'wave' && o.mv) set.add(Math.round((o.mv.bx - o.mv.max / o.mv.k) * 1000) / 1000);
+      this._waveStarts = Array.from(set).sort((a, b) => a - b);
+      this._waveLvl = this.lvl;
+    }
+    let next = Infinity, prev = -Infinity;
+    for (const s of this._waveStarts) {
+      if (s > px) {
+        next = s;
+        break;
+      }
+      prev = s;
+    }
+    const dn = next - px, dp = px - prev;
+    const raise = dn <= 4 ? U.smooth(U.clamp((4 - dn) / 2.6, 0, 1)) : 0;
+    const slashNext = dn < 1.4 ? U.clamp((1.4 - dn) / 1.4, 0, 1) : 0;
+    const retract = dp < 5.5 ? (dp < 2.2 ? 1 : 1 - U.smooth((dp - 2.2) / 3.3)) : 0;
+    const flash = dp < 2.5 ? Math.pow(1 - dp / 2.5, 1.5) : 0;
+    const slideIn = U.smooth(U.clamp((px - (boss.x0 - 3)) / 5, 0, 1));
+    const leave = U.clamp((px - boss.x1) / 14, 0, 1);
+    const bow = U.smooth(U.clamp(leave * 4, 0, 1)) * (1 - U.smooth(U.clamp((leave - 0.45) / 0.3, 0, 1)));
+    const rise = U.smooth(U.clamp((leave - 0.4) / 0.6, 0, 1));
+    const bx = px + ahead + (1 - slideIn) * 8, by = GY - (1 - slideIn) * 3 * BS - rise * 8 * BS;
+    ctx.save();
+    ctx.globalAlpha = slideIn * (1 - rise * rise);
+    Art.archangel(ctx, sx(bx, camX), by, BS, t, { raise, slash: Math.max(retract, slashNext), flash: leave > 0 ? 0 : flash, bow });
+    ctx.restore();
+    if (rise > 0.01) {
+      // he dissolves in a pillar of light
+      ctx.save();
+      ctx.globalAlpha = Math.sin(rise * Math.PI) * 0.9;
+      const lg = ctx.createLinearGradient(0, 0, 0, GY);
+      lg.addColorStop(0, 'rgba(255,250,210,1)');
+      lg.addColorStop(1, 'rgba(255,250,210,0)');
+      ctx.fillStyle = lg;
+      ctx.fillRect(sx(bx, camX) - 1.4 * BS, 0, 2.8 * BS, GY);
+      ctx.restore();
+    }
+  };
+
   // ------------------------------------------------------------------ level 4 "Schackmatt": the king boss
   // He is scenery only (no collision): a big chess king standing VD.KING_AHEAD blocks ahead of the player
   // for the whole boss span, sliding in at x0 and toppling over once you reach x1 (the finish).
   R.drawKing = function (ctx, camX, t, G, L) {
     const boss = this.lvl.boss;
     if (!boss || (G.s && (G.s.layer || 0) !== L)) return;
+    if (boss.kind === 'archangel') return this.drawArchangel(ctx, camX, t, G);
     const px = G.s ? G.s.x : camX + PX;
     const ahead = VD.KING_AHEAD || 15;
     if (px < boss.x0 - 3 || px > boss.x1 + 8) return;
@@ -5843,7 +6554,7 @@
             if (sf) sf(ctx, x, y, w, h, down, glow(o.x), t, o.id);
             else Art.spike(ctx, x, y, w, h, down, o.style, glow(o.x), t, o.id);
             if (slope) ctx.restore();
-          } else if (o.kind === 'half') Art.half(ctx, x, y, w, h, o.style, glow(o.x));
+          } else if (o.kind === 'half') Art.half(ctx, x, y, w, h, o.style, glow(o.x), t, o.id);
           else if (o.kind === 'bird') {
             const cx2 = x + w / 2, cy2 = y + h / 2;
             const brf = AH && AH.bird && AH.bird[o.style];
@@ -5951,6 +6662,21 @@
             // Nöjesparken: a striped barrel rolling at you (moveOf 'roll'); the hit box sits at mv.bx + dx, the art rolls by MV.a
             const mv = VD.Physics.moveOf(o, px, lvl);
             Art.barrel(ctx, sx(o.mv.bx + 0.5 + mv.dx, camX), sy(o.y + 0.425), BS * 0.88, mv.a);
+          } else if (o.kind === 'angel') {
+            // Sjunde himlen: an angel dives at you (moveOf 'dive'); the art is centred on the hit box and its sweep
+            const mv = VD.Physics.moveOf(o, px, lvl);
+            const hcx = o.hx0 != null ? (o.hx0 + o.hx1) / 2 : o.x + o.w / 2, hcy = o.hy0 != null ? (o.hy0 + o.hy1) / 2 : o.y + o.h / 2;
+            ctx.save();
+            ctx.translate(sx(hcx + mv.dx, camX), sy(hcy + mv.dy));
+            Art.angel(ctx, BS * 1.7, mv.a || 0, mv.k || 0, t + o.id * 0.37);
+            ctx.restore();
+          } else if (o.kind === 'wave') {
+            // a wave of light rolling along the floor from the archangel's sword (moveOf 'roll', like the barrels)
+            const mv = VD.Physics.moveOf(o, px, lvl);
+            ctx.save();
+            ctx.translate(sx(o.mv.bx + 0.5 + mv.dx, camX), sy(o.y + 0.4));
+            Art.lightWave(ctx, BS * 0.85, t + o.id * 0.21);
+            ctx.restore();
           } else if (o.kind === 'balloon') {
             const mv = VD.Physics.moveOf(o, px, lvl);
             const bcx = sx(o.x + o.w / 2 + mv.dx, camX), bcy = sy(o.y + 1.1 + mv.dy);
@@ -6080,6 +6806,11 @@
       if (cartStyle === 'flume') Art.flumeLog(ctx, cx, sy(s.y), BS * 1.85, cartTilt, t, 0);
       else Art.coasterCart(ctx, cx, sy(s.y), BS * 1.7, cartTilt, t, 0);
     }
+    // Sjunde himlen: where the gravity is low, a pulsing aura and drifting stardust show it (fading in and out at the zone's edges)
+    if (this.lvl.gravs && this.lvl.gravs.length && s.mode === 'cube') {
+      const gk = U.clamp((1 - VD.Physics.gravAt(this.lvl, s.x)) * 2, 0, 1);
+      if (gk > 0.01) Art.stardust(ctx, cx, cy, BS, t, gk);
+    }
     ctx.save();
     ctx.translate(cx, cy);
     if (laneP) {
@@ -6095,6 +6826,7 @@
       ctx.rotate(v.rot);
       // in the park the ship is a human cannonball: helmet, scarf and speed streaks
       if (this.lvl.id === 'park') Art.cannonball(ctx, BS * 1.15, expr, G.skin, t);
+      else if (this.lvl.id === 'heaven') Art.wingedShip(ctx, BS * 1.15, expr, G.skin, t, !!G.held); // Vippe grows angel wings in the palace
       else Art.ship(ctx, BS * 1.15, expr, G.skin, v.wheel, t);
     } else {
       Art.ball(ctx, BS, expr, G.skin, v.rot, s.gdir > 0);

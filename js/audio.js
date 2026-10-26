@@ -110,6 +110,19 @@
     P6: parseMelody('. . . . G5 - C6 - | D6 - A#5 D6 F6 - D6 A#5 | C6 - A5 C6 F6 - E6 F6 | G5 - B5 D6 G6 - F6 D6 | E6 E6 . E6 G6 - E6 C6 | D6 D6 . D6 F6 - D6 A#5 | C6 C6 . A5 C6 - F6 - | G6 - F6 E6 D6 - B5 G5 | G5 - C6 E6 - G6 E6 C6 | A#5 - D6 F6 - A#5 D6 F6 | A5 - C6 F6 - - - -'),
     P7: parseMelody('A5 A5 C6 E6 E6 C6 A5 C6 | A5 A5 C6 F6 F6 C6 A5 C6 | G5 G5 C6 E6 E6 G6 E6 C6 | B5 B5 D6 G6 G6 D6 B5 D6 | C6 E6 A6 E6 C6 E6 A6 - | C6 F6 A6 F6 C6 F6 A6 - | E6 G6 C6 E6 G6 E6 C6 G5 | D6 G6 B5 D6 G6 F6 E6 D6 | A5 - C6 - E6 - A5 - | A5 - C6 - F6 - - -'),
     P8: parseMelody('D6 - F#6 A6 - F#6 D6 - | C#6 - E6 A6 - E6 C#6 - | B5 - D6 G6 - B6 G6 - | E6 - C#6 E6 A6 - G6 E6 | F#6 F#6 A6 F#6 D6 - E6 F#6 | E6 - A6 E6 C#6 - E6 A6 | G6 - B6 G6 D6 - G6 B6 | A6 - E6 C#6 E6 - A6 - | A6 - F#6 D6 A6 - F#6 A6 | E6 - C#6 E6 A6 - - -'),
+    // the heaven song (level 10 "Sjunde himlen"), bright D major that lifts to E major for the throne room:
+    // bell-like gate theme, a dance hook for the golden streets, a soaring line for the wings, a sparse
+    // bell tune among the stars and an epic climbing theme for the archangel. All melodies are original.
+    H1: parseMelody('F#5 - A5 - D6 - A5 - | E5 - A5 - C#6 - A5 - | D5 - F#5 - B5 - F#5 - | D5 - G5 - B5 - A5 G5'),
+    H2: parseMelody('A5 - . F#5 - A5 - D6 | D6 - . B5 - F#5 - B5 | D6 - . B5 - D6 - G6 | E6 - . C#6 - E6 - A6 | F#6 - D6 A5 - D6 - A5 | B5 - D6 F#6 - D6 B5 - | G5 - B5 D6 - B5 D6 G6 | A6 - E6 C#6 - A5 - -'),
+    H3: parseMelody('F#5 - A5 D6 - C#6 A5 - | D6 - B5 - F#5 - B5 - | B5 - D6 G6 - F#6 D6 - | E6 - C#6 - A5 - . . | F#5 - A5 D6 - E6 F#6 - | D6 - F#6 - B6 - A6 F#6 | G6 - F#6 D6 - B5 D6 - | C#6 - E6 A6 - - - -'),
+    H4: parseMelody('B5 - D6 - G6 - D6 B5 | C#6 - E6 - A6 - E6 C#6 | D6 - F#6 A6 - F#6 D6 - | D6 - B5 F#5 - B5 D6 F#6 | G6 - D6 B5 - D6 G6 - | A6 - E6 C#6 - E6 A6 - | F#6 - D6 A5 - D6 F#6 A6 | B6 - - - A6 - F#6 -'),
+    H5: parseMelody('D6 - - - B5 - D6 - | E6 - - - C#6 - E6 - | F#6 - - A6 - - C#6 - | D6 - B5 - D6 - F#6 - | G6 - - - D6 - B5 - | A6 - - - E6 - C#6 - | C#6 - F#6 - A6 - C#7 - | B6 - - - A6 - F#6 -'),
+    H6: parseMelody('B5 . . . D6 . . . | F#5 . . . A5 . D6 . | G5 . . . B5 . E6 . | E6 . . . C#6 . A5 . | D6 . B5 . G5 . . . | F#5 . A5 . D6 . . . | E6 . . D6 . B5 . . | C#6 . . E6 . . A5 .'),
+    H6b: parseMelody('D6 - B5 - G5 - B5 D6 | F#6 - D6 - A5 - D6 F#6 | G6 - E6 - B5 - E6 G6 | A6 - E6 - C#6 - E6 A6 | B6 - G6 - D6 - B5 D6 | A6 - F#6 - D6 - F#6 A6 | G6 - B6 - G6 - E6 - | E6 - C#6 - A5 - . .'),
+    H7: parseMelody('F#5 B5 D6 F#6 - D6 B5 - | G5 B5 D6 G6 - D6 B5 - | A5 D6 F#6 A6 - F#6 D6 - | E6 A6 C#7 A6 - E6 C#6 - | B6 - F#6 - D6 - F#6 B6 | G6 - D6 - B5 - D6 G6 | A6 - F#6 - D6 F#6 A6 - | C#7 - - - E6 - A6 -'),
+    H8: parseMelody('B5 D6 G6 - F#6 D6 B5 - | C#6 E6 A6 - G6 E6 C#6 - | D6 F#6 B6 - A6 F#6 D6 - | E6 A6 C#7 - A6 - E6 - | G6 - B6 - G6 - D6 B5 | A6 - C#7 - A6 - E6 C#6 | B6 - A6 F#6 - D6 F#6 A6 | E6 - - C#6 - A5 C#6 E6'),
+    H9: parseMelody('G#5 C#6 E6 G#6 - E6 C#6 - | A5 C#6 E6 A6 - E6 C#6 - | B5 E6 G#6 B6 - G#6 E6 - | F#6 B6 D#7 B6 - F#6 D#6 - | C#7 - G#6 - E6 - G#6 C#7 | A6 - E6 - C#6 - E6 A6 | G#6 - B6 E7 - B6 G#6 - | D#6 - F#6 - B6 - - -'),
   };
   // chords: [bass root midi, triad midis]
   const CH = {
@@ -120,6 +133,8 @@
     // level 6 (doom metal, C minor): wide "5th under root" doom-chord voicings, root note kept low for the guitar/bass
     Cm: [36, [55, 60, 63]], Ab: [32, [51, 56, 60]], Fm: [41, [60, 65, 68]], Db: [37, [56, 61, 65]],
     Bm: [47, [54, 59, 62]],
+    // level 10 (heaven): the minor chords of D and E major
+    Fsm: [42, [57, 61, 66]], Csm: [37, [56, 61, 64]],
     Eb: [39, [58, 63, 67]], Gb: [42, [61, 66, 70]], Bdim: [35, [53, 59, 62]],
   };
   const PROG = {
@@ -188,6 +203,16 @@
     parkCannon: ['C', 'Bb', 'F', 'G'],
     parkCoaster: ['Am', 'F', 'C', 'G'],
     parkFinale: ['D', 'A', 'G', 'A'],
+    // the heaven level ("Sjunde himlen"): bright D major (I-V-vi-IV and friends), Fsm (F#m) for the soaring wings,
+    // and a step up to E major (Csm = C#m, A, E, B) for the throne room finale
+    heavenIntro: ['D', 'A', 'Bm', 'G'],
+    heavenA: ['D', 'Bm', 'G', 'A'],
+    heavenB: ['G', 'A', 'D', 'Bm'],
+    heavenP: ['G', 'A', 'Fsm', 'Bm'],
+    heavenS: ['G', 'D', 'Em', 'A'],
+    heavenT: ['Bm', 'G', 'D', 'A'],
+    heavenT2: ['G', 'A', 'Bm', 'A'],
+    heavenUp: ['Csm', 'A', 'E', 'B'],
   };
   // each song: [fromBar, toBar, settings]. `phrase: 'section'` starts the 4-bar phrases at the section start.
   const SONGS = {
@@ -362,6 +387,30 @@
         [58, 68, { prog: 'parkCoaster', drums: 'coaster', bass: 'octave', arp: 'fast', stabs: true, lead: 'P7', tone: 'brass', shine: true }],
         [68, 78, { prog: 'parkFinale', drums: 'coaster', bass: 'octave', arp: 'fast', stabs: true, pad: true, lead: 'P8', tone: 'brass', shine: true, fireworks: true }],
         [78, 80, { end: true }],
+      ],
+    },
+    // level 10 "Sjunde himlen": areas start at bars 0, 16, 35, 46 and 65; the finish is bar 91. Heavenly
+    // electronic music: choir pads and arpeggios, then a four-on-the-floor dance beat with supersaw leads
+    // at the golden streets, a soaring lead for the wings, sparse echoing bells in low gravity and an epic
+    // climax for the archangel that lifts from D to E major for the last 8 bars.
+    heaven: {
+      endChord: 'E',
+      phrase: 'section',
+      sections: [
+        [0, 4, { prog: 'heavenIntro', choir: true, sawpad: true, arp: 'wave', arpTone: 'sparkle' }],
+        [4, 8, { prog: 'heavenIntro', drums: 'sky', choir: true, sawpad: true, arp: 'up', arpTone: 'sparkle', lead: 'H1', tone: 'bells' }],
+        [8, 16, { prog: 'heavenA', drums: 'dance', bass: 'offbeat', choir: true, arp: 'up', arpTone: 'sparkle', lead: 'H2', tone: 'sparkle', riser: true }],
+        [16, 24, { prog: 'heavenA', drums: 'dance', bass: 'offbeat', sawpad: true, arp: 'fast', arpTone: 'sparkle', lead: 'H3', tone: 'super' }],
+        [24, 32, { prog: 'heavenB', drums: 'dance', bass: 'offbeat', sawpad: true, arp: 'fast', arpTone: 'sparkle', lead: 'H4', tone: 'super', choir: true }],
+        [32, 35, { prog: 'heavenA', drums: 'dance', bass: 'offbeat', sawpad: true, arp: 'fast', arpTone: 'sparkle', lead: 'H3', tone: 'super', riser: true }],
+        [35, 46, { prog: 'heavenP', drums: 'lift', bass: 'offbeat', sawpad: true, choir: true, arp: 'up', arpTone: 'sparkle', lead: 'H5', tone: 'soar', riser: true }],
+        [46, 54, { prog: 'heavenS', drums: 'float', bass: null, choir: true, sawpad: true, arp: 'wave', arpTone: 'sparkle', lead: 'H6', tone: 'bells', twinkle: true }],
+        [54, 65, { prog: 'heavenS', drums: 'float', bass: 'long', choir: true, sawpad: true, arp: 'wave', arpTone: 'sparkle', lead: 'H6b', tone: 'bells', twinkle: true, riser: true }],
+        [65, 73, { prog: 'heavenT', drums: 'epic', bass: 'octave', stabs: true, choir: true, sawpad: true, arp: 'fast', arpTone: 'sparkle', lead: 'H7', tone: 'super' }],
+        [73, 81, { prog: 'heavenT2', drums: 'epic', bass: 'octave', stabs: true, choir: true, sawpad: true, arp: 'fast', arpTone: 'sparkle', lead: 'H8', tone: 'super' }],
+        [81, 86, { prog: 'heavenT', drums: 'epic', bass: 'octave', stabs: true, choir: true, sawpad: true, arp: 'fast', arpTone: 'sparkle', lead: 'H7', tone: 'super', riser: true }],
+        [86, 94, { prog: 'heavenUp', drums: 'epic', bass: 'octave', stabs: true, choir: true, sawpad: true, arp: 'fast', arpTone: 'sparkle', lead: 'H9', tone: 'super', shine: true }],
+        [94, 96, { end: true, endShine: true }],
       ],
     },
   };
@@ -769,6 +818,11 @@
         tri.forEach((m) => voice('square', mtof(m + 12), t, 2.4, 0.05, { lp: 3000, hold: 0.8, release: 0.8 }));
         voice('sawtooth', mtof(tri[0] + 24), t, 2.4, 0.07, { lp: 4000, hold: 0.8, release: 0.8, detune: 6 });
         if (cfg.endBell) churchBell(t + 0.12, 48, 0.4);
+        if (cfg.endShine) {
+          // heaven: a choir chord and a rising glockenspiel arpeggio over the last chord
+          choirChord(t, tri, 2.4);
+          tri.concat(tri.map((m) => m + 12), tri.map((m) => m + 24)).forEach((m, k) => glockNote(t + 0.04 + k * 0.07, m + 12, 0.8));
+        }
       }
       return;
     }
@@ -887,6 +941,35 @@
       hat(t, s16 % 2 ? 0.35 : 0.7, s16 % 4 === 2);
       if (bar % 2 === 0 && s16 === 0) crash(t);
       if (pb % 4 === 3 && s16 >= 12) snare(t, 0.7);
+    } else if (d === 'sky') {
+      // heaven's gate: a soft four-on-the-floor with a light clap on beat 3 and airy hats
+      if (beat) kick(t, 0.6);
+      if (s16 % 4 === 2) hat(t, 0.45);
+      if (s16 === 8) clap(t, 0.3);
+    } else if (d === 'lift') {
+      // the palace wings: a soft kick on every beat, open hats on the offbeats, a single clap on beat 3
+      if (beat) kick(t, 0.75);
+      if (s16 % 4 === 2) hat(t, 0.6, true);
+      if (s16 % 2 === 1) hat(t, 0.25);
+      if (s16 === 8) clap(t, 0.5);
+    } else if (d === 'dance') {
+      // the golden streets: four-on-the-floor, claps on 2 and 4, open hats on the offbeats, a clap fill every 4th bar
+      if (beat) kick(t, s16 === 0 ? 1 : 0.9);
+      if (s16 === 4 || s16 === 12) clap(t, 0.8);
+      if (s16 % 4 === 2) hat(t, 0.7, true);
+      if (s16 % 2 === 1) hat(t, 0.25);
+      if (pb % 4 === 3 && s16 >= 14) clap(t, 0.6);
+    } else if (d === 'epic') {
+      // the throne room: the dance beat with real snares, a 16th kick pickup on odd bars, a crash every 2 bars and a snare roll to end each phrase
+      if (beat || (s16 === 14 && pb % 2 === 1)) kick(t, s16 === 0 ? 1 : 0.9);
+      if (s16 === 4 || s16 === 12) {
+        snare(t, 0.9);
+        clap(t, 0.6);
+      }
+      if (s16 % 4 === 2) hat(t, 0.7, true);
+      if (s16 % 2 === 1) hat(t, 0.3);
+      if (bar % 2 === 0 && s16 === 0) crash(t);
+      if (pb % 4 === 3 && s16 >= 12) snare(t, 0.4 + (s16 - 12) * 0.15);
     } else if (d === 'ghost') {
       // inside Tripp Troppen: a faint heartbeat and, now and then, a far-off dull tom in the dark
       if (s16 === 0) {
@@ -964,11 +1047,34 @@
       tri.forEach((m) => voice('square', mtof(m), t, STEP * 1.4, 0.03, { attack: 0.004, hold: 0.3, release: 0.05, lp: 2200 }));
     }
 
+    // heaven: a rising sweep and a 16th snare roll in the last bar of a section, leading into the next one
+    if (cfg.riser && bar === sec[1] - 1) {
+      if (s16 === 0) voice('sawtooth', 300, t, STEP * 16, 0.025, { slide: 2600, attack: 0.4, hold: 0.95, release: 0.04, lp: 3000 });
+      if (s16 >= 12) snare(t, 0.2 + (s16 - 12) * 0.12);
+    }
+    // heaven: glittering glockenspiel twinkles at pseudo-random 16ths, with an echo
+    if (cfg.twinkle && s16 % 2 === 1 && ((step * 2654435761) >>> 0) % 5 === 0) {
+      const m = tri[(step >> 1) % 3] + 24;
+      glockNote(t, m, 0.5);
+      glockNote(t + STEP * 3, m, 0.2);
+    }
+    // heaven: a lush pad of slowly swelling detuned saws, one chord per bar
+    if (cfg.sawpad && s16 === 0) {
+      tri.forEach((m) => {
+        voice('sawtooth', mtof(m), t, STEP * 15, 0.02, { attack: 0.3, hold: 0.85, lp: 1500, detune: -9 });
+        voice('sawtooth', mtof(m), t, STEP * 15, 0.02, { attack: 0.3, hold: 0.85, lp: 1500, detune: 9 });
+      });
+    }
+
     // ---- bass ----
     if (cfg.bass === 'eighth' && s16 % 2 === 0) {
       voice('sawtooth', mtof(root), t, STEP * 1.6, 0.22, { lp: 700, lpEnd: 300, q: 4 });
     } else if (cfg.bass === 'octave' && s16 % 2 === 0) {
       voice('sawtooth', mtof(root + (s16 % 4 === 2 ? 12 : 0)), t, STEP * 1.6, 0.24, { lp: 900, lpEnd: 300, q: 5 });
+    } else if (cfg.bass === 'offbeat' && s16 % 2 === 0) {
+      // heaven: the root on the offbeats (between the kicks) with a short sub under each kick
+      if (s16 % 4 === 2) voice('sawtooth', mtof(root), t, STEP * 1.8, 0.22, { lp: 900, lpEnd: 350, q: 3 });
+      else voice('sine', mtof(root), t, STEP * 1.2, 0.16, { hold: 0.5 });
     } else if (cfg.bass === 'long' && (s16 === 0 || s16 === 8)) {
       voice('triangle', mtof(root), t, STEP * 7, 0.35, { hold: 0.7 });
     } else if (cfg.bass === 'oompah' && s16 % 4 === 0) {
@@ -1005,7 +1111,13 @@
       if (cfg.arp === 'up' && s16 % 2 === 0) m = tones[(s16 / 2) % 4] + 12;
       else if (cfg.arp === 'fast') m = tones[s16 % 4] + 12;
       else if (cfg.arp === 'wave' && s16 % 2 === 0) m = [tones[0], tones[1], tones[2], tones[3], tones[2], tones[1], tones[0], tones[1]][s16 / 2] + 12;
-      if (m != null) voice('square', mtof(m), t, STEP * 0.9, cfg.arp === 'fast' ? 0.035 : 0.045, { lp: 2600 });
+      if (m != null && cfg.arpTone === 'sparkle') {
+        // heaven: a glittering pluck (triangle with a sine octave) with a reverb send
+        const v = cfg.arp === 'fast' ? 0.03 : 0.045;
+        voice('triangle', mtof(m), t, STEP * 1.4, v, { attack: 0.002, hold: 0.2, release: 0.07 });
+        voice('sine', mtof(m + 12), t, STEP * 1.0, v * 0.4, { attack: 0.002, hold: 0.2, release: 0.05 });
+        if (A.reverbIn) voice('triangle', mtof(m), t, STEP * 1.4, v * 0.5, { dest: A.reverbIn, attack: 0.002, hold: 0.2, release: 0.07 });
+      } else if (m != null) voice('square', mtof(m), t, STEP * 0.9, cfg.arp === 'fast' ? 0.035 : 0.045, { lp: 2600 });
     }
 
     // ---- pad ----
@@ -1073,6 +1185,30 @@
           voice('sine', mtof(n.midi + 12), t, dur, 0.035, { attack: 0.015, hold: 0.8, release: 0.05 });
           voice('triangle', mtof(n.midi - 12), t, dur, 0.03, { attack: 0.012, hold: 0.85, release: 0.05 });
           noise(t, 0.04, 0.025, 'bandpass', 2800, null, 2);
+        } else if (cfg.tone === 'super') {
+          // heaven: a supersaw, five detuned saws with a sine octave below and a reverb send
+          [-18, -9, 0, 9, 18].forEach((c) => voice('sawtooth', mtof(n.midi), t, dur, 0.03, { attack: 0.01, hold: 0.8, release: 0.06, lp: 4200, detune: c }));
+          voice('sine', mtof(n.midi - 12), t, dur, 0.05, { attack: 0.01, hold: 0.8, release: 0.05 });
+          if (A.reverbIn) voice('sawtooth', mtof(n.midi), t, dur, 0.03, { dest: A.reverbIn, attack: 0.01, hold: 0.7, release: 0.06, lp: 3000 });
+        } else if (cfg.tone === 'sparkle') {
+          // heaven: a bright pluck lead with a sine octave on top, a reverb send and a soft echo
+          voice('triangle', mtof(n.midi), t, Math.min(dur, STEP * 2.4), 0.13, { attack: 0.002, hold: 0.3, release: 0.12, lp: 3800 });
+          voice('sine', mtof(n.midi + 12), t, Math.min(dur, STEP * 1.6), 0.04, { attack: 0.002, hold: 0.3 });
+          voice('triangle', mtof(n.midi), t + STEP * 3, Math.min(dur, STEP * 2), 0.04, { attack: 0.002, hold: 0.3, release: 0.1, lp: 3000 });
+          if (A.reverbIn) voice('triangle', mtof(n.midi), t, dur, 0.06, { dest: A.reverbIn, attack: 0.002, hold: 0.3 });
+        } else if (cfg.tone === 'bells') {
+          // heaven: glockenspiel bells with a long, quiet echo (two repeats) and a soft sine tail
+          glockNote(t, n.midi + 12);
+          glockNote(t + STEP * 3, n.midi + 12, 0.35);
+          glockNote(t + STEP * 6, n.midi + 12, 0.15);
+          voice('sine', mtof(n.midi), t, dur * 1.6, 0.05, { attack: 0.01, hold: 0.5 });
+        } else if (cfg.tone === 'soar') {
+          // heaven: a soaring lead for the wings: detuned saws that swell into each note, plus a sine octave
+          const f = mtof(n.midi);
+          voice('sawtooth', f, t, dur, 0.06, { attack: 0.05, hold: 0.9, release: 0.1, lp: 2400, lpEnd: 4200, detune: -8 });
+          voice('sawtooth', f, t, dur, 0.05, { attack: 0.05, hold: 0.9, release: 0.1, lp: 2400, lpEnd: 4200, detune: 8 });
+          voice('sine', f * 2, t, dur, 0.03, { attack: 0.06, hold: 0.85 });
+          if (A.reverbIn) voice('sawtooth', f, t, dur, 0.03, { dest: A.reverbIn, attack: 0.05, hold: 0.8, lp: 2600 });
         } else if (cfg.tone === 'glock') {
           // a glockenspiel / music box, an octave up
           glockNote(t, n.midi + 12);

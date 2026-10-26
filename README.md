@@ -1,6 +1,6 @@
 # VippeDash
 
-A Geometry Dash–style runner starring **Vippe**. There are nine levels: **1 · Stratusvägens alla helgon** (very easy, about 2:00) rides down a quiet suburban street on Halloween: candy, zucchini, footballs and dumbbells from four neighbours, then a rocket skateboard to the finish. **2 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **3 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **4 · Vilda skogen** (hard, about 1:37) runs through the wild forest, **5 · Schackmatt** (very hard, about 1:38) plays on a giant chessboard with **Brädet › Springarna › Tornet › Kungens tron**, **6 · Nöjesparken** (very hard, about 2:00) runs through an amusement park with the new cart mode on the log flume, a Ferris wheel, a fun house, spinning barrels, a cannon and a roller coaster loop, **7 · Djupet** (very hard, about 1:38) dives through **Korallrevet › Manetsvärmen › Valens buk › Ytan**, **8 · Amazonas** (very hard, about 2:00) runs through the rainforest along the Amazon with the new raft mode on the rapids, the scary Tripp Troppen hill, and a jaguar chase, and **9 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
+A Geometry Dash–style runner starring **Vippe**. There are ten levels: **1 · Stratusvägens alla helgon** (very easy, about 2:00) rides down a quiet suburban street on Halloween: candy, zucchini, footballs and dumbbells from four neighbours, then a rocket skateboard to the finish. **2 · Hem till Storvreta** (easy, about 2 minutes) runs through **Uppland → Uppsala → Storvreta**, **3 · Tunnelbanan** (medium, about 1:29) runs through the Stockholm subway and down into the sewers, **4 · Vilda skogen** (hard, about 1:37) runs through the wild forest, **5 · Schackmatt** (very hard, about 1:38) plays on a giant chessboard with **Brädet › Springarna › Tornet › Kungens tron**, **6 · Nöjesparken** (very hard, about 2:00) runs through an amusement park with the new cart mode on the log flume, a Ferris wheel, a fun house, spinning barrels, a cannon and a roller coaster loop, **7 · Djupet** (very hard, about 1:38) dives through **Korallrevet › Manetsvärmen › Valens buk › Ytan**, **8 · Amazonas** (very hard, about 2:00) runs through the rainforest along the Amazon with the new raft mode on the rapids, the scary Tripp Troppen hill, and a jaguar chase, **9 · Mardrömmen** (nightmare, about 1:48, age 16+) runs from a graveyard at midnight through a convent, the catacombs and a haunted circus, with jump scares and strobe lights, and **10 · Sjunde himlen** (insane, about 2:20, unreleased) climbs through heaven, from the pearly gates and the golden streets where angels dive at you, on angel wings through the palace and across the stars in low gravity, to the archangel's sword in the throne room. If you crash, you restart from the last checkpoint. Finishing a level wins coins, and the coins buy new skins in the shop.
 
 ## Play
 
@@ -113,11 +113,11 @@ Debug and testing URL parameters:
 
 You win coins every time you finish a level:
 
-| | Level 1 (very easy) | Level 2 (easy) | Level 3 (medium) | Level 4 (hard) | Level 5 (very hard) | Level 6 (very hard) | Level 7 (very hard) | Level 8 (very hard) | Level 9 (nightmare) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Level cleared | 30 | 50 | 100 | 150 | 175 | 190 | 200 | 225 | 250 |
-| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 30 | up to 50 | up to 100 | up to 150 | up to 175 | up to 190 | up to 200 | up to 225 | up to 250 |
-| First time you beat the level | 30 | 50 | 100 | 150 | 175 | 190 | 200 | 225 | 250 |
+| | Level 1 (very easy) | Level 2 (easy) | Level 3 (medium) | Level 4 (hard) | Level 5 (very hard) | Level 6 (very hard) | Level 7 (very hard) | Level 8 (very hard) | Level 9 (nightmare) | Level 10 (insane) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Level cleared | 30 | 50 | 100 | 150 | 175 | 190 | 200 | 225 | 250 | 300 |
+| Crash bonus (0 crashes; 10% less per crash, gone at 10 crashes) | up to 30 | up to 50 | up to 100 | up to 150 | up to 175 | up to 190 | up to 200 | up to 225 | up to 250 | up to 300 |
+| First time you beat the level | 30 | 50 | 100 | 150 | 175 | 190 | 200 | 225 | 250 | 300 |
 
 So a harder level and fewer crashes give more coins. The coin total is shown at the top right of the menu.
 
@@ -310,6 +310,20 @@ The strobe flashes are locked to the music at most once per beat (2.6 per second
 
 Music: its own doom-metal soundtrack in C minor, in half-time so it feels like 78 BPM. It uses distorted guitar, organ, a choir, church bells, a detuned circus organ in the circus and a double-time climax in the ghost train. The melodies are original: the brief was "in the style of" the doom-metal song *Solitude* by Candlemass, and nothing is copied from it.
 
+## Level 10: Sjunde himlen (≈ 2:20, 4 checkpoints)
+
+Heaven: beautiful, bright and golden all the way, and the hardest level in the game. It is harder than Mardrömmen in two ways: the tightest presses (about 67 ms) come in long chains with few rests, and there are only four checkpoints, about 35 seconds apart. There is no health bar. Classic angels (white robe, golden halo, big feathered wings) dive down out of the sky at you all through the level, and an archangel waits in the throne room. The level is unreleased for now: it only shows on a local run (`localOnly`).
+
+| Section | Where | What happens |
+| --- | --- | --- |
+| **Pärleporten** | golden clouds at the pearly gates, St. Peter at his lectern | Light-crystal spikes, cloud blocks and golden stairs over spike beds, up through the open pearly gate. The first angels dive at you, one at a time and then in formation. |
+| **Guldgatorna** | the golden streets, with marble statues, harps and fountains | Angels dive in waves on the beat (four in a row, low-high-low formations), between triple spikes, marble pillars, orbs and pads. |
+| **Palatset** | the palace halls, on angel wings | **Ship mode** with angel wings: pairs of marble pillars from floor and ceiling every two beats, cherubs hovering in the halls, and angels diving into the gaps. |
+| **Stjärnhimlen** | the starry sky | **Low gravity**: jumps go twice as high and far, and falls are slow. Long floating hops between islands and crystal star platforms over the void, angels sweeping over the landings, and orbs over a wide gap. |
+| **Tronsalen** | the throne room, on a red carpet | The **archangel** hovers ahead of you and hews his flaming sword into the floor on the beat, sending waves of light rolling at you, mixed with spikes, marble steps and angels. The hardest combinations come last, before the throne. |
+
+Music: its own heavenly electronic soundtrack in D major: shiny supersaw and pluck synths, choir pads, arpeggios and a four-on-the-floor beat, a bright contrast to Mardrömmen's doom metal. The gates start with a shimmering intro, the streets have the main hook, the palace a soaring lead, the starry sky floats in half-time with echoing bells, and the throne room is the climax with a key change to E major for the last eight bars.
+
 ## How it's built
 
 Everything is vanilla JavaScript with Canvas 2D and WebAudio. The game has **no image or audio files**: Vippe, the scenery, the neighbours and the soundtrack are all drawn and synthesised in code. The PNGs in `icons/` are only the app icon, drawn by `tools/icons.html`. The music is generated live at 156 BPM, which is exactly 4 blocks per beat, so obstacles land on the beat. When you respawn, the music restarts from the checkpoint.
@@ -453,6 +467,18 @@ b.lightning(x0, x1);                      // lightning now and then (with thunde
 b.scare(x, 'nun');                        // a jump scare: nun, window, skull, clown, mirror, duo, final
 ```
 
+Level 10 (Sjunde himlen) adds:
+
+```js
+b.angel(x, y, { k, max, top, p, out, rise }); // a diving angel: it plunges from `top` blocks up and `max` to the right,
+                             // flies at you at k blocks per block you run, meets you exactly at (x, y) and climbs
+                             // `rise` blocks over the last `out` blocks behind you. y 0 = jump it, y 1.5 = stay down
+b.lowgrav(744, 1032, 0.5);   // low gravity for the cube: gravity and the fall-speed cap are g x normal
+b.archangel(x0, x1);         // the archangel boss: hovers KING_AHEAD blocks ahead from x0 to x1 (drawing only)
+b.wave(x, y, { k });         // a wave of light rolling at you from the archangel's feet ('roll' motion, like barrel());
+                             // it starts when you are max / k blocks before x, and the sword strikes right then
+```
+
 Moving hazards are a function of the player's x (the level clock `x / 10.4`), so the physics, the bot and the drawing always agree. Every hazard has a `dmg` value used by the health bar. A `jack`'s `rise` must stay under about 1.3 so a jump can clear an open clown (the level uses 0.8).
 
 After changing a level, verify it with the command line:
@@ -472,7 +498,7 @@ Options:
 - `--save FILE` — save a JSON baseline of all levels (timing windows are included)
 - `--compare FILE` — compare against a saved baseline; lists only segments that differ and exit code reflects the new run
 
-Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 (Stratusvägen) is the easiest, with very wide timing windows. Level 2's tightest jumps are around 100 ms. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms. Level 4 is harder: its triple spikes have about 80 ms too, and it's longer. Level 5 (Schackmatt) sits between level 4 and level 7: most of its tightest presses are around 83 ms, with one 67 ms section in the queen's hall. Level 7's tightest presses are about 67 ms, with more of them than level 5.
+Alternatively, open `tools/verify.html` through a local server. Add `?level=forest` to check one level only, and `windows` (for example `?level=forest&windows`) to also measure how much timing slack each jump has. Level 1 (Stratusvägen) is the easiest, with very wide timing windows. Level 2's tightest jumps are around 100 ms. Level 3's tightest jumps (the live rail on the tracks, the snapping crocodile heads) have about 80 ms. Level 4 is harder: its triple spikes have about 80 ms too, and it's longer. Level 5 (Schackmatt) sits between level 4 and level 7: most of its tightest presses are around 83 ms, with one 67 ms section in the queen's hall. Level 7's tightest presses are about 67 ms, with more of them than level 5. Level 9 (Mardrömmen) has 67 ms in almost every segment. Level 10 (Sjunde himlen) has 67 ms too, but in long chains: the median press in its last segment is 67 ms, and there are only four checkpoints.
 
 ### Linting a level
 

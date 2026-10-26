@@ -275,7 +275,7 @@
     return m + ':' + ('0' + s).slice(-2) + '.' + d;
   }
   function fmtCrashes(c) { return c + (c === 1 ? ' crash' : ' crashes'); }
-  const DIFF_COLOR = { 1: '#3f8cff', 2: '#2ea84a', 3: '#d2412f', 4: '#a8241c', 5: '#7a0010' }; // matches .lnum in style.css
+  const DIFF_COLOR = { 1: '#3f8cff', 2: '#2ea84a', 3: '#d2412f', 4: '#a8241c', 5: '#7a0010', 6: 'linear-gradient(160deg, #fffbe8, #ffd85a 70%, #e0a820)' }; // matches .lnum in style.css
 
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
 
@@ -311,6 +311,7 @@
       const badge = document.createElement('span');
       badge.className = 'lnum';
       badge.style.background = DIFF_COLOR[L.difficulty] || DIFF_COLOR[1];
+      if (L.difficulty === 6) badge.style.color = '#6b4400'; // dark number on the pale gold badge
       badge.textContent = L.num;
       b.appendChild(badge);
       b.onclick = () => selectBoardLevel(L.id);
