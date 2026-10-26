@@ -12743,17 +12743,51 @@
     }
   }
   // a pair of wings (mirrored) at the origin; phi = angle from straight up (0 up .. 90 out .. 180 down), L = length
+  // A wing is ~40 feathers, far too many shapes to draw every frame for several angels at once (it made the game
+  // lag). So each wing (one size, one colour set, at the screen's pixel scale) is drawn once into a small canvas
+  // with a soft violet glow, and wingPair() just rotates, mirrors and copies that picture.
+  const wingCache = new Map();
+  function wingSprite(L, col, ps) {
+    const key = Math.round(L * ps * 2) + '|' + col.join(',');
+    let c = wingCache.get(key);
+    if (c) return c;
+    if (wingCache.size > 48) wingCache.clear();
+    // the wing fits in x -0.15L..1.45L, y -0.35L..0.95L (feathers, the leading edge and its outline), plus the glow
+    const pad = 8, x0 = -0.15 * L - pad, y0 = -0.35 * L - pad, w = 1.6 * L + pad * 2, h = 1.3 * L + pad * 2;
+    c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil(w * ps));
+    c.height = Math.max(1, Math.ceil(h * ps));
+    const g = c.getContext('2d');
+    g.scale(ps, ps);
+    g.translate(-x0, -y0);
+    g.lineJoin = 'round';
+    g.lineCap = 'round';
+    g.shadowColor = 'rgba(100,70,170,0.7)';
+    g.shadowBlur = 6 * ps;
+    g.strokeStyle = 'rgba(110,84,170,0.62)';
+    g.fillStyle = col[0];
+    featherWing(g, L, col, 0);
+    g.shadowBlur = 0;
+    g.shadowColor = 'rgba(0,0,0,0)';
+    g.strokeStyle = col[2];
+    featherWing(g, L, col, 1);
+    c.x0 = x0;
+    c.y0 = y0;
+    c.w = w;
+    c.h = h;
+    wingCache.set(key, c);
+    return c;
+  }
   function wingPair(ctx, L, phi, tint) {
     const col = tint || ['#ffffff', '#fffdf4', '#b9a36a'];
+    const m = ctx.getTransform();
+    const ps = Math.min(3, Math.max(0.25, Math.round(Math.hypot(m.a, m.b) * 4) / 4)); // device pixels per px, in steps of 1/4
+    const spr = wingSprite(L, col, ps);
     for (const sd of [-1, 1]) {
       ctx.save();
       ctx.scale(sd, 1);
       ctx.rotate(phi - Math.PI / 2);
-      ctx.strokeStyle = 'rgba(122,100,172,0.45)';
-      ctx.fillStyle = col[0];
-      featherWing(ctx, L, col, 0);
-      ctx.strokeStyle = col[2];
-      featherWing(ctx, L, col, 1);
+      ctx.drawImage(spr, spr.x0, spr.y0, spr.w, spr.h);
       ctx.restore();
     }
   }
@@ -12767,9 +12801,8 @@
     ctx.lineCap = 'round';
     glowAt(ctx, 0, 0, u * 1.55, HV_GOLD, 0.55 + 0.1 * Math.sin(t * 6));
     ctx.rotate(-a);
-    // a violet drop shadow lifts the white figure off the pale sky
-    ctx.shadowColor = 'rgba(100,70,170,0.8)';
-    ctx.shadowBlur = 9;
+    // no shadowBlur here: it was redrawn for every feather (~160 shapes per angel) and made the game lag whenever
+    // angels were on screen. The wide violet outline pass in wingPair() lifts the white figure off the pale sky instead.
     // wing pose: swept back at the start of the dive, spread at the bottom, beating as it climbs away
     let phi = k < 0.5 ? U.lerp(2.75, 1.45, U.smooth(k / 0.5)) : U.lerp(1.45, 0.55, U.smooth((k - 0.5) / 0.5));
     if (k > 0.55) phi += Math.sin(t * 13) * 0.2 * U.clamp((k - 0.55) * 3, 0, 1);
@@ -14415,12 +14448,9 @@
     ctx.translate(-x, -feet);
     const cx = x, sh = feet - 3.0 * b; // sh = shoulder line
     // the aura and the halo-light behind him
-    const aur = ctx.createRadialGradient(cx, sh, 10, cx, sh, 4.4 * b);
-    aur.addColorStop(0, 'rgba(255,255,230,0.85)');
-    aur.addColorStop(0.5, 'rgba(255,230,150,0.4)');
-    aur.addColorStop(1, 'rgba(255,220,120,0)');
-    ctx.fillStyle = aur;
-    ctx.fillRect(cx - 4.5 * b, sh - 4.5 * b, 9 * b, 9 * b);
+    // (the cached glow sprite, not a new 9-block radial gradient every frame)
+    glowAt(ctx, cx, sh, 4.4 * b, '#ffe9a0', 0.75);
+    glowAt(ctx, cx, sh, 2.0 * b, '#fffbe6', 0.6);
     // the huge wings, slowly beating
     const beat = Math.sin(t * 1.7) * 0.1;
     ctx.save();
