@@ -479,6 +479,7 @@
   function renderWin(levelId) {
     const el = $('winBoard');
     el.innerHTML = '';
+    if (G.practiceWin) return; // a practice win has no board
     const def = VD.levelDef(levelId);
     const title = document.createElement('div');
     title.className = 'wbtitle';

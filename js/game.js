@@ -2,7 +2,7 @@
 (function () {
   const VD = (window.VD = window.VD || {});
   const P = VD.PHYS, Ph = VD.Physics, R = VD.Render, AU = VD.Audio, Art = VD.Art, U = VD.U;
-  const G = (VD.Game = { particles: [], clock: 0, flash: 0, shake: 0, held: false, tickN: 0 });
+  const G = (VD.Game = { particles: [], clock: 0, flash: 0, shake: 0, held: false, tickN: 0, practice: false, practiceCps: [] });
 
   const store = {
     get(k, d) {
@@ -59,6 +59,8 @@
     G.camX = -4;
     G.camV = G.camVT = 0;
     G.hpMax = G.levelDef.health || 0; // 0 means no health bar; refilled to full on G.start()
+    G.practice = false; // practice mode never follows you to another level
+    G.practiceCps = [];
   }
   // { levelId: { best: %, wins, fewest: crashes } }. Older saves only had one level's best/wins.
   function loadProgress() {
@@ -138,6 +140,7 @@
         return;
       }
       if (e.code === 'KeyM') return toggleMute();
+      if (G.practice && (e.code === 'KeyZ' || e.code === 'KeyX')) return e.code === 'KeyZ' ? practiceSet() : practiceRemove();
       if (G.state === 'menu') {
         if (G.shopOpen) {
           if (e.code === 'Escape' || e.code === 'Backspace') closeShop();
@@ -188,6 +191,11 @@
       const r = cv.getBoundingClientRect();
       const lx = ((e.clientX - r.left) / r.width) * R.W, ly = ((e.clientY - r.top) / r.height) * R.H;
       if (lx > R.W - 70 && ly < 66 && G.state === 'play') return G.pause();
+      // practice buttons (bottom left) are caught here so a press on them never queues a jump
+      if (G.practice && (G.state === 'play' || G.state === 'dead')) {
+        const hit = R.practiceHit(lx, ly);
+        if (hit) return hit === 'set' ? practiceSet() : practiceRemove();
+      }
       if (G.state !== 'play' && G.state !== 'dead') return;
       pointers.add(e.pointerId);
       updateHeld();
@@ -334,6 +342,14 @@
       G.bot = true;
       if (G.s) computeBot(G.s);
     }
+    if ('practice' in q && G.state === 'play') {
+      // practice mode on, with one checkpoint set where the run starts (after hp= so it keeps the same state)
+      G.practice = true;
+      const pcp = Ph.clone(G.s);
+      pcp.x += +q.practice || 0; // practice=6 puts the checkpoint 6 blocks ahead, so a screenshot can show the diamond
+      G.practiceCps = [pcp];
+    }
+    if ('pause' in q && G.state === 'play') G.pause(); // opens the pause menu, for screenshots of it
     if ('god' in q) G.god = true;
     if ('mute' in q) {
       AU.setMuted(true); // session only: never persisted to the saved mute setting
@@ -362,6 +378,17 @@
     $('winMenu').onclick = () => G.toMenu();
     $('goRestart').onclick = () => G.start();
     $('goMenu').onclick = () => G.toMenu();
+    $('practiceBtn').onclick = () => {
+      if (G.practice) {
+        // leaving practice starts the level over, so practising your way forward can't turn into a normal win
+        G.practice = false;
+        G.start();
+      } else {
+        G.practice = true;
+        G.practiceCps = [];
+        G.resume();
+      }
+    };
     $('strobeBtn').onclick = () => {
       G.strobeOn = !G.strobeOn;
       store.set('strobe', G.strobeOn);
@@ -586,6 +613,19 @@
   function updateLowHp() {
     G.lowHp = G.hpMax > 0 && G.hp > 0 && G.hp < 30;
   }
+  function updatePracticeBtn() {
+    $('practiceBtn').innerHTML = '🎯&nbsp; Practice: ' + (G.practice ? 'On' : 'Off');
+  }
+  // practice mode: a checkpoint is a full copy of the physics state, so speed, mode and layer come back exactly
+  function practiceSet() {
+    if (G.state !== 'play' || !G.s || G.s.dead) return;
+    G.practiceCps.push(Ph.clone(G.s));
+    AU.sfx('checkpoint');
+  }
+  function practiceRemove() {
+    if ((G.state !== 'play' && G.state !== 'dead') || !G.practiceCps.length) return;
+    G.practiceCps.pop();
+  }
   function updateStrobeBtn() {
     const btn = $('strobeBtn');
     btn.classList.toggle('hidden', !G.levelDef.strobe);
@@ -603,6 +643,7 @@
     show('win', false);
     show('gameover', false);
     G.cpIndex = cpIndex || 0;
+    G.practiceCps = []; // a restart wipes the practice checkpoints, but practice itself stays on
     G.attempts = 0;
     G.deaths = 0;
     G.runTime = 0;
@@ -624,8 +665,16 @@
   };
 
   G.respawn = function () {
-    const cp = G.lvl.checkpoints[G.cpIndex];
-    G.s = Ph.spawn(cp);
+    let cp = G.lvl.checkpoints[G.cpIndex];
+    const pcp = G.practice && G.practiceCps.length ? G.practiceCps[G.practiceCps.length - 1] : null;
+    if (pcp) {
+      // practice: come back exactly as saved (cloned again so the saved copy is never mutated by the run)
+      G.s = Ph.clone(pcp);
+      G.cpIndex = G.lvl.checkpointAt(pcp.x);
+      cp = { x: pcp.x, layer: pcp.layer };
+    } else {
+      G.s = Ph.spawn(cp);
+    }
     G.attempts++;
     G.attemptText = { x: cp.x, n: G.attempts, layer: cp.layer };
     G.camV = G.camVT = G.lvl.depthOf(G.s.layer);
@@ -658,6 +707,7 @@
     AU.stopMusic(0.05);
     releaseAll();
     updateStrobeBtn();
+    updatePracticeBtn();
     show('pause', true);
   };
   G.resume = function () {
@@ -670,6 +720,8 @@
     AU.startMusic(Ph.timeAt(G.lvl, G.s.x));
   };
   G.toMenu = function () {
+    G.practice = false;
+    G.practiceCps = [];
     AU.stopMusic(0.1);
     show('pause', false);
     show('win', false);
@@ -700,14 +752,14 @@
     const s = G.s, ph = Ph.boxH(s);
     const cx = s.x + 0.5, cy = s.y + ph / 2;
     const health = G.hpMax > 0;
-    if (health) {
+    if (health && !G.practice) {
       AU.sfx('hurt');
       const dmg = s.dmg || 12;
       G.hp = Math.max(0, G.hp - dmg);
       G.hurt = { n: dmg, t: 0, x: cx, y: cy };
       updateLowHp();
     } else {
-      AU.sfx('death');
+      AU.sfx(health ? 'hurt' : 'death');
     }
     const k = Art.SKINS[G.skin];
     const cols = health
@@ -720,7 +772,7 @@
     particle({ x: cx, y: cy, life: 0.45, size: 90, color: '#ffffff', ring: true });
     const pct = Math.floor(U.clamp(s.x / G.lvl.finishX, 0, 1) * 100);
     const p = G.progress[G.levelDef.id];
-    if (pct > p.best) {
+    if (!G.practice && pct > p.best) {
       p.best = pct;
       saveProgress();
     }
@@ -739,6 +791,18 @@
     G.winAge = 0;
     G.fwT = 0;
     AU.sfx(G.hpMax > 0 ? 'bell' : 'win');
+    if (G.practice) {
+      // practice never counts: no reward, progress, stats or leaderboard. Turned off here so the buttons
+      // on the win screen start a normal run.
+      G.practiceWin = true;
+      G.practice = false;
+      G.practiceCps = [];
+      G.reward = null;
+      G.finalTime = G.runTime;
+      G.flash = 0.5;
+      return;
+    }
+    G.practiceWin = false;
     const p = G.progress[G.levelDef.id];
     G.reward = levelReward(G.levelDef, G.deaths, p.wins === 0, G.runCoins || 0);
     G.coinsBefore = G.coins;
@@ -760,6 +824,18 @@
   function showWin() {
     G.state = 'won';
     const def = G.levelDef, r = G.reward;
+    if (G.practiceWin) {
+      $('winTitle').textContent = 'Practice complete';
+      $('winSub').textContent = 'Nothing is saved from practice. Now try it for real!';
+      $('stats').innerHTML = '<div><b>' + G.attempts + '</b><span>attempts</span></div>';
+      $('reward').innerHTML = '';
+      $('next').classList.add('hidden');
+      $('again').classList.add('big');
+      show('win', true);
+      if (VD.Board) $('winBoard').innerHTML = '';
+      G.countUp = null;
+      return;
+    }
     const m = Math.floor(G.finalTime / 60), sec = Math.floor(G.finalTime % 60);
     $('winTitle').textContent = def.winTitle;
     $('winSub').textContent = def.winSub;
@@ -1076,7 +1152,7 @@
     } else if (G.state === 'dead') {
       G.deadAge += dt;
       if (G.deadAge >= 0.9) {
-        if (G.hpMax && G.hp <= 0) gameOver();
+        if (G.hpMax && G.hp <= 0 && !G.practice) gameOver();
         else G.respawn();
       }
     } else if (G.state === 'winning' || G.state === 'won') {

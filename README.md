@@ -567,10 +567,16 @@ The hash (or query string) also accepts URL parameters to drop straight into a s
 | `bot` | The bot plays |
 | `god` | God mode |
 | `mute` | Start muted (not saved) |
+| `practice=<n>` | Start in practice mode with one checkpoint *n* blocks ahead of the start position (`practice` alone = at the start) |
+| `pause` | Open the pause menu straight away (for screenshots of it) |
 | `freeze` | Stop the game at the start position (for screenshots); any key, click or tap continues |
 | `shop` | Open the shop (on the tab of the character you're wearing) |
 | `fakelevels=<n>` | (menu only) Pad the level list with copies of the real levels up to *n* cards, to test the menu layout |
 | `menulevel=<id>` | Select that level in the menu without starting a run (different from `level=`, which starts a run) |
+
+### Practice mode
+
+Pause a level and press **Practice: Off** to turn practice mode on. Two buttons appear bottom left: set a checkpoint where you are (green diamond; keyboard **Z**) and remove the latest one (red diamond; **X**). Each checkpoint saves the full state (speed, mode, layer), shows as a green diamond in the world, and you respawn at the latest one after a crash. Health levels lose no HP and have no game over. Practice never counts: no reward, best %, statistics or leaderboard. Reaching the finish shows "Practice complete" and turns practice off. Switching practice off, or leaving to the menu or another level, restarts from the beginning; "Restart from the beginning" keeps practice on but clears the checkpoints.
 
 Examples: `index.html?debug&level=metro&x=500&freeze` or `index.html#debug&level=forest&cp=5`. Parameters can go after `?` or `#`.
 

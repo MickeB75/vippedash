@@ -6500,6 +6500,13 @@
         const active = G.state !== 'menu' && G.cpIndex >= cp.index;
         Art.checkpoint(ctx, sx(cp.x, camX), GY, BS, active, t);
       }
+      // practice checkpoints: a green diamond where the player stood (centre of the box)
+      if (G.practice && G.practiceCps) {
+        for (const pc of G.practiceCps) {
+          if ((pc.layer || 0) !== L || pc.x < camX - 2 || pc.x > camX + 30) continue;
+          practiceDiamond(ctx, sx(pc.x + 0.5, camX), sy(pc.y + VD.Physics.boxH(pc) / 2) + Math.sin(t * 3) * 3, 18, '#3ddc5a');
+        }
+      }
     }
     for (const o of vis) {
       if (laneFilter === 1 && o.lane !== 1) continue;
@@ -6954,6 +6961,28 @@
   };
 
   // ------------------------------------------------------------------ HUD
+  // practice mode buttons (game coordinates): set a checkpoint, and right next to it remove the last one
+  const PRACTICE_BTN = { set: { x: 20, y: H - 90, w: 70 }, del: { x: 102, y: H - 90, w: 70 } };
+  R.practiceHit = function (lx, ly) {
+    for (const k of ['set', 'del']) {
+      const b = PRACTICE_BTN[k];
+      if (lx >= b.x && lx <= b.x + b.w && ly >= b.y && ly <= b.y + b.w) return k;
+    }
+    return null;
+  };
+  function practiceDiamond(ctx, cx, cy, r, col) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r * 0.72, cy);
+    ctx.lineTo(cx, cy + r);
+    ctx.lineTo(cx - r * 0.72, cy);
+    ctx.closePath();
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.stroke();
+  }
   R.drawHUD = function (ctx, G, t, camX, mirrored) {
     const lvl = this.lvl;
     const prog = G.s ? U.clamp(G.s.x / lvl.finishX, 0, 1) : 0;
@@ -6988,6 +7017,43 @@
     ctx.fillStyle = '#fff';
     ctx.fillRect(W - 44, 23, 6, 22);
     ctx.fillRect(W - 32, 23, 6, 22);
+    // practice mode: label + the two checkpoint buttons bottom left (hit areas in R.practiceHit, used by game.js)
+    if (G.practice && (G.state === 'play' || G.state === 'dead')) {
+      ctx.font = '22px ' + FONT;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillStyle = '#5cff7a';
+      ctx.strokeText('PRACTICE', 14, 80);
+      ctx.fillText('PRACTICE', 14, 80);
+      const has = G.practiceCps.length > 0;
+      for (const k of ['set', 'del']) {
+        const b = PRACTICE_BTN[k];
+        ctx.globalAlpha = k === 'del' && !has ? 0.35 : 1;
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        Art.rr(ctx, b.x, b.y, b.w, b.w, 12);
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.stroke();
+        const cx = b.x + b.w / 2, cy = b.y + b.w / 2;
+        practiceDiamond(ctx, cx, cy, 20, k === 'set' ? '#3ddc5a' : '#e0344a');
+        if (k === 'del') {
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 5;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(cx - 8, cy - 8);
+          ctx.lineTo(cx + 8, cy + 8);
+          ctx.moveTo(cx + 8, cy - 8);
+          ctx.lineTo(cx - 8, cy + 8);
+          ctx.stroke();
+          ctx.lineCap = 'butt';
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
     // area banner
     const b = G.banner;
     if (b && b.t < 3.2) {
