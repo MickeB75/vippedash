@@ -3656,7 +3656,7 @@
     },
     {
       id: 'heaven', num: 10, name: 'Sjunde himlen', route: 'Pärleporten › Guldgatorna › Palatset › Stjärnhimlen › Tronsalen',
-      difficulty: 6, diffName: 'Insane', reward: 300, localOnly: true,
+      difficulty: 6, diffName: 'Insane', reward: 300,
       winTitle: 'Välkommen till sjunde himlen!',
       winSub: "Through the pearly gates, down the golden streets, on angel wings through the palace, across the stars and past the archangel's sword, all the way to the throne.",
       build: buildHeaven, theme: HEAVEN_THEME,
