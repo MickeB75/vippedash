@@ -6962,7 +6962,7 @@
 
   // ------------------------------------------------------------------ HUD
   // practice mode buttons (game coordinates): set a checkpoint, and right next to it remove the last one
-  const PRACTICE_BTN = { set: { x: 20, y: H - 90, w: 70 }, del: { x: 102, y: H - 90, w: 70 } };
+  const PRACTICE_BTN = { set: { x: 20, y: H - 125, w: 105 }, del: { x: 141, y: H - 125, w: 105 } };
   R.practiceHit = function (lx, ly) {
     for (const k of ['set', 'del']) {
       const b = PRACTICE_BTN[k];
@@ -7032,22 +7032,22 @@
         const b = PRACTICE_BTN[k];
         ctx.globalAlpha = k === 'del' && !has ? 0.35 : 1;
         ctx.fillStyle = 'rgba(0,0,0,0.4)';
-        Art.rr(ctx, b.x, b.y, b.w, b.w, 12);
+        Art.rr(ctx, b.x, b.y, b.w, b.w, 16);
         ctx.fill();
         ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(255,255,255,0.35)';
         ctx.stroke();
         const cx = b.x + b.w / 2, cy = b.y + b.w / 2;
-        practiceDiamond(ctx, cx, cy, 20, k === 'set' ? '#3ddc5a' : '#e0344a');
+        practiceDiamond(ctx, cx, cy, 30, k === 'set' ? '#3ddc5a' : '#e0344a');
         if (k === 'del') {
           ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 5;
+          ctx.lineWidth = 7;
           ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(cx - 8, cy - 8);
-          ctx.lineTo(cx + 8, cy + 8);
-          ctx.moveTo(cx + 8, cy - 8);
-          ctx.lineTo(cx - 8, cy + 8);
+          ctx.moveTo(cx - 12, cy - 12);
+          ctx.lineTo(cx + 12, cy + 12);
+          ctx.moveTo(cx + 12, cy - 12);
+          ctx.lineTo(cx - 12, cy + 12);
           ctx.stroke();
           ctx.lineCap = 'butt';
         }
